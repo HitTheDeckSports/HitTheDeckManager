@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+import 'app_router.dart';
+
 class HitTheDeckApp extends StatelessWidget {
   const HitTheDeckApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Hit the Deck Manager',
       debugShowCheckedModeBanner: false,
-
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.red),
-
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'Hit the Deck Manager v0.1',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
+      theme: AppTheme.light,
+      routerConfig: appRouter,
     );
   }
 }
