@@ -9,6 +9,7 @@ import 'package:hit_the_deck_manager/app/app.dart';
 import 'package:flutter/material.dart';
 import 'package:hit_the_deck_manager/app/app_router.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('app loads home screen and navigates between sections', (
@@ -23,7 +24,7 @@ void main() {
     });
 
     appRouter.go(AppRoutes.home);
-    await tester.pumpWidget(const HitTheDeckApp());
+    await tester.pumpWidget(const ProviderScope(child: HitTheDeckApp()));
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory Management'), findsOneWidget);
@@ -53,7 +54,7 @@ void main() {
 
     appRouter.go(AppRoutes.home);
 
-    await tester.pumpWidget(const HitTheDeckApp());
+    await tester.pumpWidget(const ProviderScope(child: HitTheDeckApp()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Buy Inventory'));
