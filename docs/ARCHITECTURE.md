@@ -64,37 +64,62 @@ lib/
         transactions/
 
 This structure keeps related code together and makes the application easier to maintain as it grows.
+---
 
+# Feature Layer Structure
+
+Features may use the following structure as they grow:
+
+```text
+feature_name/
+    data/
+    domain/
+    presentation/
 ---
 
 # Current Development Status
 
 Current Milestone:
 
-Project Foundation
+Phase 2 — Core Architecture
 
 Completed:
 
-- Git repository created
+- Git repository and branch workflow established
 - Flutter project created
-- Development branch created
+- Feature-first folder structure created
+- Riverpod added at the application root
+- GoRouter configured
+- Centralized route names and paths created
+- Responsive application navigation shell created
+- Main feature routes added
+- Buy Inventory and Sell Inventory routes added
+- Shared page layout component created
+- Navigation widget tests added
+- Shared page layout tests added
 
 In Progress:
 
-- Project architecture
-- Documentation
-- Application shell
+- Feature-layer architecture conventions
+- Riverpod provider organization
+- Domain model structure
+- Repository interface structure
+- Shared application utilities
+- Additional testing conventions
+- Architecture documentation updates
 
 Upcoming:
 
-- Firebase integration
-- Navigation
-- Inventory module
-- Contacts
-- Dashboard
-- Reports
-
----
+- Initial inventory domain model
+- Repository contracts
+- Firebase project integration
+- Firebase Authentication
+- Cloud Firestore integration
+- Firebase Storage integration
+- Inventory module implementation
+- Contacts module implementation
+- Transactions module implementation
+- Dashboard and reports implementation
 
 # Development Philosophy
 
