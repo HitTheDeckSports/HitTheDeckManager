@@ -4,6 +4,9 @@ abstract interface class InventoryRepository {
   /// Returns all inventory records available to the current user.
   Future<List<InventoryItem>> getInventory();
 
+  /// Watches inventory and emits a new list whenever inventory changes.
+  Stream<List<InventoryItem>> watchInventory();
+
   /// Returns one inventory item, or null when the ID does not exist.
   Future<InventoryItem?> getInventoryItem(String id);
 

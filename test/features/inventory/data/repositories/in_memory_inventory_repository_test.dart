@@ -189,5 +189,43 @@ void main() {
       expect(firstSaved.inventoryNumber, 'BAT-2607-0001');
       expect(secondSaved.inventoryNumber, 'BAT-2607-0002');
     });
+    test(
+      'watchInventory emits the initial inventory and later changes',
+      () async {
+        const initialItem = InventoryItem(
+          id: 'item-1',
+          category: InventoryCategory.bat,
+          brand: 'Combat',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 20000,
+        );
+
+        final repository = InMemoryInventoryRepository(
+          initialItems: [initialItem],
+        );
+        addTearDown(repository.dispose);
+
+        final emissions = <List<InventoryItem>>[];
+        final subscription = repository.watchInventory().listen(emissions.add);
+        addTearDown(subscription.cancel);
+
+        await Future<void>.delayed(Duration.zero);
+
+        const secondItem = InventoryItem(
+          id: 'item-2',
+          category: InventoryCategory.glove,
+          brand: 'Wilson',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 15000,
+        );
+
+        await repository.createInventoryItem(secondItem);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(emissions, hasLength(2));
+        expect(emissions.first, contains(initialItem));
+        expect(emissions.last, containsAll([initialItem, secondItem]));
+      },
+    );
   });
 }

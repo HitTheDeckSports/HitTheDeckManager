@@ -8,8 +8,8 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
   return InMemoryInventoryRepository();
 });
 
-final inventoryItemsProvider = FutureProvider<List<InventoryItem>>((ref) async {
+final inventoryItemsProvider = StreamProvider<List<InventoryItem>>((ref) {
   final repository = ref.watch(inventoryRepositoryProvider);
 
-  return repository.getInventory();
+  return repository.watchInventory();
 });

@@ -29,8 +29,6 @@ class InventoryController extends AsyncNotifier<void> {
       Error.throwWithStackTrace(savedItem.error!, savedItem.stackTrace!);
     }
 
-    ref.invalidate(inventoryItemsProvider);
-
     return savedItem.requireValue;
   }
 
@@ -53,8 +51,6 @@ class InventoryController extends AsyncNotifier<void> {
       Error.throwWithStackTrace(updatedItem.error!, updatedItem.stackTrace!);
     }
 
-    ref.invalidate(inventoryItemsProvider);
-
     return updatedItem.requireValue;
   }
 
@@ -72,7 +68,5 @@ class InventoryController extends AsyncNotifier<void> {
     if (result.hasError) {
       Error.throwWithStackTrace(result.error!, result.stackTrace!);
     }
-
-    ref.invalidate(inventoryItemsProvider);
   }
 }

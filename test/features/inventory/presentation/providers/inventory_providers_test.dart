@@ -32,12 +32,58 @@ void main() {
       final container = ProviderContainer(
         overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
       );
+
+      final subscription = container.listen(
+        inventoryItemsProvider,
+        (previous, next) {},
+      );
+
+      addTearDown(subscription.close);
       addTearDown(container.dispose);
+      addTearDown(repository.dispose);
 
       final inventory = await container.read(inventoryItemsProvider.future);
 
       expect(inventory, contains(item));
       expect(inventory, hasLength(1));
+    });
+
+    test('inventory items provider emits repository changes', () async {
+      final repository = InMemoryInventoryRepository();
+
+      final container = ProviderContainer(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      final emissions = <List<InventoryItem>>[];
+
+      final subscription = container.listen(inventoryItemsProvider, (
+        previous,
+        next,
+      ) {
+        next.whenData(emissions.add);
+      }, fireImmediately: true);
+
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      addTearDown(repository.dispose);
+
+      await Future<void>.delayed(Duration.zero);
+
+      const item = InventoryItem(
+        id: 'item-1',
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 20000,
+      );
+
+      await repository.createInventoryItem(item);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(emissions, hasLength(2));
+      expect(emissions.first, isEmpty);
+      expect(emissions.last, contains(item));
     });
   });
 }

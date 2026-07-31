@@ -19,7 +19,21 @@ void main() {
             inventoryRepositoryProvider.overrideWithValue(repository),
           ],
         );
+
+        final inventoryEmissions = <List<InventoryItem>>[];
+
+        final inventorySubscription = container.listen(inventoryItemsProvider, (
+          previous,
+          next,
+        ) {
+          next.whenData(inventoryEmissions.add);
+        }, fireImmediately: true);
+
+        addTearDown(inventorySubscription.close);
         addTearDown(container.dispose);
+        addTearDown(repository.dispose);
+
+        await Future<void>.delayed(Duration.zero);
 
         const item = InventoryItem(
           category: InventoryCategory.bat,
@@ -32,10 +46,11 @@ void main() {
             .read(inventoryControllerProvider.notifier)
             .createItem(item);
 
-        final inventory = await container.read(inventoryItemsProvider.future);
+        await Future<void>.delayed(Duration.zero);
 
         expect(savedItem.id, isNotNull);
-        expect(inventory, contains(savedItem));
+        expect(inventoryEmissions.first, isEmpty);
+        expect(inventoryEmissions.last, contains(savedItem));
         expect(
           container.read(inventoryControllerProvider),
           const AsyncData<void>(null),

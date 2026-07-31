@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:uuid/uuid.dart';
 
 import '../../domain/models/inventory_item.dart';
@@ -20,9 +22,18 @@ class InMemoryInventoryRepository implements InventoryRepository {
   final Uuid _uuid;
   final InventoryNumberGenerator _inventoryNumberGenerator;
 
+  final StreamController<List<InventoryItem>> _inventoryController =
+      StreamController<List<InventoryItem>>.broadcast();
+
   @override
   Future<List<InventoryItem>> getInventory() async {
     return List.unmodifiable(_items);
+  }
+
+  @override
+  Stream<List<InventoryItem>> watchInventory() async* {
+    yield List.unmodifiable(_items);
+    yield* _inventoryController.stream;
   }
 
   @override
@@ -63,6 +74,7 @@ class InMemoryInventoryRepository implements InventoryRepository {
     );
 
     _items.add(savedItem);
+    _notifyInventoryChanged();
 
     return savedItem;
   }
@@ -88,6 +100,7 @@ class InMemoryInventoryRepository implements InventoryRepository {
     }
 
     _items[index] = item;
+    _notifyInventoryChanged();
     return item;
   }
 
@@ -100,5 +113,14 @@ class InMemoryInventoryRepository implements InventoryRepository {
     if (_items.length == originalLength) {
       throw NotFoundException('No inventory item exists with ID $id.');
     }
+    _notifyInventoryChanged();
+  }
+
+  void _notifyInventoryChanged() {
+    _inventoryController.add(List.unmodifiable(_items));
+  }
+
+  Future<void> dispose() async {
+    await _inventoryController.close();
   }
 }
