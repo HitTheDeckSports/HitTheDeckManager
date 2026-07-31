@@ -4,6 +4,7 @@ import '../../domain/models/inventory_item.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/services/inventory_number_generator.dart';
 import '../services/in_memory_inventory_number_generator.dart';
+import '../../../../core/errors/app_exception.dart';
 
 class InMemoryInventoryRepository implements InventoryRepository {
   InMemoryInventoryRepository({
@@ -38,13 +39,15 @@ class InMemoryInventoryRepository implements InventoryRepository {
   @override
   Future<InventoryItem> createInventoryItem(InventoryItem item) async {
     if (!item.isValid) {
-      throw ArgumentError(item.validationErrors.join(' '));
+      throw ValidationException(item.validationErrors.join(' '));
     }
 
     final itemId = item.id ?? _uuid.v4();
 
     if (_items.any((existingItem) => existingItem.id == itemId)) {
-      throw StateError('An inventory item with ID $itemId already exists.');
+      throw DuplicateException(
+        'An inventory item with ID $itemId already exists.',
+      );
     }
 
     final inventoryNumber =
@@ -67,13 +70,13 @@ class InMemoryInventoryRepository implements InventoryRepository {
   @override
   Future<InventoryItem> updateInventoryItem(InventoryItem item) async {
     if (item.id == null) {
-      throw ArgumentError(
+      throw const ValidationException(
         'An inventory item must have an ID before it can be updated.',
       );
     }
 
     if (!item.isValid) {
-      throw ArgumentError(item.validationErrors.join(' '));
+      throw ValidationException(item.validationErrors.join(' '));
     }
 
     final index = _items.indexWhere(
@@ -81,7 +84,7 @@ class InMemoryInventoryRepository implements InventoryRepository {
     );
 
     if (index == -1) {
-      throw StateError('No inventory item exists with ID ${item.id}.');
+      throw NotFoundException('No inventory item exists with ID ${item.id}.');
     }
 
     _items[index] = item;
@@ -95,7 +98,7 @@ class InMemoryInventoryRepository implements InventoryRepository {
     _items.removeWhere((item) => item.id == id);
 
     if (_items.length == originalLength) {
-      throw StateError('No inventory item exists with ID $id.');
+      throw NotFoundException('No inventory item exists with ID $id.');
     }
   }
 }

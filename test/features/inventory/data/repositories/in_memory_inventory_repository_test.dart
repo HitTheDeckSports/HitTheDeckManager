@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
+import 'package:hit_the_deck_manager/core/errors/app_exception.dart';
 
 void main() {
   group('InMemoryInventoryRepository', () {
@@ -106,7 +107,10 @@ void main() {
         acquisitionValueCents: -100,
       );
 
-      expect(() => repository.createInventoryItem(item), throwsArgumentError);
+      expect(
+        () => repository.createInventoryItem(item),
+        throwsA(isA<ValidationException>()),
+      );
     });
 
     test('rejects duplicate ids', () async {
@@ -130,7 +134,10 @@ void main() {
 
       await repository.createInventoryItem(first);
 
-      expect(() => repository.createInventoryItem(second), throwsStateError);
+      expect(
+        () => repository.createInventoryItem(second),
+        throwsA(isA<DuplicateException>()),
+      );
     });
 
     test('rejects updating an item without an id', () async {
@@ -143,7 +150,10 @@ void main() {
         acquisitionValueCents: 20000,
       );
 
-      expect(() => repository.updateInventoryItem(item), throwsArgumentError);
+      expect(
+        () => repository.updateInventoryItem(item),
+        throwsA(isA<ValidationException>()),
+      );
     });
 
     test('rejects deleting an unknown item', () async {
@@ -151,7 +161,7 @@ void main() {
 
       expect(
         () => repository.deleteInventoryItem('missing-item'),
-        throwsStateError,
+        throwsA(isA<NotFoundException>()),
       );
     });
     test('assigns sequential inventory numbers when creating items', () async {

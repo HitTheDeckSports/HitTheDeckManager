@@ -5,6 +5,7 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_controller.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
+import 'package:hit_the_deck_manager/core/errors/app_exception.dart';
 
 void main() {
   group('InventoryController', () {
@@ -124,7 +125,7 @@ void main() {
         () => container
             .read(inventoryControllerProvider.notifier)
             .createItem(invalidItem),
-        throwsArgumentError,
+        throwsA(isA<ValidationException>()),
       );
 
       expect(container.read(inventoryControllerProvider).hasError, isTrue);
