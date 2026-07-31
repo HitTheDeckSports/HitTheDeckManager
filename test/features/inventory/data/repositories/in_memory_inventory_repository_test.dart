@@ -19,6 +19,8 @@ void main() {
       final inventory = await repository.getInventory();
 
       expect(savedItem.id, isNotNull);
+      expect(savedItem.inventoryNumber, isNotNull);
+      expect(savedItem.inventoryNumber, startsWith('BAT-'));
       expect(inventory, contains(savedItem));
     });
 
@@ -151,6 +153,31 @@ void main() {
         () => repository.deleteInventoryItem('missing-item'),
         throwsStateError,
       );
+    });
+    test('assigns sequential inventory numbers when creating items', () async {
+      final repository = InMemoryInventoryRepository();
+
+      final first = InventoryItem(
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 20000,
+        purchaseDate: DateTime(2026, 7, 31),
+      );
+
+      final second = InventoryItem(
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 22000,
+        purchaseDate: DateTime(2026, 7, 31),
+      );
+
+      final firstSaved = await repository.createInventoryItem(first);
+      final secondSaved = await repository.createInventoryItem(second);
+
+      expect(firstSaved.inventoryNumber, 'BAT-2607-0001');
+      expect(secondSaved.inventoryNumber, 'BAT-2607-0002');
     });
   });
 }

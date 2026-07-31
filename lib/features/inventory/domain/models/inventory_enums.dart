@@ -18,6 +18,18 @@ extension InventoryCategoryLabel on InventoryCategory {
   }
 }
 
+extension InventoryCategoryPrefix on InventoryCategory {
+  String get prefix {
+    return switch (this) {
+      InventoryCategory.bat => 'BAT',
+      InventoryCategory.glove => 'GLV',
+      InventoryCategory.catchersGear => 'CGR',
+      InventoryCategory.helmet => 'HLM',
+      InventoryCategory.other => 'OTH',
+    };
+  }
+}
+
 extension AcquisitionTypeLabel on AcquisitionType {
   String get label {
     return switch (this) {

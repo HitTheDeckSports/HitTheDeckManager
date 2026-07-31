@@ -2,16 +2,22 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/models/inventory_item.dart';
 import '../../domain/repositories/inventory_repository.dart';
+import '../../domain/services/inventory_number_generator.dart';
+import '../services/in_memory_inventory_number_generator.dart';
 
 class InMemoryInventoryRepository implements InventoryRepository {
   InMemoryInventoryRepository({
     List<InventoryItem> initialItems = const [],
     Uuid? uuid,
+    InventoryNumberGenerator? inventoryNumberGenerator,
   }) : _items = [...initialItems],
-       _uuid = uuid ?? const Uuid();
+       _uuid = uuid ?? const Uuid(),
+       _inventoryNumberGenerator =
+           inventoryNumberGenerator ?? InMemoryInventoryNumberGenerator();
 
   final List<InventoryItem> _items;
   final Uuid _uuid;
+  final InventoryNumberGenerator _inventoryNumberGenerator;
 
   @override
   Future<List<InventoryItem>> getInventory() async {
@@ -35,15 +41,26 @@ class InMemoryInventoryRepository implements InventoryRepository {
       throw ArgumentError(item.validationErrors.join(' '));
     }
 
-    final savedItem = item.copyWith(id: item.id ?? _uuid.v4());
+    final itemId = item.id ?? _uuid.v4();
 
-    if (_items.any((existingItem) => existingItem.id == savedItem.id)) {
-      throw StateError(
-        'An inventory item with ID ${savedItem.id} already exists.',
-      );
+    if (_items.any((existingItem) => existingItem.id == itemId)) {
+      throw StateError('An inventory item with ID $itemId already exists.');
     }
 
+    final inventoryNumber =
+        item.inventoryNumber ??
+        await _inventoryNumberGenerator.generate(
+          category: item.category,
+          date: item.purchaseDate ?? DateTime.now(),
+        );
+
+    final savedItem = item.copyWith(
+      id: itemId,
+      inventoryNumber: inventoryNumber,
+    );
+
     _items.add(savedItem);
+
     return savedItem;
   }
 
