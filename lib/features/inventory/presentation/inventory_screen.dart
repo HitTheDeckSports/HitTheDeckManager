@@ -7,6 +7,7 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../domain/models/inventory_enums.dart';
 import 'providers/inventory_providers.dart';
+import '../../../core/formatting/currency_formatter.dart';
 
 class InventoryScreen extends ConsumerWidget {
   const InventoryScreen({super.key});
@@ -48,9 +49,34 @@ class InventoryScreen extends ConsumerWidget {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.sports_baseball),
-                    title: Text(item.brand),
-                    subtitle: Text(item.category.label),
-                    trailing: Text(item.inventoryNumber ?? 'Not assigned'),
+                    title: Text(
+                      item.model == null || item.model!.trim().isEmpty
+                          ? item.brand
+                          : '${item.brand} ${item.model}',
+                    ),
+                    subtitle: Text(
+                      '${item.category.label} • '
+                      '${item.inventoryNumber ?? 'Not assigned'}',
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          item.askingPriceCents == null
+                              ? 'No asking price'
+                              : CurrencyFormatter.formatCents(
+                                  item.askingPriceCents!,
+                                ),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],

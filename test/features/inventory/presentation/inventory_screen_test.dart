@@ -38,8 +38,10 @@ void main() {
       inventoryNumber: 'BAT-2607-0001',
       category: InventoryCategory.bat,
       brand: 'Combat',
+      model: 'Spec H1',
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
     );
 
     final repository = InMemoryInventoryRepository(initialItems: [item]);
@@ -54,9 +56,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1 inventory item'), findsOneWidget);
-    expect(find.text('Combat'), findsOneWidget);
-    expect(find.text('Bat'), findsOneWidget);
-    expect(find.text('BAT-2607-0001'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.text('Bat • BAT-2607-0001'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'Cost: $200.00'), findsOneWidget);
     expect(find.text('No inventory items yet.'), findsNothing);
   });
 }
