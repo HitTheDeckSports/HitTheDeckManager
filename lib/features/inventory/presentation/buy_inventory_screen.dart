@@ -16,6 +16,30 @@ class BuyInventoryScreen extends ConsumerStatefulWidget {
 
 class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final _formKey = GlobalKey<FormState>();
+  String _formatDate(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+
+    return '$month/$day/${date.year}';
+  }
+
+  Future<void> _selectPurchaseDate({
+    required DateTime? currentDate,
+    required BuyInventoryFormController formController,
+  }) async {
+    final today = DateTime.now();
+
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: currentDate ?? today,
+      firstDate: DateTime(1900),
+      lastDate: today,
+    );
+
+    if (selectedDate != null) {
+      formController.setPurchaseDate(selectedDate);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,6 +160,52 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                 );
               },
               onChanged: formController.setAcquisitionValue,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<InventoryCondition?>(
+              key: const Key('buyInventoryConditionField'),
+              initialValue: formState.condition,
+              decoration: const InputDecoration(
+                labelText: 'Condition',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<InventoryCondition?>(
+                  value: null,
+                  child: Text('Not Specified'),
+                ),
+                for (final condition in InventoryCondition.values)
+                  DropdownMenuItem<InventoryCondition?>(
+                    value: condition,
+                    child: Text(condition.label),
+                  ),
+              ],
+              onChanged: formController.setCondition,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              key: const Key('buyInventoryPurchaseDateField'),
+              onTap: isSaving
+                  ? null
+                  : () async {
+                      await _selectPurchaseDate(
+                        currentDate: formState.purchaseDate,
+                        formController: formController,
+                      );
+                    },
+              borderRadius: BorderRadius.circular(4),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Purchase Date',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today_outlined),
+                ),
+                child: Text(
+                  formState.purchaseDate == null
+                      ? 'Not Specified'
+                      : _formatDate(formState.purchaseDate!),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
