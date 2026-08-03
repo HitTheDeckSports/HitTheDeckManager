@@ -13,17 +13,9 @@ void main() {
     required String itemId,
   }) {
     return ProviderScope(
-      overrides: [
-        inventoryRepositoryProvider.overrideWithValue(
-          repository,
-        ),
-      ],
+      overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
       child: MaterialApp(
-        home: Scaffold(
-          body: InventoryItemDetailScreen(
-            itemId: itemId,
-          ),
-        ),
+        home: Scaffold(body: InventoryItemDetailScreen(itemId: itemId)),
       ),
     );
   }
@@ -52,15 +44,10 @@ void main() {
       notes: 'Limited-edition bat.',
     );
 
-    final repository = InMemoryInventoryRepository(
-      initialItems: [item],
-    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
 
     await tester.pumpWidget(
-      createTestApp(
-        repository: repository,
-        itemId: 'item-1',
-      ),
+      createTestApp(repository: repository, itemId: 'item-1'),
     );
 
     await tester.pumpAndSettle();
@@ -104,15 +91,10 @@ void main() {
       handOrientation: 'Right Hand Throw',
     );
 
-    final repository = InMemoryInventoryRepository(
-      initialItems: [item],
-    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
 
     await tester.pumpWidget(
-      createTestApp(
-        repository: repository,
-        itemId: 'item-2',
-      ),
+      createTestApp(repository: repository, itemId: 'item-2'),
     );
 
     await tester.pumpAndSettle();
@@ -134,23 +116,15 @@ void main() {
     final repository = InMemoryInventoryRepository();
 
     await tester.pumpWidget(
-      createTestApp(
-        repository: repository,
-        itemId: 'missing-item',
-      ),
+      createTestApp(repository: repository, itemId: 'missing-item'),
     );
 
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Inventory item not found.'),
-      findsOneWidget,
-    );
+    expect(find.text('Inventory item not found.'), findsOneWidget);
 
     expect(
-      find.text(
-        'The item may have been removed or is no longer available.',
-      ),
+      find.text('The item may have been removed or is no longer available.'),
       findsOneWidget,
     );
   });
