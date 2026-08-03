@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/models/inventory_enums.dart';
 import '../../domain/models/inventory_item.dart';
 import 'inventory_providers.dart';
 
@@ -52,6 +53,13 @@ class InventoryController extends AsyncNotifier<void> {
     }
 
     return updatedItem.requireValue;
+  }
+
+  Future<InventoryItem> updateStatus({
+    required InventoryItem item,
+    required InventoryStatus status,
+  }) {
+    return updateItem(item.copyWith(status: status));
   }
 
   Future<void> deleteItem(String id) async {

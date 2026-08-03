@@ -10,6 +10,7 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
+import 'providers/inventory_controller.dart';
 import 'providers/inventory_providers.dart';
 
 class InventoryItemDetailScreen extends ConsumerWidget {
@@ -55,30 +56,109 @@ class InventoryItemDetailScreen extends ConsumerWidget {
   }
 }
 
-class _InventoryItemDetailContent extends StatelessWidget {
+class _InventoryItemDetailContent extends ConsumerWidget {
   const _InventoryItemDetailContent({required this.item});
 
   final InventoryItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final displayName = item.model == null || item.model!.trim().isEmpty
         ? item.brand
         : '${item.brand} ${item.model}';
+    final inventoryControllerState = ref.watch(inventoryControllerProvider);
 
+    final isUpdatingStatus = inventoryControllerState.isLoading;
     return AppPage(
       title: displayName,
       subtitle: item.inventoryNumber ?? 'Inventory number not assigned',
       actions: [
         if (item.id != null)
+          PopupMenuButton<InventoryStatus>(
+            key: const Key('inventoryItemStatusButton'),
+            enabled: !isUpdatingStatus,
+            tooltip: 'Change inventory status',
+            onSelected: (status) async {
+              try {
+                final updatedItem = await ref
+                    .read(inventoryControllerProvider.notifier)
+                    .updateStatus(item: item, status: status);
+
+                ref.invalidate(inventoryItemProvider(updatedItem.id!));
+
+                if (!context.mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Inventory status changed to ${updatedItem.status.label}.',
+                    ),
+                  ),
+                );
+              } catch (error) {
+                if (!context.mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Unable to change inventory status: $error'),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (context) {
+              return [
+                for (final status in const [
+                  InventoryStatus.available,
+                  InventoryStatus.inactive,
+                  InventoryStatus.broken,
+                ])
+                  PopupMenuItem<InventoryStatus>(
+                    value: status,
+                    enabled: status != item.status,
+                    child: Row(
+                      children: [
+                        Icon(
+                          status == item.status
+                              ? Icons.check
+                              : Icons.circle_outlined,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(status.label),
+                      ],
+                    ),
+                  ),
+              ];
+            },
+            child: OutlinedButton.icon(
+              onPressed: null,
+              icon: isUpdatingStatus
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.swap_horiz),
+              label: Text(
+                isUpdatingStatus ? 'Updating Status...' : 'Change Status',
+              ),
+            ),
+          ),
+        if (item.id != null)
           FilledButton.icon(
             key: const Key('inventoryItemEditButton'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.inventoryEdit,
-                pathParameters: {'itemId': item.id!},
-              );
-            },
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.inventoryEdit,
+                      pathParameters: {'itemId': item.id!},
+                    );
+                  },
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),

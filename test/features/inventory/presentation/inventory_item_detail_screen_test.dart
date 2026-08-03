@@ -226,4 +226,60 @@ void main() {
 
     expect(find.byKey(const Key('buyInventoryDropField')), findsOneWidget);
   });
+  testWidgets('changes and persists inventory status', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.available,
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final statusButton = find.byKey(const Key('inventoryItemStatusButton'));
+
+    expect(statusButton, findsOneWidget);
+    expect(find.text('Available'), findsOneWidget);
+
+    await tester.tap(statusButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inactive'), findsOneWidget);
+    expect(find.text('Broken'), findsOneWidget);
+    expect(find.text('Sold'), findsNothing);
+    expect(find.text('Disposed'), findsNothing);
+
+    await tester.tap(find.text('Inactive'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inventory status changed to Inactive.'), findsOneWidget);
+
+    final storedItem = await repository.getInventoryItem('item-1');
+
+    expect(storedItem, isNotNull);
+    expect(storedItem?.status, InventoryStatus.inactive);
+    expect(storedItem?.id, item.id);
+    expect(storedItem?.inventoryNumber, item.inventoryNumber);
+    expect(storedItem?.brand, item.brand);
+    expect(storedItem?.model, item.model);
+  });
 }

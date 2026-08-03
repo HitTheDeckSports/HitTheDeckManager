@@ -82,25 +82,31 @@ void main() {
     );
 
     final repository = InMemoryInventoryRepository(initialItems: [item]);
+    addTearDown(repository.dispose);
 
     final router = GoRouter(
       initialLocation: AppRoutes.inventory,
       routes: [
         GoRoute(
           path: AppRoutes.inventory,
-          builder: (context, state) => const InventoryScreen(),
+          builder: (context, state) {
+            return const Scaffold(body: InventoryScreen());
+          },
         ),
         GoRoute(
           path: AppRoutes.inventoryDetail,
           name: AppRouteNames.inventoryDetail,
           builder: (context, state) {
-            return InventoryItemDetailScreen(
-              itemId: state.pathParameters['itemId']!,
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
             );
           },
         ),
       ],
     );
+    addTearDown(router.dispose);
 
     await tester.pumpWidget(
       ProviderScope(

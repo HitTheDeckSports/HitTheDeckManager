@@ -92,6 +92,98 @@ void main() {
       expect(storedItem?.status, InventoryStatus.sold);
     });
 
+    test(
+      'updates inventory status while preserving all other item data',
+      () async {
+        final original = InventoryItem(
+          id: 'item-1',
+          inventoryNumber: 'BAT-2608-0001',
+          category: InventoryCategory.bat,
+          brand: 'Combat',
+          model: 'Spec H1',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 20000,
+          condition: InventoryCondition.likeNew,
+          status: InventoryStatus.available,
+          purchaseDate: DateTime(2026, 8, 3),
+          newValueCents: 49999,
+          askingPriceCents: 32500,
+          minimumPriceCents: 27500,
+          notes: 'Limited-edition bat.',
+          lengthInches: 32,
+          weightOunces: 29,
+          drop: -3,
+          certification: 'BBCOR',
+        );
+
+        final repository = InMemoryInventoryRepository(
+          initialItems: [original],
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+
+        addTearDown(container.dispose);
+        addTearDown(repository.dispose);
+
+        final controller = container.read(inventoryControllerProvider.notifier);
+
+        final inactiveItem = await controller.updateStatus(
+          item: original,
+          status: InventoryStatus.inactive,
+        );
+
+        expect(inactiveItem.status, InventoryStatus.inactive);
+        expect(inactiveItem.id, original.id);
+        expect(inactiveItem.inventoryNumber, original.inventoryNumber);
+        expect(inactiveItem.category, original.category);
+        expect(inactiveItem.brand, original.brand);
+        expect(inactiveItem.model, original.model);
+        expect(inactiveItem.acquisitionType, original.acquisitionType);
+        expect(
+          inactiveItem.acquisitionValueCents,
+          original.acquisitionValueCents,
+        );
+        expect(inactiveItem.condition, original.condition);
+        expect(inactiveItem.purchaseDate, original.purchaseDate);
+        expect(inactiveItem.newValueCents, original.newValueCents);
+        expect(inactiveItem.askingPriceCents, original.askingPriceCents);
+        expect(inactiveItem.minimumPriceCents, original.minimumPriceCents);
+        expect(inactiveItem.notes, original.notes);
+        expect(inactiveItem.lengthInches, original.lengthInches);
+        expect(inactiveItem.weightOunces, original.weightOunces);
+        expect(inactiveItem.drop, original.drop);
+        expect(inactiveItem.certification, original.certification);
+
+        final availableItem = await controller.updateStatus(
+          item: inactiveItem,
+          status: InventoryStatus.available,
+        );
+
+        expect(availableItem.status, InventoryStatus.available);
+
+        final brokenItem = await controller.updateStatus(
+          item: availableItem,
+          status: InventoryStatus.broken,
+        );
+
+        expect(brokenItem.status, InventoryStatus.broken);
+
+        final storedItem = await repository.getInventoryItem('item-1');
+
+        expect(storedItem, brokenItem);
+        expect(storedItem?.status, InventoryStatus.broken);
+
+        expect(
+          container.read(inventoryControllerProvider),
+          const AsyncData<void>(null),
+        );
+      },
+    );
+
     test('deletes an inventory item', () async {
       const item = InventoryItem(
         id: 'item-1',
