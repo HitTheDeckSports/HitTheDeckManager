@@ -6,11 +6,7 @@ import 'package:hit_the_deck_manager/features/inventory/presentation/buy_invento
 void main() {
   Widget createTestApp() {
     return const ProviderScope(
-      child: MaterialApp(
-        home: Scaffold(
-          body: BuyInventoryScreen(),
-        ),
-      ),
+      child: MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
     );
   }
 
@@ -27,36 +23,20 @@ void main() {
     expect(find.text('Model'), findsOneWidget);
     expect(find.text('Acquisition Type'), findsOneWidget);
     expect(find.text('Acquisition Value'), findsOneWidget);
-    expect(find.text('Validate Information'), findsOneWidget);
+    expect(find.text('Save Inventory'), findsOneWidget);
 
+    expect(find.byKey(const Key('buyInventoryCategoryField')), findsOneWidget);
+    expect(find.byKey(const Key('buyInventoryBrandField')), findsOneWidget);
+    expect(find.byKey(const Key('buyInventoryModelField')), findsOneWidget);
     expect(
-      find.byKey(const Key('buyInventoryCategoryField')),
+      find.byKey(const Key('buyInventoryAcquisitionTypeField')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const Key('buyInventoryBrandField')),
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const Key('buyInventoryModelField')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(
-        const Key('buyInventoryAcquisitionTypeField'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(
-        const Key('buyInventoryAcquisitionValueField'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('buyInventoryValidateButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('buyInventorySubmitButton')), findsOneWidget);
   });
 
   testWidgets('shows required-field errors for blank submission', (
@@ -65,19 +45,14 @@ void main() {
     await tester.pumpWidget(createTestApp());
     await tester.pumpAndSettle();
 
-    final validateButton = find.byKey(
-      const Key('buyInventoryValidateButton'),
-    );
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
 
-    await tester.ensureVisible(validateButton);
-    await tester.tap(validateButton);
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Brand is required.'), findsOneWidget);
-    expect(
-      find.text('Acquisition value is required.'),
-      findsOneWidget,
-    );
+    expect(find.text('Acquisition value is required.'), findsOneWidget);
   });
 
   testWidgets('shows an error for invalid acquisition value', (
@@ -92,27 +67,20 @@ void main() {
     );
 
     await tester.enterText(
-      find.byKey(
-        const Key('buyInventoryAcquisitionValueField'),
-      ),
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
       'invalid',
     );
 
-    final validateButton = find.byKey(
-      const Key('buyInventoryValidateButton'),
-    );
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
 
-    await tester.ensureVisible(validateButton);
-    await tester.tap(validateButton);
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Enter a valid Acquisition value.'),
-      findsOneWidget,
-    );
+    expect(find.text('Enter a valid Acquisition value.'), findsOneWidget);
   });
 
-  testWidgets('shows confirmation when basic information is valid', (
+  testWidgets('saves inventory when basic information is valid', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createTestApp());
@@ -129,28 +97,18 @@ void main() {
     );
 
     await tester.enterText(
-      find.byKey(
-        const Key('buyInventoryAcquisitionValueField'),
-      ),
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
       '200.00',
     );
 
-    final validateButton = find.byKey(
-      const Key('buyInventoryValidateButton'),
-    );
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
 
-    await tester.ensureVisible(validateButton);
-    await tester.tap(validateButton);
-    await tester.pump();
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
 
-    expect(
-      find.text('Basic inventory information is valid.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('was created.'), findsOneWidget);
     expect(find.text('Brand is required.'), findsNothing);
-    expect(
-      find.text('Acquisition value is required.'),
-      findsNothing,
-    );
+    expect(find.text('Acquisition value is required.'), findsNothing);
   });
 }

@@ -5,28 +5,28 @@ import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../domain/models/inventory_enums.dart';
 import 'forms/buy_inventory_form_controller.dart';
+import 'providers/inventory_controller.dart';
 
 class BuyInventoryScreen extends ConsumerStatefulWidget {
   const BuyInventoryScreen({super.key});
 
   @override
-  ConsumerState<BuyInventoryScreen> createState() =>
-      _BuyInventoryScreenState();
+  ConsumerState<BuyInventoryScreen> createState() => _BuyInventoryScreenState();
 }
 
-class _BuyInventoryScreenState
-    extends ConsumerState<BuyInventoryScreen> {
+class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
-    final formState = ref.watch(
-      buyInventoryFormControllerProvider,
-    );
+    final formState = ref.watch(buyInventoryFormControllerProvider);
 
     final formController = ref.read(
       buyInventoryFormControllerProvider.notifier,
     );
+    final inventoryControllerState = ref.watch(inventoryControllerProvider);
+
+    final isSaving = inventoryControllerState.isLoading;
 
     return AppPage(
       title: 'Buy Inventory',
@@ -78,10 +78,7 @@ class _BuyInventoryScreenState
               ),
               textCapitalization: TextCapitalization.words,
               validator: (value) {
-                return AppValidators.requiredText(
-                  value,
-                  fieldName: 'Brand',
-                );
+                return AppValidators.requiredText(value, fieldName: 'Brand');
               },
               onChanged: formController.setBrand,
             ),
@@ -114,17 +111,15 @@ class _BuyInventoryScreenState
               ],
               onChanged: (acquisitionType) {
                 if (acquisitionType != null) {
-                  formController.setAcquisitionType(
-                    acquisitionType,
-                  );
+                  formController.setAcquisitionType(acquisitionType);
                 }
               },
             ),
             const SizedBox(height: 16),
-              TextFormField(
-                key: const Key('buyInventoryAcquisitionValueField'),
-                initialValue: formState.acquisitionValue,
-                decoration: const InputDecoration(
+            TextFormField(
+              key: const Key('buyInventoryAcquisitionValueField'),
+              initialValue: formState.acquisitionValue,
+              decoration: const InputDecoration(
                 labelText: 'Acquisition Value',
                 hintText: r'Example: $200.00',
                 prefixText: r'$ ',
@@ -144,25 +139,64 @@ class _BuyInventoryScreenState
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              key: const Key('buyInventoryValidateButton'),
-              onPressed: () {
-                final isValid =
-                    _formKey.currentState?.validate() ?? false;
+              key: const Key('buyInventorySubmitButton'),
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      final isValid =
+                          _formKey.currentState?.validate() ?? false;
 
-                if (!isValid) {
-                  return;
-                }
+                      if (!isValid) {
+                        return;
+                      }
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Basic inventory information is valid.',
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Validate Information'),
+                      try {
+                        final savedItem = await formController.submit();
+
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        if (savedItem == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Unable to create the inventory item.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        _formKey.currentState?.reset();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Inventory item ${savedItem.inventoryNumber} was created.',
+                            ),
+                          ),
+                        );
+                      } catch (error) {
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Unable to save inventory: $error'),
+                          ),
+                        );
+                      }
+                    },
+              icon: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(isSaving ? 'Saving Inventory...' : 'Save Inventory'),
             ),
             const SizedBox(height: 24),
             const Divider(),
