@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -67,6 +69,20 @@ class _InventoryItemDetailContent extends StatelessWidget {
     return AppPage(
       title: displayName,
       subtitle: item.inventoryNumber ?? 'Inventory number not assigned',
+      actions: [
+        if (item.id != null)
+          FilledButton.icon(
+            key: const Key('inventoryItemEditButton'),
+            onPressed: () {
+              context.goNamed(
+                AppRouteNames.inventoryEdit,
+                pathParameters: {'itemId': item.id!},
+              );
+            },
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit'),
+          ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

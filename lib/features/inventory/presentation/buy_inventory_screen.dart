@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../domain/models/inventory_enums.dart';
+import '../domain/models/inventory_item.dart';
 import 'forms/buy_inventory_form_controller.dart';
 import 'providers/inventory_controller.dart';
+import 'providers/inventory_providers.dart';
 
 class BuyInventoryScreen extends ConsumerStatefulWidget {
-  const BuyInventoryScreen({super.key});
+  const BuyInventoryScreen({this.existingItem, super.key});
+
+  final InventoryItem? existingItem;
+
+  bool get isEditing => existingItem != null;
 
   @override
   ConsumerState<BuyInventoryScreen> createState() => _BuyInventoryScreenState();
@@ -20,6 +28,40 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final _lengthController = TextEditingController();
   final _weightController = TextEditingController();
   final _dropController = TextEditingController();
+
+  bool _isFormInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final formController = ref.read(
+        buyInventoryFormControllerProvider.notifier,
+      );
+
+      final existingItem = widget.existingItem;
+
+      if (existingItem == null) {
+        formController.reset();
+      } else {
+        formController.initializeFromItem(existingItem);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isFormInitialized = true;
+      });
+    });
+  }
+
   String _formatDate(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
@@ -69,6 +111,16 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isFormInitialized) {
+      return AppPage(
+        title: widget.isEditing ? 'Edit Inventory' : 'Buy Inventory',
+        subtitle: widget.isEditing
+            ? 'Update the saved information for this inventory item.'
+            : 'Record equipment purchased, traded, or accepted on consignment.',
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final formState = ref.watch(buyInventoryFormControllerProvider);
     ref.listen(buyInventoryFormControllerProvider, (previous, next) {
       _updateControllerText(
@@ -110,9 +162,10 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     final isSaving = inventoryControllerState.isLoading;
 
     return AppPage(
-      title: 'Buy Inventory',
-      subtitle:
-          'Record equipment purchased, traded, or accepted on consignment.',
+      title: widget.isEditing ? 'Edit Inventory' : 'Buy Inventory',
+      subtitle: widget.isEditing
+          ? 'Update the saved information for this inventory item.'
+          : 'Record equipment purchased, traded, or accepted on consignment.',
       child: Form(
         key: _formKey,
         child: Column(
@@ -530,7 +583,11 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                       }
 
                       try {
-                        final savedItem = await formController.submit();
+                        final savedItem = widget.isEditing
+                            ? await formController.submitUpdate(
+                                widget.existingItem!,
+                              )
+                            : await formController.submit();
 
                         if (!context.mounted) {
                           return;
@@ -538,9 +595,11 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
 
                         if (savedItem == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                'Unable to create the inventory item.',
+                                widget.isEditing
+                                    ? 'Unable to update the inventory item.'
+                                    : 'Unable to create the inventory item.',
                               ),
                             ),
                           );
@@ -556,10 +615,21 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Inventory item ${savedItem.inventoryNumber} was created.',
+                              widget.isEditing
+                                  ? 'Inventory item ${savedItem.inventoryNumber} was updated.'
+                                  : 'Inventory item ${savedItem.inventoryNumber} was created.',
                             ),
                           ),
                         );
+
+                        if (widget.isEditing && savedItem.id != null) {
+                          ref.invalidate(inventoryItemProvider(savedItem.id!));
+
+                          context.goNamed(
+                            AppRouteNames.inventoryDetail,
+                            pathParameters: {'itemId': savedItem.id!},
+                          );
+                        }
                       } catch (error) {
                         if (!context.mounted) {
                           return;
@@ -579,7 +649,15 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              label: Text(isSaving ? 'Saving Inventory...' : 'Save Inventory'),
+              label: Text(
+                isSaving
+                    ? widget.isEditing
+                          ? 'Saving Changes...'
+                          : 'Saving Inventory...'
+                    : widget.isEditing
+                    ? 'Save Changes'
+                    : 'Save Inventory',
+              ),
             ),
             const SizedBox(height: 24),
             const Divider(),

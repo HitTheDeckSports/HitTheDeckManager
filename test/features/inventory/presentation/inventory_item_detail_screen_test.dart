@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
+import 'package:hit_the_deck_manager/features/inventory/presentation/edit_inventory_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/inventory_item_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 
@@ -127,5 +130,100 @@ void main() {
       find.text('The item may have been removed or is no longer available.'),
       findsOneWidget,
     );
+  });
+  testWidgets('Edit button opens a prefilled edit form', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      condition: InventoryCondition.likeNew,
+      askingPriceCents: 32500,
+      lengthInches: 32,
+      weightOunces: 29,
+      drop: -3,
+      certification: 'BBCOR',
+      notes: 'Original notes.',
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    addTearDown(repository.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-1',
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryEdit,
+          name: AppRouteNames.inventoryEdit,
+          builder: (context, state) {
+            return Scaffold(
+              body: EditInventoryScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final editButton = find.byKey(const Key('inventoryItemEditButton'));
+
+    expect(editButton, findsOneWidget);
+
+    await tester.tap(editButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Inventory'), findsOneWidget);
+    expect(find.text('Save Changes'), findsOneWidget);
+
+    final brandField = tester.widget<TextFormField>(
+      find.byKey(const Key('buyInventoryBrandField')),
+    );
+
+    final modelField = tester.widget<TextFormField>(
+      find.byKey(const Key('buyInventoryModelField')),
+    );
+
+    final acquisitionValueField = tester.widget<TextFormField>(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+    );
+
+    expect(brandField.initialValue, 'Combat');
+    expect(modelField.initialValue, 'Spec H1');
+    expect(acquisitionValueField.initialValue, '200.00');
+
+    expect(find.byKey(const Key('buyInventoryLengthField')), findsOneWidget);
+
+    expect(find.byKey(const Key('buyInventoryWeightField')), findsOneWidget);
+
+    expect(find.byKey(const Key('buyInventoryDropField')), findsOneWidget);
   });
 }

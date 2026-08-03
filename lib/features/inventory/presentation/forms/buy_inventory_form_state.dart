@@ -25,7 +25,30 @@ class BuyInventoryFormState {
     this.catchersGearSize = '',
     this.photoUrls = const [],
   });
-
+  factory BuyInventoryFormState.fromInventoryItem(InventoryItem item) {
+    return BuyInventoryFormState(
+      category: item.category,
+      brand: item.brand,
+      model: item.model ?? '',
+      acquisitionType: item.acquisitionType,
+      acquisitionValue: _formatCentsForInput(item.acquisitionValueCents),
+      condition: item.condition,
+      purchaseDate: item.purchaseDate,
+      newValue: _formatOptionalCentsForInput(item.newValueCents),
+      askingPrice: _formatOptionalCentsForInput(item.askingPriceCents),
+      minimumPrice: _formatOptionalCentsForInput(item.minimumPriceCents),
+      sellerContactId: item.sellerContactId,
+      notes: item.notes ?? '',
+      lengthInches: _formatOptionalNumber(item.lengthInches),
+      weightOunces: _formatOptionalNumber(item.weightOunces),
+      drop: _formatOptionalNumber(item.drop),
+      certification: item.certification ?? '',
+      gloveSizeInches: _formatOptionalNumber(item.gloveSizeInches),
+      handOrientation: item.handOrientation ?? '',
+      catchersGearSize: item.catchersGearSize ?? '',
+      photoUrls: item.photoUrls,
+    );
+  }
   final InventoryCategory category;
   final String brand;
   final String model;
@@ -159,4 +182,27 @@ String? _emptyToNull(String value) {
   final trimmed = value.trim();
 
   return trimmed.isEmpty ? null : trimmed;
+}
+
+String _formatCentsForInput(int cents) {
+  return (cents / 100).toStringAsFixed(2);
+}
+
+String _formatOptionalCentsForInput(int? cents) {
+  return cents == null ? '' : _formatCentsForInput(cents);
+}
+
+String _formatOptionalNumber(double? value) {
+  if (value == null) {
+    return '';
+  }
+
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+
+  return value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }

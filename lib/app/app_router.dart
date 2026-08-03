@@ -9,6 +9,7 @@ import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
+import '../features/inventory/presentation/edit_inventory_screen.dart';
 import '../features/inventory/presentation/sell_inventory_screen.dart';
 import 'app_routes.dart';
 import 'app_shell.dart';
@@ -45,6 +46,19 @@ final GoRouter appRouter = GoRouter(
           path: AppRoutes.sellInventory,
           name: AppRouteNames.sellInventory,
           builder: (context, state) => const SellInventoryScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryEdit,
+          name: AppRouteNames.inventoryEdit,
+          builder: (context, state) {
+            final itemId = state.pathParameters['itemId'];
+
+            if (itemId == null || itemId.isEmpty) {
+              throw StateError('Inventory edit route requires an item ID.');
+            }
+
+            return EditInventoryScreen(itemId: itemId);
+          },
         ),
         GoRoute(
           path: AppRoutes.inventoryDetail,

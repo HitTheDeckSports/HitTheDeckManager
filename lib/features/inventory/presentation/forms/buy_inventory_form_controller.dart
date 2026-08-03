@@ -16,6 +16,10 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     return const BuyInventoryFormState();
   }
 
+  void initializeFromItem(InventoryItem item) {
+    state = BuyInventoryFormState.fromInventoryItem(item);
+  }
+
   void setCategory(InventoryCategory category) {
     state = state.copyWith(category: category);
   }
@@ -177,6 +181,28 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     state = const BuyInventoryFormState();
 
     return savedItem;
+  }
+
+  Future<InventoryItem?> submitUpdate(InventoryItem existingItem) async {
+    final editedItem = state.toInventoryItem();
+
+    if (editedItem == null) {
+      return null;
+    }
+
+    final itemToUpdate = editedItem.copyWith(
+      id: existingItem.id,
+      inventoryNumber: existingItem.inventoryNumber,
+      status: existingItem.status,
+    );
+
+    final updatedItem = await ref
+        .read(inventoryControllerProvider.notifier)
+        .updateItem(itemToUpdate);
+
+    state = const BuyInventoryFormState();
+
+    return updatedItem;
   }
 
   void reset() {
