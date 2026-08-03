@@ -39,6 +39,15 @@ void main() {
     expect(find.text('Acquisition Value'), findsOneWidget);
     expect(find.text('Condition'), findsOneWidget);
     expect(find.text('Purchase Date'), findsOneWidget);
+    expect(find.text('Pricing'), findsOneWidget);
+    expect(find.text('New Value'), findsOneWidget);
+    expect(find.text('Asking Price'), findsOneWidget);
+    expect(find.text('Minimum Acceptable Price'), findsOneWidget);
+    expect(find.text('Item Details'), findsOneWidget);
+    expect(find.text('Bat Length'), findsOneWidget);
+    expect(find.text('Bat Weight'), findsOneWidget);
+    expect(find.text('Certification'), findsOneWidget);
+    expect(find.text('Notes'), findsOneWidget);
     expect(find.text('Save Inventory'), findsOneWidget);
 
     expect(find.byKey(const Key('buyInventoryCategoryField')), findsOneWidget);
@@ -57,7 +66,97 @@ void main() {
       find.byKey(const Key('buyInventoryPurchaseDateField')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('buyInventoryNewValueField')), findsOneWidget);
+    expect(
+      find.byKey(const Key('buyInventoryAskingPriceField')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('buyInventoryMinimumPriceField')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('buyInventoryLengthField')), findsOneWidget);
+    expect(find.byKey(const Key('buyInventoryWeightField')), findsOneWidget);
+    expect(
+      find.byKey(const Key('buyInventoryCertificationField')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
     expect(find.byKey(const Key('buyInventorySubmitButton')), findsOneWidget);
+  });
+  testWidgets('shows glove-specific fields when Glove is selected', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final categoryField = find.byKey(const Key('buyInventoryCategoryField'));
+
+    await tester.tap(categoryField);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Glove').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsOneWidget);
+    expect(
+      find.byKey(const Key('buyInventoryHandOrientationField')),
+      findsOneWidget,
+    );
+
+    expect(find.byKey(const Key('buyInventoryLengthField')), findsNothing);
+    expect(find.byKey(const Key('buyInventoryWeightField')), findsNothing);
+    expect(
+      find.byKey(const Key('buyInventoryCertificationField')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('shows catcher-specific field when Catcher’s Gear is selected', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final categoryField = find.byKey(const Key('buyInventoryCategoryField'));
+
+    await tester.tap(categoryField);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text("Catcher's Gear").last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('buyInventoryCatchersGearSizeField')),
+      findsOneWidget,
+    );
+
+    expect(find.byKey(const Key('buyInventoryLengthField')), findsNothing);
+    expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
+  });
+
+  testWidgets('shows only common details for Helmet', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final categoryField = find.byKey(const Key('buyInventoryCategoryField'));
+
+    await tester.tap(categoryField);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Helmet').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
+
+    expect(find.byKey(const Key('buyInventoryLengthField')), findsNothing);
+    expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
+    expect(
+      find.byKey(const Key('buyInventoryCatchersGearSizeField')),
+      findsNothing,
+    );
   });
   testWidgets('updates the selected inventory condition', (
     WidgetTester tester,
@@ -149,7 +248,122 @@ void main() {
 
     expect(find.text('Enter a valid Acquisition value.'), findsOneWidget);
   });
+  testWidgets('shows errors for invalid optional pricing values', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
 
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '100.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryNewValueField')),
+      'invalid',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAskingPriceField')),
+      '-25',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryMinimumPriceField')),
+      'invalid',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a valid New value.'), findsOneWidget);
+    expect(find.text('Asking price cannot be negative.'), findsOneWidget);
+    expect(
+      find.text('Enter a valid Minimum acceptable price.'),
+      findsOneWidget,
+    );
+  });
+  testWidgets('shows errors for invalid bat measurements', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '100.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryLengthField')),
+      'invalid',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryWeightField')),
+      '0',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a valid Bat length.'), findsOneWidget);
+    expect(find.text('Bat weight must be greater than zero.'), findsOneWidget);
+  });
+
+  testWidgets('shows an error for invalid glove size', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setCategory(InventoryCategory.glove);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Rawlings',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '75.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryGloveSizeField')),
+      '-11.5',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Glove size must be greater than zero.'), findsOneWidget);
+  });
   testWidgets('saves inventory when basic information is valid', (
     WidgetTester tester,
   ) async {
@@ -223,5 +437,336 @@ void main() {
 
     expect(savedItem.condition, selectedCondition);
     expect(savedItem.purchaseDate, selectedPurchaseDate);
+  });
+  testWidgets('saves optional pricing values with inventory item', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Easton',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '150.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryNewValueField')),
+      '399.99',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAskingPriceField')),
+      '275.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryMinimumPriceField')),
+      '225.00',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    final savedItem = items.single;
+
+    expect(savedItem.newValueCents, 39999);
+    expect(savedItem.askingPriceCents, 27500);
+    expect(savedItem.minimumPriceCents, 22500);
+  });
+  testWidgets('saves bat-specific fields and notes', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '200.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryLengthField')),
+      '32',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryWeightField')),
+      '29',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryCertificationField')),
+      'BBCOR',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryNotesField')),
+      'Limited-edition bat.',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    final savedItem = items.single;
+
+    expect(savedItem.category, InventoryCategory.bat);
+    expect(savedItem.lengthInches, 32);
+    expect(savedItem.weightOunces, 29);
+    expect(savedItem.certification, 'BBCOR');
+    expect(savedItem.notes, 'Limited-edition bat.');
+  });
+
+  testWidgets('saves glove-specific fields', (WidgetTester tester) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setCategory(InventoryCategory.glove);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Rawlings',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '125.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryGloveSizeField')),
+      '11.5',
+    );
+
+    final orientationField = find.byKey(
+      const Key('buyInventoryHandOrientationField'),
+    );
+
+    await tester.ensureVisible(orientationField);
+    await tester.tap(orientationField);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Right Hand Throw').last);
+    await tester.pumpAndSettle();
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    final savedItem = items.single;
+
+    expect(savedItem.category, InventoryCategory.glove);
+    expect(savedItem.gloveSizeInches, 11.5);
+    expect(savedItem.handOrientation, 'Right Hand Throw');
+  });
+
+  testWidgets('saves catcher’s gear size', (WidgetTester tester) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setCategory(InventoryCategory.catchersGear);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'All-Star',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '175.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryCatchersGearSizeField')),
+      'Adult',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    final savedItem = items.single;
+
+    expect(savedItem.category, InventoryCategory.catchersGear);
+    expect(savedItem.catchersGearSize, 'Adult');
+  });
+  testWidgets('calculates drop from bat length and weight', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryLengthField')),
+      '32',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryWeightField')),
+      '29',
+    );
+
+    await tester.pumpAndSettle();
+
+    final formState = container.read(buyInventoryFormControllerProvider);
+
+    expect(formState.lengthInches, '32');
+    expect(formState.weightOunces, '29');
+    expect(formState.drop, '-3');
+  });
+
+  testWidgets('calculates bat weight from length and drop', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryLengthField')),
+      '32',
+    );
+
+    await tester.enterText(find.byKey(const Key('buyInventoryDropField')), '3');
+
+    await tester.pumpAndSettle();
+
+    final formState = container.read(buyInventoryFormControllerProvider);
+
+    expect(formState.lengthInches, '32');
+    expect(formState.drop, '-3');
+    expect(formState.weightOunces, '29');
+  });
+
+  testWidgets('recalculates drop when bat weight changes', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryLengthField')),
+      '32',
+    );
+
+    await tester.enterText(find.byKey(const Key('buyInventoryDropField')), '3');
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryWeightField')),
+      '27',
+    );
+
+    await tester.pumpAndSettle();
+
+    final formState = container.read(buyInventoryFormControllerProvider);
+
+    expect(formState.weightOunces, '27');
+    expect(formState.drop, '-5');
+  });
+
+  testWidgets('does not save hidden bat fields for a glove', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setLengthInches('32');
+    formController.setWeightOunces('29');
+    formController.setCertification('BBCOR');
+    formController.setCategory(InventoryCategory.glove);
+
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Rawlings',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '100.00',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryGloveSizeField')),
+      '11.5',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    final savedItem = items.single;
+
+    expect(savedItem.category, InventoryCategory.glove);
+    expect(savedItem.gloveSizeInches, 11.5);
+    expect(savedItem.lengthInches, isNull);
+    expect(savedItem.weightOunces, isNull);
+    expect(savedItem.drop, isNull);
+    expect(savedItem.certification, isNull);
   });
 }

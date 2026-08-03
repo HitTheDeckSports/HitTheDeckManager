@@ -18,6 +18,7 @@ class BuyInventoryFormState {
     this.notes = '',
     this.lengthInches = '',
     this.weightOunces = '',
+    this.drop = '',
     this.certification = '',
     this.gloveSizeInches = '',
     this.handOrientation = '',
@@ -40,6 +41,7 @@ class BuyInventoryFormState {
 
   final String lengthInches;
   final String weightOunces;
+  final String drop;
   final String certification;
 
   final String gloveSizeInches;
@@ -71,12 +73,27 @@ class BuyInventoryFormState {
       minimumPriceCents: CurrencyFormatter.tryParseToCents(minimumPrice),
       sellerContactId: sellerContactId,
       notes: _emptyToNull(notes),
-      lengthInches: double.tryParse(lengthInches.trim()),
-      weightOunces: double.tryParse(weightOunces.trim()),
-      certification: _emptyToNull(certification),
-      gloveSizeInches: double.tryParse(gloveSizeInches.trim()),
-      handOrientation: _emptyToNull(handOrientation),
-      catchersGearSize: _emptyToNull(catchersGearSize),
+      lengthInches: category == InventoryCategory.bat
+          ? double.tryParse(lengthInches.trim())
+          : null,
+      weightOunces: category == InventoryCategory.bat
+          ? double.tryParse(weightOunces.trim())
+          : null,
+      drop: category == InventoryCategory.bat
+          ? double.tryParse(drop.trim())
+          : null,
+      certification: category == InventoryCategory.bat
+          ? _emptyToNull(certification)
+          : null,
+      gloveSizeInches: category == InventoryCategory.glove
+          ? double.tryParse(gloveSizeInches.trim())
+          : null,
+      handOrientation: category == InventoryCategory.glove
+          ? _emptyToNull(handOrientation)
+          : null,
+      catchersGearSize: category == InventoryCategory.catchersGear
+          ? _emptyToNull(catchersGearSize)
+          : null,
       photoUrls: photoUrls,
     );
 
@@ -98,6 +115,7 @@ class BuyInventoryFormState {
     String? notes,
     String? lengthInches,
     String? weightOunces,
+    String? drop,
     String? certification,
     String? gloveSizeInches,
     String? handOrientation,
@@ -125,6 +143,7 @@ class BuyInventoryFormState {
       notes: notes ?? this.notes,
       lengthInches: lengthInches ?? this.lengthInches,
       weightOunces: weightOunces ?? this.weightOunces,
+      drop: drop ?? this.drop,
       certification: certification ?? this.certification,
       gloveSizeInches: gloveSizeInches ?? this.gloveSizeInches,
       handOrientation: handOrientation ?? this.handOrientation,

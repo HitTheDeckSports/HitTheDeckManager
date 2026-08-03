@@ -16,6 +16,10 @@ class BuyInventoryScreen extends ConsumerStatefulWidget {
 
 class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  final _lengthController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _dropController = TextEditingController();
   String _formatDate(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
@@ -41,9 +45,62 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     }
   }
 
+  void _updateControllerText({
+    required TextEditingController controller,
+    required String value,
+  }) {
+    if (controller.text == value) {
+      return;
+    }
+
+    controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lengthController.dispose();
+    _weightController.dispose();
+    _dropController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final formState = ref.watch(buyInventoryFormControllerProvider);
+    ref.listen(buyInventoryFormControllerProvider, (previous, next) {
+      _updateControllerText(
+        controller: _lengthController,
+        value: next.lengthInches,
+      );
+
+      _updateControllerText(
+        controller: _weightController,
+        value: next.weightOunces,
+      );
+
+      _updateControllerText(
+        controller: _dropController,
+        value: next.drop.isEmpty ? '' : next.drop.replaceFirst('-', ''),
+      );
+    });
+    if (_lengthController.text.isEmpty && formState.lengthInches.isNotEmpty) {
+      _lengthController.text = formState.lengthInches;
+    }
+
+    if (_weightController.text.isEmpty && formState.weightOunces.isNotEmpty) {
+      _weightController.text = formState.weightOunces;
+    }
+
+    final displayedDrop = formState.drop.isEmpty
+        ? ''
+        : formState.drop.replaceFirst('-', '');
+
+    if (_dropController.text.isEmpty && displayedDrop.isNotEmpty) {
+      _dropController.text = displayedDrop;
+    }
 
     final formController = ref.read(
       buyInventoryFormControllerProvider.notifier,
@@ -208,6 +265,258 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            Text('Pricing', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Enter the estimated value and planned selling prices.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              key: const Key('buyInventoryNewValueField'),
+              initialValue: formState.newValue,
+              decoration: const InputDecoration(
+                labelText: 'New Value',
+                hintText: r'Example: $399.99',
+                prefixText: r'$ ',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (value) {
+                return AppValidators.nonNegativeMoney(
+                  value,
+                  fieldName: 'New value',
+                );
+              },
+              onChanged: formController.setNewValue,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('buyInventoryAskingPriceField'),
+              initialValue: formState.askingPrice,
+              decoration: const InputDecoration(
+                labelText: 'Asking Price',
+                hintText: r'Example: $275.00',
+                prefixText: r'$ ',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (value) {
+                return AppValidators.nonNegativeMoney(
+                  value,
+                  fieldName: 'Asking price',
+                );
+              },
+              onChanged: formController.setAskingPrice,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('buyInventoryMinimumPriceField'),
+              initialValue: formState.minimumPrice,
+              decoration: const InputDecoration(
+                labelText: 'Minimum Acceptable Price',
+                hintText: r'Example: $225.00',
+                prefixText: r'$ ',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (value) {
+                return AppValidators.nonNegativeMoney(
+                  value,
+                  fieldName: 'Minimum acceptable price',
+                );
+              },
+              onChanged: formController.setMinimumPrice,
+            ),
+            const SizedBox(height: 24),
+            Text('Item Details', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Enter details specific to the selected equipment category.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+
+            if (formState.category == InventoryCategory.bat) ...[
+              TextFormField(
+                key: const Key('buyInventoryLengthField'),
+                controller: _lengthController,
+                decoration: const InputDecoration(
+                  labelText: 'Bat Length',
+                  hintText: 'Example: 32',
+                  suffixText: 'in',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  return AppValidators.positiveNumber(
+                    value,
+                    fieldName: 'Bat length',
+                  );
+                },
+                onChanged: formController.setLengthInches,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('buyInventoryWeightField'),
+                controller: _weightController,
+                decoration: const InputDecoration(
+                  labelText: 'Bat Weight',
+                  hintText: 'Example: 29',
+                  suffixText: 'oz',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  return AppValidators.positiveNumber(
+                    value,
+                    fieldName: 'Bat weight',
+                  );
+                },
+                onChanged: formController.setWeightOunces,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('buyInventoryDropField'),
+                controller: _dropController,
+                decoration: const InputDecoration(
+                  labelText: 'Drop',
+                  hintText: 'Example: 3',
+                  prefixText: '- ',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  final trimmedValue = value?.trim() ?? '';
+
+                  if (trimmedValue.isEmpty) {
+                    return null;
+                  }
+
+                  final parsedDrop = double.tryParse(trimmedValue);
+
+                  if (parsedDrop == null) {
+                    return 'Enter a valid Drop.';
+                  }
+
+                  if (parsedDrop <= 0) {
+                    return 'Drop must be greater than zero.';
+                  }
+
+                  return null;
+                },
+                onChanged: formController.setDrop,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('buyInventoryCertificationField'),
+                initialValue: formState.certification,
+                decoration: const InputDecoration(
+                  labelText: 'Certification',
+                  hintText: 'Example: BBCOR, USSSA, or USA Baseball',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                onChanged: formController.setCertification,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            if (formState.category == InventoryCategory.glove) ...[
+              TextFormField(
+                key: const Key('buyInventoryGloveSizeField'),
+                initialValue: formState.gloveSizeInches,
+                decoration: const InputDecoration(
+                  labelText: 'Glove Size',
+                  hintText: 'Example: 11.5',
+                  suffixText: 'in',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  return AppValidators.positiveNumber(
+                    value,
+                    fieldName: 'Glove size',
+                  );
+                },
+                onChanged: formController.setGloveSizeInches,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String?>(
+                key: const Key('buyInventoryHandOrientationField'),
+                initialValue: formState.handOrientation.isEmpty
+                    ? null
+                    : formState.handOrientation,
+                decoration: const InputDecoration(
+                  labelText: 'Hand Orientation',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Not Specified'),
+                  ),
+                  DropdownMenuItem<String?>(
+                    value: 'Right Hand Throw',
+                    child: Text('Right Hand Throw'),
+                  ),
+                  DropdownMenuItem<String?>(
+                    value: 'Left Hand Throw',
+                    child: Text('Left Hand Throw'),
+                  ),
+                ],
+                onChanged: (value) {
+                  formController.setHandOrientation(value ?? '');
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            if (formState.category == InventoryCategory.catchersGear) ...[
+              TextFormField(
+                key: const Key('buyInventoryCatchersGearSizeField'),
+                initialValue: formState.catchersGearSize,
+                decoration: const InputDecoration(
+                  labelText: "Catcher’s Gear Size",
+                  hintText: 'Example: Adult, Intermediate, or Youth',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+                onChanged: formController.setCatchersGearSize,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            TextFormField(
+              key: const Key('buyInventoryNotesField'),
+              initialValue: formState.notes,
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                hintText:
+                    'Enter condition details, included accessories, or other information.',
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
+              minLines: 3,
+              maxLines: 6,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: formController.setNotes,
+            ),
+            const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('buyInventorySubmitButton'),
               onPressed: isSaving
@@ -239,6 +548,10 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                         }
 
                         _formKey.currentState?.reset();
+
+                        _lengthController.clear();
+                        _weightController.clear();
+                        _dropController.clear();
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

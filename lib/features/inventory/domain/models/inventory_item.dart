@@ -21,6 +21,7 @@ class InventoryItem {
     this.notes,
     this.lengthInches,
     this.weightOunces,
+    this.drop,
     this.certification,
     this.gloveSizeInches,
     this.handOrientation,
@@ -59,6 +60,12 @@ class InventoryItem {
   // Bat-specific fields.
   final double? lengthInches;
   final double? weightOunces;
+
+  /// Bat drop, calculated as weight in ounces minus length in inches.
+  ///
+  /// Example: a 32-inch, 29-ounce bat has a drop of -3.
+  final double? drop;
+
   final String? certification;
 
   // Glove-specific fields.
@@ -143,6 +150,7 @@ class InventoryItem {
     Object? notes = _unset,
     Object? lengthInches = _unset,
     Object? weightOunces = _unset,
+    Object? drop = _unset,
     Object? certification = _unset,
     Object? gloveSizeInches = _unset,
     Object? handOrientation = _unset,
@@ -186,6 +194,7 @@ class InventoryItem {
       weightOunces: identical(weightOunces, _unset)
           ? this.weightOunces
           : weightOunces as double?,
+      drop: identical(drop, _unset) ? this.drop : drop as double?,
       certification: identical(certification, _unset)
           ? this.certification
           : certification as String?,

@@ -65,11 +65,82 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
   }
 
   void setLengthInches(String lengthInches) {
+    final parsedLength = double.tryParse(lengthInches.trim());
+    final parsedWeight = double.tryParse(state.weightOunces.trim());
+    final parsedDrop = double.tryParse(state.drop.trim());
+
+    if (parsedLength == null || parsedLength <= 0) {
+      state = state.copyWith(lengthInches: lengthInches);
+      return;
+    }
+
+    if (parsedWeight != null && parsedWeight > 0) {
+      state = state.copyWith(
+        lengthInches: lengthInches,
+        drop: _formatNumber(parsedWeight - parsedLength),
+      );
+      return;
+    }
+
+    if (parsedDrop != null && parsedDrop < 0) {
+      final calculatedWeight = parsedLength + parsedDrop;
+
+      state = state.copyWith(
+        lengthInches: lengthInches,
+        weightOunces: calculatedWeight > 0
+            ? _formatNumber(calculatedWeight)
+            : state.weightOunces,
+      );
+      return;
+    }
+
     state = state.copyWith(lengthInches: lengthInches);
   }
 
   void setWeightOunces(String weightOunces) {
-    state = state.copyWith(weightOunces: weightOunces);
+    final parsedLength = double.tryParse(state.lengthInches.trim());
+    final parsedWeight = double.tryParse(weightOunces.trim());
+
+    if (parsedLength == null ||
+        parsedLength <= 0 ||
+        parsedWeight == null ||
+        parsedWeight <= 0) {
+      state = state.copyWith(weightOunces: weightOunces);
+      return;
+    }
+
+    state = state.copyWith(
+      weightOunces: weightOunces,
+      drop: _formatNumber(parsedWeight - parsedLength),
+    );
+  }
+
+  void setDrop(String drop) {
+    final trimmedDrop = drop.trim();
+    final enteredDrop = double.tryParse(trimmedDrop);
+    final parsedLength = double.tryParse(state.lengthInches.trim());
+
+    if (trimmedDrop.isEmpty || enteredDrop == null) {
+      state = state.copyWith(drop: drop);
+      return;
+    }
+
+    final signedDrop = -enteredDrop.abs();
+    final storedDrop = _formatNumber(signedDrop);
+
+    if (parsedLength == null || parsedLength <= 0) {
+      state = state.copyWith(drop: storedDrop);
+      return;
+    }
+
+    final calculatedWeight = parsedLength + signedDrop;
+
+    state = state.copyWith(
+      drop: storedDrop,
+      weightOunces: calculatedWeight > 0
+          ? _formatNumber(calculatedWeight)
+          : state.weightOunces,
+    );
   }
 
   void setCertification(String certification) {
@@ -111,4 +182,15 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
   void reset() {
     state = const BuyInventoryFormState();
   }
+}
+
+String _formatNumber(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+
+  return value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }
