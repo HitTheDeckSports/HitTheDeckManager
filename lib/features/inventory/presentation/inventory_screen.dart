@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:go_router/go_router.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
@@ -8,6 +8,7 @@ import '../../../shared/presentation/widgets/app_page.dart';
 import '../domain/models/inventory_enums.dart';
 import 'providers/inventory_providers.dart';
 import '../../../core/formatting/currency_formatter.dart';
+import '../../../app/app_routes.dart';
 
 class InventoryScreen extends ConsumerWidget {
   const InventoryScreen({super.key});
@@ -48,6 +49,15 @@ class InventoryScreen extends ConsumerWidget {
               for (final item in items)
                 Card(
                   child: ListTile(
+                    key: ValueKey('inventoryItemTile-${item.id}'),
+                    onTap: item.id == null
+                        ? null
+                        : () {
+                            context.goNamed(
+                              AppRouteNames.inventoryDetail,
+                              pathParameters: {'itemId': item.id!},
+                            );
+                          },
                     leading: const Icon(Icons.sports_baseball),
                     title: Text(
                       item.model == null || item.model!.trim().isEmpty

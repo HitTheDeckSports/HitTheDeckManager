@@ -13,3 +13,11 @@ final inventoryItemsProvider = StreamProvider<List<InventoryItem>>((ref) {
 
   return repository.watchInventory();
 });
+final inventoryItemProvider = FutureProvider.family<InventoryItem?, String>((
+  ref,
+  itemId,
+) {
+  final repository = ref.watch(inventoryRepositoryProvider);
+
+  return repository.getInventoryItem(itemId);
+});

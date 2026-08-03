@@ -4,6 +4,7 @@ import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
+import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
@@ -44,6 +45,19 @@ final GoRouter appRouter = GoRouter(
           path: AppRoutes.sellInventory,
           name: AppRouteNames.sellInventory,
           builder: (context, state) => const SellInventoryScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            final itemId = state.pathParameters['itemId'];
+
+            if (itemId == null || itemId.isEmpty) {
+              throw StateError('Inventory detail route requires an item ID.');
+            }
+
+            return InventoryItemDetailScreen(itemId: itemId);
+          },
         ),
         GoRoute(
           path: AppRoutes.contacts,
