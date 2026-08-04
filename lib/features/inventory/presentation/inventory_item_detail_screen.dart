@@ -8,6 +8,9 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../transactions/domain/models/sale_transaction.dart';
+import '../../transactions/domain/models/transaction_enums.dart';
+import '../../transactions/presentation/providers/transaction_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
@@ -220,6 +223,10 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.status == InventoryStatus.sold && item.id != null) ...[
+            const SizedBox(height: 24),
+            _SaleInformationSection(inventoryItemId: item.id!),
+          ],
           const SizedBox(height: 24),
           _DetailSection(
             title: 'Item Details',
@@ -233,6 +240,111 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SaleInformationSection extends ConsumerWidget {
+  const _SaleInformationSection({required this.inventoryItemId});
+
+  final String inventoryItemId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saleAsync = ref.watch(saleForInventoryItemProvider(inventoryItemId));
+
+    return saleAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Sale Information',
+        children: [AppLoadingState(message: 'Loading sale information...')],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Sale Information',
+        children: [
+          AppErrorState(
+            message: 'Unable to load sale information.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(saleForInventoryItemProvider(inventoryItemId));
+            },
+          ),
+        ],
+      ),
+      data: (sale) {
+        if (sale == null) {
+          return const _DetailSection(
+            title: 'Sale Information',
+            children: [
+              Text(
+                'This item is marked Sold, but no matching sale transaction was found.',
+              ),
+            ],
+          );
+        }
+
+        return _SaleInformationCardContent(sale: sale);
+      },
+    );
+  }
+}
+
+class _SaleInformationCardContent extends StatelessWidget {
+  const _SaleInformationCardContent({required this.sale});
+
+  final SaleTransaction sale;
+
+  @override
+  Widget build(BuildContext context) {
+    final acquisitionValue = sale.acquisitionValueCents;
+    final profit = sale.profitCents;
+
+    return _DetailSection(
+      title: 'Sale Information',
+      children: [
+        _DetailRow(label: 'Sale Date', value: _formatDate(sale.saleDate)),
+        _DetailRow(label: 'Payment Method', value: sale.paymentMethod.label),
+        _DetailRow(
+          label: 'Sale Price',
+          value: CurrencyFormatter.formatCents(sale.salePriceCents),
+        ),
+        _DetailRow(
+          label: 'Cost at Time of Sale',
+          value: acquisitionValue == null
+              ? 'Not available'
+              : CurrencyFormatter.formatCents(acquisitionValue),
+        ),
+        _DetailRow(
+          label: 'Profit',
+          value: profit == null
+              ? 'Not available'
+              : CurrencyFormatter.formatCents(profit),
+        ),
+        _DetailRow(
+          label: 'Gross Margin',
+          value: sale.grossMargin == null
+              ? 'Not available'
+              : '${(sale.grossMargin! * 100).toStringAsFixed(1)}%',
+        ),
+        if (sale.notes != null && sale.notes!.trim().isNotEmpty)
+          _DetailRow(label: 'Sale Notes', value: sale.notes!),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('inventoryItemViewTransactionButton'),
+            onPressed: sale.id == null
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.transactionDetail,
+                      pathParameters: {'transactionId': sale.id!},
+                    );
+                  },
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('View Transaction'),
+          ),
+        ),
+      ],
     );
   }
 }

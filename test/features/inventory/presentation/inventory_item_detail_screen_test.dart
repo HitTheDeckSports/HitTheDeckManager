@@ -9,6 +9,11 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/presentation/edit_inventory_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/inventory_item_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
 
 void main() {
   Widget createTestApp({
@@ -281,5 +286,267 @@ void main() {
     expect(storedItem?.inventoryNumber, item.inventoryNumber);
     expect(storedItem?.brand, item.brand);
     expect(storedItem?.model, item.model);
+  });
+  testWidgets('sold item displays matching sale information', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.venmo,
+      notes: 'Sold during tournament.',
+      acquisitionValueCents: 20000,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsOneWidget);
+    expect(find.text('08/03/2026'), findsOneWidget);
+    expect(find.text('Venmo'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
+    expect(find.text(r'$125.00'), findsOneWidget);
+    expect(find.text('38.5%'), findsOneWidget);
+    expect(find.text('Sold during tournament.'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('inventoryItemViewTransactionButton')),
+      findsOneWidget,
+    );
+  });
+  testWidgets('available item does not display sale information', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.available,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsNothing);
+
+    expect(
+      find.byKey(const Key('inventoryItemViewTransactionButton')),
+      findsNothing,
+    );
+  });
+  testWidgets('sold item without a sale displays warning', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsOneWidget);
+
+    expect(
+      find.text(
+        'This item is marked Sold, but no matching sale transaction was found.',
+      ),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const Key('inventoryItemViewTransactionButton')),
+      findsNothing,
+    );
+  });
+  testWidgets('View Transaction opens matching transaction details', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      notes: 'Navigation test sale.',
+      acquisitionValueCents: 20000,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-1',
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.transactionDetail,
+          name: AppRouteNames.transactionDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: TransactionDetailScreen(
+                transactionId: state.pathParameters['transactionId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final viewTransactionButton = find.byKey(
+      const Key('inventoryItemViewTransactionButton'),
+    );
+
+    expect(viewTransactionButton, findsOneWidget);
+
+    await tester.ensureVisible(viewTransactionButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(viewTransactionButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Transaction'), findsOneWidget);
+    expect(find.text('Transaction Summary'), findsOneWidget);
+
+    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
+
+    expect(find.text('Navigation test sale.'), findsOneWidget);
   });
 }
