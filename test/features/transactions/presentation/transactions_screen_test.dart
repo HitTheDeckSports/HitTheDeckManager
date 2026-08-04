@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
@@ -186,5 +189,94 @@ void main() {
     expect(find.text('Inventory record unavailable'), findsOneWidget);
 
     expect(find.text('missing-item'), findsNothing);
+  });
+  testWidgets('tapping a transaction opens its detail screen', (
+    WidgetTester tester,
+  ) async {
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      acquisitionValueCents: 20000,
+    );
+
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    addTearDown(transactionRepository.dispose);
+    addTearDown(inventoryRepository.dispose);
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.transactions,
+      routes: [
+        GoRoute(
+          path: AppRoutes.transactions,
+          name: AppRouteNames.transactions,
+          builder: (context, state) {
+            return const Scaffold(body: TransactionsScreen());
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.transactionDetail,
+          name: AppRouteNames.transactionDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: TransactionDetailScreen(
+                transactionId: state.pathParameters['transactionId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final transactionCard = find.byKey(
+      const ValueKey('transactionCard-sale-1'),
+    );
+
+    expect(transactionCard, findsOneWidget);
+
+    await tester.tap(transactionCard);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Transaction'), findsOneWidget);
+
+    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
+
+    expect(find.text(r'$325.00'), findsOneWidget);
   });
 }

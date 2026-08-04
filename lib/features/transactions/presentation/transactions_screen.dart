@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -137,81 +139,97 @@ class _SaleTransactionCard extends StatelessWidget {
 
     return Card(
       key: ValueKey(sale.id ?? 'sale-${sale.inventoryItemId}-${sale.saleDate}'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.point_of_sale_outlined, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        TransactionType.sale.label,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(sale.saleDate),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey(
+          sale.id == null
+              ? 'transactionCardUnavailable'
+              : 'transactionCard-${sale.id}',
+        ),
+        onTap: sale.id == null
+            ? null
+            : () {
+                context.goNamed(
+                  AppRouteNames.transactionDetail,
+                  pathParameters: {'transactionId': sale.id!},
+                );
+              },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.point_of_sale_outlined, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          TransactionType.sale.label,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(sale.saleDate),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  CurrencyFormatter.formatCents(sale.salePriceCents),
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-            _TransactionDetailRow(
-              label: 'Inventory Item',
-              value: _inventoryDisplayName(),
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Payment Method',
-              value: sale.paymentMethod.label,
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Revenue',
-              value: CurrencyFormatter.formatCents(sale.salePriceCents),
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Cost',
-              value: acquisitionValue == null
-                  ? 'Not available'
-                  : CurrencyFormatter.formatCents(acquisitionValue),
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Profit',
-              value: profit == null
-                  ? 'Not available'
-                  : CurrencyFormatter.formatCents(profit),
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Gross Margin',
-              value: _formatMargin(sale.grossMargin),
-            ),
-            if (sale.notes != null && sale.notes!.trim().isNotEmpty) ...[
+                  Text(
+                    CurrencyFormatter.formatCents(sale.salePriceCents),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
-              Text('Notes', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 4),
-              Text(sale.notes!),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _TransactionDetailRow(
+                label: 'Inventory Item',
+                value: _inventoryDisplayName(),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Payment Method',
+                value: sale.paymentMethod.label,
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Revenue',
+                value: CurrencyFormatter.formatCents(sale.salePriceCents),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Cost',
+                value: acquisitionValue == null
+                    ? 'Not available'
+                    : CurrencyFormatter.formatCents(acquisitionValue),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Profit',
+                value: profit == null
+                    ? 'Not available'
+                    : CurrencyFormatter.formatCents(profit),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Gross Margin',
+                value: _formatMargin(sale.grossMargin),
+              ),
+              if (sale.notes != null && sale.notes!.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Notes', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(sale.notes!),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

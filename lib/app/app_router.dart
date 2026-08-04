@@ -8,6 +8,7 @@ import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
+import '../features/transactions/presentation/transaction_detail_screen.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
 import '../features/inventory/presentation/edit_inventory_screen.dart';
 import '../features/inventory/presentation/sell_inventory_screen.dart';
@@ -82,6 +83,21 @@ final GoRouter appRouter = GoRouter(
           path: AppRoutes.transactions,
           name: AppRouteNames.transactions,
           builder: (context, state) => const TransactionsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.transactionDetail,
+          name: AppRouteNames.transactionDetail,
+          builder: (context, state) {
+            final transactionId = state.pathParameters['transactionId'];
+
+            if (transactionId == null || transactionId.isEmpty) {
+              throw StateError(
+                'Transaction detail route requires a transaction ID.',
+              );
+            }
+
+            return TransactionDetailScreen(transactionId: transactionId);
+          },
         ),
         GoRoute(
           path: AppRoutes.reports,
