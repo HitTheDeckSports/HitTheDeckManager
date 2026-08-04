@@ -7,6 +7,7 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/forms/sell_inventory_form_controller.dart';
 import '../../transactions/presentation/providers/sale_completion_controller.dart';
@@ -67,6 +68,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
+    final contactsAsync = ref.watch(contactsProvider);
     final formState = ref.watch(sellInventoryFormControllerProvider);
     final completionState = ref.watch(saleCompletionControllerProvider);
 
@@ -270,6 +272,74 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                             formController.setPaymentMethod(paymentMethod);
                           }
                         },
+                ),
+                const SizedBox(height: 16),
+                contactsAsync.when(
+                  loading: () => const InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Buyer',
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Loading contacts...'),
+                      ],
+                    ),
+                  ),
+                  error: (error, stackTrace) => InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Buyer',
+                      border: OutlineInputBorder(),
+                      errorText: 'Unable to load contacts.',
+                    ),
+                    child: Text(error.toString()),
+                  ),
+                  data: (contacts) {
+                    final savedContacts = contacts
+                        .where(
+                          (contact) =>
+                              contact.id != null &&
+                              contact.id!.trim().isNotEmpty,
+                        )
+                        .toList();
+
+                    final selectedBuyerExists =
+                        formState.buyerContactId == null ||
+                        savedContacts.any(
+                          (contact) => contact.id == formState.buyerContactId,
+                        );
+
+                    return DropdownButtonFormField<String?>(
+                      key: const Key('sellInventoryBuyerField'),
+                      initialValue: selectedBuyerExists
+                          ? formState.buyerContactId
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Buyer',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('No Buyer Selected'),
+                        ),
+                        for (final contact in savedContacts)
+                          DropdownMenuItem<String?>(
+                            value: contact.id,
+                            child: Text(contact.name),
+                          ),
+                      ],
+                      onChanged: isCompletingSale
+                          ? null
+                          : formController.setBuyerContactId,
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

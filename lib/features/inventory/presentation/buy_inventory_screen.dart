@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../contacts/presentation/providers/contact_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'forms/buy_inventory_form_controller.dart';
@@ -157,7 +158,10 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     final formController = ref.read(
       buyInventoryFormControllerProvider.notifier,
     );
+
     final inventoryControllerState = ref.watch(inventoryControllerProvider);
+
+    final contactsAsync = ref.watch(contactsProvider);
 
     final isSaving = inventoryControllerState.isLoading;
 
@@ -316,6 +320,83 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                       : _formatDate(formState.purchaseDate!),
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Seller Information',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Optionally link the person who sold, traded, or consigned this item.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            contactsAsync.when(
+              loading: () => const InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Seller',
+                  border: OutlineInputBorder(),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Loading contacts...'),
+                  ],
+                ),
+              ),
+              error: (error, stackTrace) => InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Seller',
+                  border: OutlineInputBorder(),
+                  errorText: 'Unable to load contacts.',
+                ),
+                child: Text(error.toString()),
+              ),
+              data: (contacts) {
+                final savedContacts = contacts
+                    .where(
+                      (contact) =>
+                          contact.id != null && contact.id!.trim().isNotEmpty,
+                    )
+                    .toList();
+
+                final selectedSellerExists =
+                    formState.sellerContactId == null ||
+                    savedContacts.any(
+                      (contact) => contact.id == formState.sellerContactId,
+                    );
+
+                return DropdownButtonFormField<String?>(
+                  key: const Key('buyInventorySellerField'),
+                  initialValue: selectedSellerExists
+                      ? formState.sellerContactId
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Seller',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No Seller Selected'),
+                    ),
+                    for (final contact in savedContacts)
+                      DropdownMenuItem<String?>(
+                        value: contact.id,
+                        child: Text(contact.name),
+                      ),
+                  ],
+                  onChanged: isSaving
+                      ? null
+                      : formController.setSellerContactId,
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text('Pricing', style: Theme.of(context).textTheme.titleLarge),

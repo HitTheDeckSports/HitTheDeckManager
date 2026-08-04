@@ -8,6 +8,7 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
@@ -200,6 +201,8 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
+          _SellerInformationSection(sellerContactId: item.sellerContactId),
+          const SizedBox(height: 24),
           _DetailSection(
             title: 'Pricing',
             children: [
@@ -240,6 +243,105 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SellerInformationSection extends ConsumerWidget {
+  const _SellerInformationSection({required this.sellerContactId});
+
+  final String? sellerContactId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactId = sellerContactId?.trim() ?? '';
+
+    if (contactId.isEmpty) {
+      return const _DetailSection(
+        title: 'Seller Information',
+        children: [_DetailRow(label: 'Seller', value: 'No seller linked')],
+      );
+    }
+
+    final sellerAsync = ref.watch(contactProvider(contactId));
+
+    return sellerAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Seller Information',
+        children: [AppLoadingState(message: 'Loading seller information...')],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Seller Information',
+        children: [
+          AppErrorState(
+            message: 'Unable to load seller information.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(contactProvider(contactId));
+            },
+          ),
+        ],
+      ),
+      data: (seller) {
+        if (seller == null) {
+          return const _DetailSection(
+            title: 'Seller Information',
+            children: [
+              Text(
+                'A seller is linked to this item, but the Contact record is unavailable.',
+              ),
+            ],
+          );
+        }
+
+        return _SellerInformationContent(
+          sellerId: contactId,
+          sellerName: seller.name,
+          sellerPhone: seller.phone,
+          sellerEmail: seller.email,
+        );
+      },
+    );
+  }
+}
+
+class _SellerInformationContent extends StatelessWidget {
+  const _SellerInformationContent({
+    required this.sellerId,
+    required this.sellerName,
+    required this.sellerPhone,
+    required this.sellerEmail,
+  });
+
+  final String sellerId;
+  final String sellerName;
+  final String? sellerPhone;
+  final String? sellerEmail;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailSection(
+      title: 'Seller Information',
+      children: [
+        _DetailRow(label: 'Seller', value: sellerName),
+        _DetailRow(label: 'Phone', value: _displayOptionalText(sellerPhone)),
+        _DetailRow(label: 'Email', value: _displayOptionalText(sellerEmail)),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('inventoryItemViewSellerButton'),
+            onPressed: () {
+              context.goNamed(
+                AppRouteNames.contactDetail,
+                pathParameters: {'contactId': sellerId},
+              );
+            },
+            icon: const Icon(Icons.person_outline),
+            label: const Text('View Seller'),
+          ),
+        ),
+      ],
     );
   }
 }

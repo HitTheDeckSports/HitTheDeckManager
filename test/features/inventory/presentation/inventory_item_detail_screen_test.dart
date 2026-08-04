@@ -14,6 +14,10 @@ import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_tr
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
+import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memory_contact_repository.dart';
+import 'package:hit_the_deck_manager/features/contacts/domain/models/contact.dart';
+import 'package:hit_the_deck_manager/features/contacts/presentation/contact_detail_screen.dart';
+import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
 
 void main() {
   Widget createTestApp({
@@ -548,5 +552,250 @@ void main() {
     expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
 
     expect(find.text('Navigation test sale.'), findsOneWidget);
+  });
+  testWidgets('item without a seller displays no seller linked', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('No seller linked'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('inventoryItemViewSellerButton')),
+      findsNothing,
+    );
+  });
+  testWidgets('linked seller information is displayed', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      sellerContactId: 'contact-1',
+    );
+
+    const seller = Contact(
+      id: 'contact-1',
+      name: 'Taylor Morgan',
+      phone: '555-123-4567',
+      email: 'taylor@example.com',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [seller],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Taylor Morgan'), findsOneWidget);
+    expect(find.text('555-123-4567'), findsOneWidget);
+    expect(find.text('taylor@example.com'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('inventoryItemViewSellerButton')),
+      findsOneWidget,
+    );
+  });
+  testWidgets('missing linked seller displays warning', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      sellerContactId: 'missing-contact',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Seller Information'), findsOneWidget);
+
+    expect(
+      find.text(
+        'A seller is linked to this item, but the Contact record is unavailable.',
+      ),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const Key('inventoryItemViewSellerButton')),
+      findsNothing,
+    );
+  });
+  testWidgets('View Seller opens the linked contact detail screen', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      sellerContactId: 'contact-1',
+    );
+
+    const seller = Contact(
+      id: 'contact-1',
+      name: 'Taylor Morgan',
+      phone: '555-123-4567',
+      email: 'taylor@example.com',
+      address: '100 Main Street',
+      notes: 'Inventory seller.',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [seller],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-1',
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.contactDetail,
+          name: AppRouteNames.contactDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: ContactDetailScreen(
+                contactId: state.pathParameters['contactId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final viewSellerButton = find.byKey(
+      const Key('inventoryItemViewSellerButton'),
+    );
+
+    expect(viewSellerButton, findsOneWidget);
+
+    await tester.ensureVisible(viewSellerButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(viewSellerButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
+    expect(find.text('555-123-4567'), findsOneWidget);
+    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('100 Main Street'), findsOneWidget);
+    expect(find.text('Inventory seller.'), findsOneWidget);
   });
 }

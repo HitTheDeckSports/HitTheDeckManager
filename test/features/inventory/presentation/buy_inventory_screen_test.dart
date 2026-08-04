@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/forms/buy_inventory_form_controller.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/buy_inventory_screen.dart';
+import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memory_contact_repository.dart';
+import 'package:hit_the_deck_manager/features/contacts/domain/models/contact.dart';
+import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
 
 void main() {
   late ProviderContainer container;
@@ -768,5 +773,187 @@ void main() {
     expect(savedItem.weightOunces, isNull);
     expect(savedItem.drop, isNull);
     expect(savedItem.certification, isNull);
+  });
+  testWidgets('seller dropdown displays saved contacts', (
+    WidgetTester tester,
+  ) async {
+    final inventoryRepository = InMemoryInventoryRepository();
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [
+        Contact(id: 'contact-2', name: 'Jordan Smith'),
+        Contact(id: 'contact-1', name: 'Alex Johnson'),
+      ],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final sellerField = find.byKey(const Key('buyInventorySellerField'));
+
+    expect(sellerField, findsOneWidget);
+
+    await tester.ensureVisible(sellerField);
+    await tester.tap(sellerField);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Seller Selected'), findsAtLeastNWidgets(1));
+    expect(find.text('Alex Johnson'), findsOneWidget);
+    expect(find.text('Jordan Smith'), findsOneWidget);
+  });
+  testWidgets('selected seller is saved on new inventory item', (
+    WidgetTester tester,
+  ) async {
+    final inventoryRepository = InMemoryInventoryRepository();
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [Contact(id: 'contact-1', name: 'Taylor Morgan')],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '200.00',
+    );
+
+    final sellerField = find.byKey(const Key('buyInventorySellerField'));
+
+    await tester.ensureVisible(sellerField);
+    await tester.tap(sellerField);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Taylor Morgan'));
+    await tester.pumpAndSettle();
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final items = await inventoryRepository.getInventory();
+
+    expect(items, hasLength(1));
+    expect(items.single.sellerContactId, 'contact-1');
+  });
+  testWidgets('editing inventory preselects the saved seller', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      sellerContactId: 'contact-1',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [
+        Contact(id: 'contact-1', name: 'Taylor Morgan'),
+        Contact(id: 'contact-2', name: 'Jordan Smith'),
+      ],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final sellerField = tester.widget<DropdownButtonFormField<String?>>(
+      find.byKey(const Key('buyInventorySellerField')),
+    );
+
+    expect(sellerField.initialValue, 'contact-1');
+    expect(find.text('Taylor Morgan'), findsOneWidget);
+  });
+  testWidgets('missing linked seller does not crash edit form', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      sellerContactId: 'missing-contact',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final contactRepository = InMemoryContactRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('buyInventorySellerField')), findsOneWidget);
+
+    expect(find.text('No Seller Selected'), findsOneWidget);
+    expect(find.text('missing-contact'), findsNothing);
   });
 }
