@@ -1,6 +1,9 @@
 import 'package:go_router/go_router.dart';
 
+import '../features/contacts/presentation/contact_detail_screen.dart';
 import '../features/contacts/presentation/contacts_screen.dart';
+import '../features/contacts/presentation/create_contact_screen.dart';
+import '../features/contacts/presentation/edit_contact_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
@@ -78,6 +81,37 @@ final GoRouter appRouter = GoRouter(
           path: AppRoutes.contacts,
           name: AppRouteNames.contacts,
           builder: (context, state) => const ContactsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.createContact,
+          name: AppRouteNames.createContact,
+          builder: (context, state) => const CreateContactScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.contactDetail,
+          name: AppRouteNames.contactDetail,
+          builder: (context, state) {
+            final contactId = state.pathParameters['contactId'];
+
+            if (contactId == null || contactId.isEmpty) {
+              throw StateError('Contact detail route requires a contact ID.');
+            }
+
+            return ContactDetailScreen(contactId: contactId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.editContact,
+          name: AppRouteNames.editContact,
+          builder: (context, state) {
+            final contactId = state.pathParameters['contactId'];
+
+            if (contactId == null || contactId.isEmpty) {
+              throw StateError('Edit Contact route requires a contact ID.');
+            }
+
+            return EditContactScreen(contactId: contactId);
+          },
         ),
         GoRoute(
           path: AppRoutes.transactions,

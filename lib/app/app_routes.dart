@@ -3,6 +3,9 @@ abstract final class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String inventory = '/inventory';
   static const String contacts = '/contacts';
+  static const String createContact = '/contacts/new';
+  static const String contactDetail = '/contacts/:contactId';
+  static const String editContact = '/contacts/:contactId/edit';
   static const String transactions = '/transactions';
   static const String transactionDetail = '/transactions/:transactionId';
   static const String reports = '/reports';
@@ -19,6 +22,9 @@ abstract final class AppRouteNames {
   static const String dashboard = 'dashboard';
   static const String inventory = 'inventory';
   static const String contacts = 'contacts';
+  static const String createContact = 'createContact';
+  static const String contactDetail = 'contactDetail';
+  static const String editContact = 'editContact';
   static const String transactions = 'transactions';
   static const String transactionDetail = 'transactionDetail';
   static const String reports = 'reports';
