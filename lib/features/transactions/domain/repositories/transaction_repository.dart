@@ -1,3 +1,4 @@
+import '../models/repair_transaction.dart';
 import '../models/sale_transaction.dart';
 
 abstract interface class TransactionRepository {
@@ -29,4 +30,31 @@ abstract interface class TransactionRepository {
   /// Normal sale corrections should generally update the transaction rather
   /// than deleting it.
   Future<void> deleteSale(String id);
+
+  /// Returns all recorded repair transactions.
+  Future<List<RepairTransaction>> getRepairs();
+
+  /// Watches repair transactions and emits a new list whenever repairs change.
+  Stream<List<RepairTransaction>> watchRepairs();
+
+  /// Returns one repair transaction, or null when the ID does not exist.
+  Future<RepairTransaction?> getRepair(String id);
+
+  /// Returns every repair recorded for an inventory item.
+  ///
+  /// An inventory item may have multiple repair transactions.
+  Future<List<RepairTransaction>> getRepairsForInventoryItem(
+    String inventoryItemId,
+  );
+
+  /// Creates a repair transaction and returns the saved record.
+  ///
+  /// The returned transaction should contain its assigned ID.
+  Future<RepairTransaction> createRepair(RepairTransaction transaction);
+
+  /// Saves changes to an existing repair transaction.
+  Future<RepairTransaction> updateRepair(RepairTransaction transaction);
+
+  /// Permanently removes a repair transaction.
+  Future<void> deleteRepair(String id);
 }

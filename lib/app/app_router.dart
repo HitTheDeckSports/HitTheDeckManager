@@ -10,6 +10,8 @@ import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/transactions/presentation/add_repair_screen.dart';
+import '../features/transactions/presentation/repair_detail_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/transactions/presentation/transaction_detail_screen.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
@@ -64,6 +66,36 @@ final GoRouter appRouter = GoRouter(
             return EditInventoryScreen(itemId: itemId);
           },
         ),
+
+        GoRoute(
+          path: AppRoutes.addRepair,
+          name: AppRouteNames.addRepair,
+          builder: (context, state) {
+            final itemId = state.pathParameters['itemId'];
+
+            if (itemId == null || itemId.isEmpty) {
+              throw StateError(
+                'Add Repair route requires an inventory item ID.',
+              );
+            }
+
+            return AddRepairScreen(inventoryItemId: itemId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.repairDetail,
+          name: AppRouteNames.repairDetail,
+          builder: (context, state) {
+            final repairId = state.pathParameters['repairId'];
+
+            if (repairId == null || repairId.isEmpty) {
+              throw StateError('Repair detail route requires a repair ID.');
+            }
+
+            return RepairDetailScreen(repairId: repairId);
+          },
+        ),
+
         GoRoute(
           path: AppRoutes.inventoryDetail,
           name: AppRouteNames.inventoryDetail,

@@ -9,6 +9,7 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
+import '../../transactions/domain/models/repair_transaction.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
@@ -166,6 +167,20 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),
+        if (item.id != null)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemAddRepairButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.addRepair,
+                      pathParameters: {'itemId': item.id!},
+                    );
+                  },
+            icon: const Icon(Icons.build_outlined),
+            label: const Text('Add Repair'),
+          ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -226,6 +241,13 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.id != null) ...[
+            const SizedBox(height: 24),
+            _RepairHistorySection(
+              inventoryItemId: item.id!,
+              acquisitionValueCents: item.acquisitionValueCents,
+            ),
+          ],
           if (item.status == InventoryStatus.sold && item.id != null) ...[
             const SizedBox(height: 24),
             _SaleInformationSection(inventoryItemId: item.id!),
@@ -243,6 +265,137 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RepairHistorySection extends ConsumerWidget {
+  const _RepairHistorySection({
+    required this.inventoryItemId,
+    required this.acquisitionValueCents,
+  });
+
+  final String inventoryItemId;
+  final int acquisitionValueCents;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repairsAsync = ref.watch(
+      repairsForInventoryItemProvider(inventoryItemId),
+    );
+
+    return repairsAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Repair History',
+        children: [AppLoadingState(message: 'Loading repair history...')],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Repair History',
+        children: [
+          AppErrorState(
+            message: 'Unable to load repair history.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(repairsForInventoryItemProvider(inventoryItemId));
+            },
+          ),
+        ],
+      ),
+      data: (repairs) {
+        return _RepairHistoryContent(
+          repairs: repairs,
+          acquisitionValueCents: acquisitionValueCents,
+        );
+      },
+    );
+  }
+}
+
+class _RepairHistoryContent extends StatelessWidget {
+  const _RepairHistoryContent({
+    required this.repairs,
+    required this.acquisitionValueCents,
+  });
+
+  final List<RepairTransaction> repairs;
+  final int acquisitionValueCents;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalRepairCostCents = repairs.fold<int>(
+      0,
+      (total, repair) => total + repair.costCents,
+    );
+
+    final trueCostCents = acquisitionValueCents + totalRepairCostCents;
+
+    return _DetailSection(
+      title: 'Repair History',
+      children: [
+        _DetailRow(
+          label: 'Number of Repairs',
+          value: repairs.length.toString(),
+        ),
+        _DetailRow(
+          label: 'Total Repair Cost',
+          value: CurrencyFormatter.formatCents(totalRepairCostCents),
+        ),
+        _DetailRow(
+          label: 'True Cost',
+          value: CurrencyFormatter.formatCents(trueCostCents),
+        ),
+        const SizedBox(height: 12),
+        if (repairs.isEmpty)
+          const Text('No repairs have been recorded for this item.')
+        else
+          for (var index = 0; index < repairs.length; index++) ...[
+            if (index > 0) const Divider(height: 32),
+            _RepairHistoryEntry(repair: repairs[index]),
+          ],
+      ],
+    );
+  }
+}
+
+class _RepairHistoryEntry extends StatelessWidget {
+  const _RepairHistoryEntry({required this.repair});
+
+  final RepairTransaction repair;
+
+  @override
+  Widget build(BuildContext context) {
+    final repairId = repair.id;
+
+    return Column(
+      key: ValueKey('repairHistoryEntry-${repair.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DetailRow(label: 'Repair Date', value: _formatDate(repair.repairDate)),
+        _DetailRow(label: 'Description', value: repair.description),
+        _DetailRow(
+          label: 'Repair Cost',
+          value: CurrencyFormatter.formatCents(repair.costCents),
+        ),
+        if (repair.notes != null && repair.notes!.trim().isNotEmpty)
+          _DetailRow(label: 'Notes', value: repair.notes!),
+        if (repairId != null && repairId.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: ValueKey('repairHistoryViewButton-$repairId'),
+              onPressed: () {
+                context.goNamed(
+                  AppRouteNames.repairDetail,
+                  pathParameters: {'repairId': repairId},
+                );
+              },
+              icon: const Icon(Icons.open_in_new_outlined),
+              label: const Text('View Repair'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -14,6 +14,8 @@ abstract final class AppRoutes {
   static const String buyInventory = '/inventory/buy';
   static const String sellInventory = '/inventory/sell';
   static const String inventoryEdit = '/inventory/:itemId/edit';
+  static const String addRepair = '/inventory/:itemId/repairs/new';
+  static const String repairDetail = '/repairs/:repairId';
   static const String inventoryDetail = '/inventory/:itemId';
 }
 
@@ -33,5 +35,7 @@ abstract final class AppRouteNames {
   static const String buyInventory = 'buyInventory';
   static const String sellInventory = 'sellInventory';
   static const String inventoryEdit = 'inventoryEdit';
+  static const String addRepair = 'addRepair';
+  static const String repairDetail = 'repairDetail';
   static const String inventoryDetail = 'inventoryDetail';
 }

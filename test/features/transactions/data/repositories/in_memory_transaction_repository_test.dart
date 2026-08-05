@@ -3,6 +3,7 @@ import 'package:hit_the_deck_manager/core/errors/app_exception.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_transaction.dart';
 
 void main() {
   group('InMemoryTransactionRepository', () {
@@ -194,5 +195,253 @@ void main() {
         throwsA(isA<NotFoundException>()),
       );
     });
+  });
+  test('getRepairs returns initial repair records', () async {
+    final repair = RepairTransaction(
+      id: 'repair-1',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    final repository = InMemoryTransactionRepository(initialRepairs: [repair]);
+
+    addTearDown(repository.dispose);
+
+    final repairs = await repository.getRepairs();
+
+    expect(repairs, [repair]);
+  });
+  test('createRepair assigns an ID and stores the repair', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    final repair = RepairTransaction(
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    final savedRepair = await repository.createRepair(repair);
+
+    expect(savedRepair.id, isNotNull);
+    expect(savedRepair.inventoryItemId, 'item-1');
+    expect(savedRepair.costCents, 4500);
+
+    expect(await repository.getRepair(savedRepair.id!), savedRepair);
+  });
+  test('createRepair rejects invalid repair information', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    final repair = RepairTransaction(
+      inventoryItemId: '',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    expect(
+      () => repository.createRepair(repair),
+      throwsA(isA<ValidationException>()),
+    );
+  });
+  test('createRepair rejects duplicate repair IDs', () async {
+    final repair = RepairTransaction(
+      id: 'repair-1',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    final repository = InMemoryTransactionRepository(initialRepairs: [repair]);
+
+    addTearDown(repository.dispose);
+
+    expect(
+      () => repository.createRepair(repair),
+      throwsA(isA<DuplicateException>()),
+    );
+  });
+  test('multiple repairs can be stored for the same item', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    await repository.createRepair(
+      RepairTransaction(
+        id: 'repair-1',
+        inventoryItemId: 'item-1',
+        repairDate: DateTime(2026, 8, 4),
+        costCents: 2500,
+        description: 'Cleaned and conditioned.',
+      ),
+    );
+
+    await repository.createRepair(
+      RepairTransaction(
+        id: 'repair-2',
+        inventoryItemId: 'item-1',
+        repairDate: DateTime(2026, 8, 6),
+        costCents: 4500,
+        description: 'Replaced damaged grip.',
+      ),
+    );
+
+    final repairs = await repository.getRepairsForInventoryItem('item-1');
+
+    expect(repairs, hasLength(2));
+    expect(repairs.first.id, 'repair-2');
+    expect(repairs.last.id, 'repair-1');
+  });
+  test('getRepairsForInventoryItem excludes other items', () async {
+    final repository = InMemoryTransactionRepository(
+      initialRepairs: [
+        RepairTransaction(
+          id: 'repair-1',
+          inventoryItemId: 'item-1',
+          repairDate: DateTime(2026, 8, 5),
+          costCents: 4500,
+          description: 'Replaced damaged grip.',
+        ),
+        RepairTransaction(
+          id: 'repair-2',
+          inventoryItemId: 'item-2',
+          repairDate: DateTime(2026, 8, 6),
+          costCents: 3000,
+          description: 'Re-laced glove.',
+        ),
+      ],
+    );
+
+    addTearDown(repository.dispose);
+
+    final repairs = await repository.getRepairsForInventoryItem('item-1');
+
+    expect(repairs, hasLength(1));
+    expect(repairs.single.id, 'repair-1');
+  });
+  test('updateRepair persists changes', () async {
+    final original = RepairTransaction(
+      id: 'repair-1',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    final repository = InMemoryTransactionRepository(
+      initialRepairs: [original],
+    );
+
+    addTearDown(repository.dispose);
+
+    final updated = original.copyWith(
+      costCents: 5500,
+      description: 'Replaced grip and cleaned barrel.',
+    );
+
+    final savedRepair = await repository.updateRepair(updated);
+
+    expect(savedRepair, updated);
+    expect(await repository.getRepair('repair-1'), updated);
+  });
+  test('updateRepair requires an ID', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    final repair = RepairTransaction(
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    expect(
+      () => repository.updateRepair(repair),
+      throwsA(isA<ValidationException>()),
+    );
+  });
+  test('updateRepair rejects an unknown ID', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    final repair = RepairTransaction(
+      id: 'missing-repair',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    expect(
+      () => repository.updateRepair(repair),
+      throwsA(isA<NotFoundException>()),
+    );
+  });
+  test('deleteRepair removes an existing repair', () async {
+    final repair = RepairTransaction(
+      id: 'repair-1',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+    );
+
+    final repository = InMemoryTransactionRepository(initialRepairs: [repair]);
+
+    addTearDown(repository.dispose);
+
+    await repository.deleteRepair('repair-1');
+
+    expect(await repository.getRepair('repair-1'), isNull);
+    expect(await repository.getRepairs(), isEmpty);
+  });
+  test('deleteRepair rejects an unknown ID', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    expect(
+      () => repository.deleteRepair('missing-repair'),
+      throwsA(isA<NotFoundException>()),
+    );
+  });
+  test('watchRepairs emits initial and updated repair lists', () async {
+    final repository = InMemoryTransactionRepository();
+
+    addTearDown(repository.dispose);
+
+    final emittedLists = <List<RepairTransaction>>[];
+
+    final subscription = repository.watchRepairs().listen(emittedLists.add);
+
+    addTearDown(subscription.cancel);
+
+    await Future<void>.delayed(Duration.zero);
+
+    await repository.createRepair(
+      RepairTransaction(
+        id: 'repair-1',
+        inventoryItemId: 'item-1',
+        repairDate: DateTime(2026, 8, 5),
+        costCents: 4500,
+        description: 'Replaced damaged grip.',
+      ),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emittedLists, hasLength(2));
+    expect(emittedLists.first, isEmpty);
+    expect(emittedLists.last, hasLength(1));
+    expect(emittedLists.last.single.id, 'repair-1');
   });
 }

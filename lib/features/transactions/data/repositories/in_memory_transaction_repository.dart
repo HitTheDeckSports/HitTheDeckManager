@@ -3,21 +3,27 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../domain/models/repair_transaction.dart';
 import '../../domain/models/sale_transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
 
 class InMemoryTransactionRepository implements TransactionRepository {
   InMemoryTransactionRepository({
     List<SaleTransaction> initialSales = const [],
+    List<RepairTransaction> initialRepairs = const [],
     Uuid? uuid,
   }) : _sales = [...initialSales],
+       _repairs = [...initialRepairs],
        _uuid = uuid ?? const Uuid();
 
   final List<SaleTransaction> _sales;
+  final List<RepairTransaction> _repairs;
   final Uuid _uuid;
 
   final StreamController<List<SaleTransaction>> _salesController =
       StreamController<List<SaleTransaction>>.broadcast();
+  final StreamController<List<RepairTransaction>> _repairsController =
+      StreamController<List<RepairTransaction>>.broadcast();
 
   @override
   Future<List<SaleTransaction>> getSales() async {
@@ -141,11 +147,127 @@ class InMemoryTransactionRepository implements TransactionRepository {
     _notifySalesChanged();
   }
 
+  @override
+  Future<List<RepairTransaction>> getRepairs() async {
+    return List.unmodifiable(_repairs);
+  }
+
+  @override
+  Stream<List<RepairTransaction>> watchRepairs() {
+    return Stream<List<RepairTransaction>>.multi((controller) {
+      final subscription = _repairsController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+
+      controller.add(List.unmodifiable(_repairs));
+
+      controller.onCancel = subscription.cancel;
+    });
+  }
+
+  @override
+  Future<RepairTransaction?> getRepair(String id) async {
+    for (final repair in _repairs) {
+      if (repair.id == id) {
+        return repair;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<List<RepairTransaction>> getRepairsForInventoryItem(
+    String inventoryItemId,
+  ) async {
+    final repairs = _repairs
+        .where((repair) => repair.inventoryItemId == inventoryItemId)
+        .toList();
+
+    repairs.sort(
+      (first, second) => second.repairDate.compareTo(first.repairDate),
+    );
+
+    return List.unmodifiable(repairs);
+  }
+
+  @override
+  Future<RepairTransaction> createRepair(RepairTransaction transaction) async {
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The repair transaction contains invalid information.',
+      );
+    }
+
+    final transactionId = transaction.id ?? _uuid.v4();
+
+    if (_repairs.any((repair) => repair.id == transactionId)) {
+      throw DuplicateException(
+        'A repair transaction with ID $transactionId already exists.',
+      );
+    }
+
+    final savedTransaction = transaction.copyWith(id: transactionId);
+
+    _repairs.add(savedTransaction);
+    _notifyRepairsChanged();
+
+    return savedTransaction;
+  }
+
+  @override
+  Future<RepairTransaction> updateRepair(RepairTransaction transaction) async {
+    if (transaction.id == null) {
+      throw const ValidationException(
+        'A repair transaction must have an ID before it can be updated.',
+      );
+    }
+
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The repair transaction contains invalid information.',
+      );
+    }
+
+    final index = _repairs.indexWhere((repair) => repair.id == transaction.id);
+
+    if (index == -1) {
+      throw NotFoundException(
+        'No repair transaction exists with ID ${transaction.id}.',
+      );
+    }
+
+    _repairs[index] = transaction;
+    _notifyRepairsChanged();
+
+    return transaction;
+  }
+
+  @override
+  Future<void> deleteRepair(String id) async {
+    final originalLength = _repairs.length;
+
+    _repairs.removeWhere((repair) => repair.id == id);
+
+    if (_repairs.length == originalLength) {
+      throw NotFoundException('No repair transaction exists with ID $id.');
+    }
+
+    _notifyRepairsChanged();
+  }
+
   void _notifySalesChanged() {
     _salesController.add(List.unmodifiable(_sales));
   }
 
+  void _notifyRepairsChanged() {
+    _repairsController.add(List.unmodifiable(_repairs));
+  }
+
   Future<void> dispose() async {
     await _salesController.close();
+    await _repairsController.close();
   }
 }

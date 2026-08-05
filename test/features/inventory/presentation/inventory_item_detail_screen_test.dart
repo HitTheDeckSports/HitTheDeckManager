@@ -18,6 +18,8 @@ import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memo
 import 'package:hit_the_deck_manager/features/contacts/domain/models/contact.dart';
 import 'package:hit_the_deck_manager/features/contacts/presentation/contact_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/add_repair_screen.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_transaction.dart';
 
 void main() {
   Widget createTestApp({
@@ -75,7 +77,7 @@ void main() {
     expect(find.text('08/02/2026'), findsOneWidget);
 
     expect(find.text('Pricing'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsNWidgets(2));
     expect(find.text(r'$499.99'), findsOneWidget);
     expect(find.text(r'$325.00'), findsOneWidget);
     expect(find.text(r'$275.00'), findsOneWidget);
@@ -1109,5 +1111,259 @@ void main() {
     expect(find.text('taylor@example.com'), findsOneWidget);
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat buyer.'), findsOneWidget);
+  });
+  testWidgets('Add Repair opens repair form for the selected item', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.available,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-1',
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.addRepair,
+          name: AppRouteNames.addRepair,
+          builder: (context, state) {
+            return Scaffold(
+              body: AddRepairScreen(
+                inventoryItemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final addRepairButton = find.byKey(
+      const Key('inventoryItemAddRepairButton'),
+    );
+
+    expect(addRepairButton, findsOneWidget);
+
+    await tester.ensureVisible(addRepairButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(addRepairButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('addRepairInventoryItemField')),
+      findsOneWidget,
+    );
+
+    expect(
+      find.text('BAT-2608-0001 — Combat Spec H1'),
+      findsAtLeastNWidgets(1),
+    );
+
+    expect(find.byKey(const Key('addRepairCostField')), findsOneWidget);
+
+    expect(find.byKey(const Key('addRepairDescriptionField')), findsOneWidget);
+
+    expect(find.byKey(const Key('addRepairSubmitButton')), findsOneWidget);
+  });
+  testWidgets('displays empty repair history and current true cost', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.available,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Repair History'), findsOneWidget);
+    expect(find.text('Number of Repairs'), findsOneWidget);
+    expect(find.text('Total Repair Cost'), findsOneWidget);
+    expect(find.text('True Cost'), findsOneWidget);
+
+    expect(
+      find.text('No repairs have been recorded for this item.'),
+      findsOneWidget,
+    );
+
+    expect(find.text(r'$0.00'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsNWidgets(2));
+  });
+  testWidgets('displays repair history newest first with total and true cost', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.available,
+    );
+
+    final olderRepair = RepairTransaction(
+      id: 'repair-1',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 3),
+      costCents: 2500,
+      description: 'Cleaned and conditioned.',
+    );
+
+    final newerRepair = RepairTransaction(
+      id: 'repair-2',
+      inventoryItemId: 'item-1',
+      repairDate: DateTime(2026, 8, 5),
+      costCents: 4500,
+      description: 'Replaced damaged grip.',
+      notes: 'Completed in-house.',
+    );
+
+    final unrelatedRepair = RepairTransaction(
+      id: 'repair-3',
+      inventoryItemId: 'item-2',
+      repairDate: DateTime(2026, 8, 6),
+      costCents: 3000,
+      description: 'Re-laced glove.',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialRepairs: [olderRepair, unrelatedRepair, newerRepair],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Repair History'), findsOneWidget);
+    expect(find.text('2'), findsAtLeastNWidgets(1));
+    expect(find.text(r'$70.00'), findsOneWidget);
+    expect(find.text(r'$270.00'), findsOneWidget);
+
+    expect(
+      find.byKey(const ValueKey('repairHistoryEntry-repair-1')),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const ValueKey('repairHistoryEntry-repair-2')),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const ValueKey('repairHistoryEntry-repair-3')),
+      findsNothing,
+    );
+
+    expect(find.text('Replaced damaged grip.'), findsOneWidget);
+
+    expect(find.text('Cleaned and conditioned.'), findsOneWidget);
+
+    expect(find.text('Completed in-house.'), findsOneWidget);
+
+    expect(find.text('Re-laced glove.'), findsNothing);
+
+    final newerEntry = find.byKey(
+      const ValueKey('repairHistoryEntry-repair-2'),
+    );
+
+    final olderEntry = find.byKey(
+      const ValueKey('repairHistoryEntry-repair-1'),
+    );
+
+    expect(
+      tester.getTopLeft(newerEntry).dy,
+      lessThan(tester.getTopLeft(olderEntry).dy),
+    );
   });
 }
