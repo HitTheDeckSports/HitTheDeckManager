@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/sale_transaction.dart';
@@ -180,6 +183,8 @@ class _TransactionDetailView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _BuyerInformationSection(buyerContactId: transaction.buyerContactId),
+          const SizedBox(height: 16),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -244,6 +249,118 @@ class _TransactionDetailView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BuyerInformationSection extends ConsumerWidget {
+  const _BuyerInformationSection({required this.buyerContactId});
+
+  final String? buyerContactId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactId = buyerContactId?.trim() ?? '';
+
+    if (contactId.isEmpty) {
+      return const _BuyerInformationCard(
+        children: [
+          _TransactionDetailRow(label: 'Buyer', value: 'No buyer linked'),
+        ],
+      );
+    }
+
+    final buyerAsync = ref.watch(contactProvider(contactId));
+
+    return buyerAsync.when(
+      loading: () => const _BuyerInformationCard(
+        children: [AppLoadingState(message: 'Loading buyer information...')],
+      ),
+      error: (error, stackTrace) => _BuyerInformationCard(
+        children: [
+          AppErrorState(
+            message: 'Unable to load buyer information.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(contactProvider(contactId));
+            },
+          ),
+        ],
+      ),
+      data: (buyer) {
+        if (buyer == null) {
+          return const _BuyerInformationCard(
+            children: [
+              Text(
+                'A buyer is linked to this sale, but the Contact record is unavailable.',
+              ),
+            ],
+          );
+        }
+
+        return _BuyerInformationCard(
+          children: [
+            _TransactionDetailRow(label: 'Buyer', value: buyer.name),
+            const SizedBox(height: 8),
+            _TransactionDetailRow(
+              label: 'Phone',
+              value: _displayOptionalContactValue(buyer.phone),
+            ),
+            const SizedBox(height: 8),
+            _TransactionDetailRow(
+              label: 'Email',
+              value: _displayOptionalContactValue(buyer.email),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('transactionDetailViewBuyerButton'),
+                onPressed: () {
+                  context.goNamed(
+                    AppRouteNames.contactDetail,
+                    pathParameters: {'contactId': contactId},
+                  );
+                },
+                icon: const Icon(Icons.person_outline),
+                label: const Text('View Buyer'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BuyerInformationCard extends StatelessWidget {
+  const _BuyerInformationCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Buyer Information',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _displayOptionalContactValue(String? value) {
+  final trimmedValue = value?.trim() ?? '';
+
+  return trimmedValue.isEmpty ? 'Not specified' : trimmedValue;
 }
 
 class _TransactionDetailRow extends StatelessWidget {

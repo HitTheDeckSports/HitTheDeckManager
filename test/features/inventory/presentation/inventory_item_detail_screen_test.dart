@@ -798,4 +798,316 @@ void main() {
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Inventory seller.'), findsOneWidget);
   });
+  testWidgets('sold item without a buyer displays no buyer linked', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      acquisitionValueCents: 20000,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    final contactRepository = InMemoryContactRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsOneWidget);
+    expect(find.text('No buyer linked'), findsOneWidget);
+
+    expect(find.byKey(const Key('inventoryItemViewBuyerButton')), findsNothing);
+  });
+  testWidgets('sold item displays linked buyer information', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      buyerContactId: 'contact-1',
+      acquisitionValueCents: 20000,
+    );
+
+    const buyer = Contact(
+      id: 'contact-1',
+      name: 'Taylor Morgan',
+      phone: '555-123-4567',
+      email: 'taylor@example.com',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [buyer],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsOneWidget);
+    expect(find.text('Taylor Morgan'), findsOneWidget);
+    expect(find.text('555-123-4567'), findsOneWidget);
+    expect(find.text('taylor@example.com'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('inventoryItemViewBuyerButton')),
+      findsOneWidget,
+    );
+  });
+  testWidgets('sold item displays warning for missing linked buyer', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      buyerContactId: 'missing-contact',
+      acquisitionValueCents: 20000,
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    final contactRepository = InMemoryContactRepository();
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: InventoryItemDetailScreen(itemId: 'item-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Information'), findsOneWidget);
+
+    expect(
+      find.text(
+        'A buyer is linked to this sale, but the Contact record is unavailable.',
+      ),
+      findsOneWidget,
+    );
+
+    expect(find.byKey(const Key('inventoryItemViewBuyerButton')), findsNothing);
+  });
+  testWidgets('View Buyer opens buyer contact details from sold item', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2608-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+
+    final sale = SaleTransaction(
+      id: 'sale-1',
+      inventoryItemId: 'item-1',
+      salePriceCents: 32500,
+      saleDate: DateTime(2026, 8, 3),
+      paymentMethod: PaymentMethod.cash,
+      buyerContactId: 'contact-1',
+      acquisitionValueCents: 20000,
+    );
+
+    const buyer = Contact(
+      id: 'contact-1',
+      name: 'Taylor Morgan',
+      phone: '555-123-4567',
+      email: 'taylor@example.com',
+      address: '100 Main Street',
+      notes: 'Repeat buyer.',
+    );
+
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+
+    final transactionRepository = InMemoryTransactionRepository(
+      initialSales: [sale],
+    );
+
+    final contactRepository = InMemoryContactRepository(
+      initialContacts: const [buyer],
+    );
+
+    addTearDown(inventoryRepository.dispose);
+    addTearDown(transactionRepository.dispose);
+    addTearDown(contactRepository.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-1',
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.contactDetail,
+          name: AppRouteNames.contactDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: ContactDetailScreen(
+                contactId: state.pathParameters['contactId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          contactRepositoryProvider.overrideWithValue(contactRepository),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final viewBuyerButton = find.byKey(
+      const Key('inventoryItemViewBuyerButton'),
+    );
+
+    expect(viewBuyerButton, findsOneWidget);
+
+    await tester.ensureVisible(viewBuyerButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(viewBuyerButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
+    expect(find.text('555-123-4567'), findsOneWidget);
+    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('100 Main Street'), findsOneWidget);
+    expect(find.text('Repeat buyer.'), findsOneWidget);
+  });
 }

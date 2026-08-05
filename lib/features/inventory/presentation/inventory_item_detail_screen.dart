@@ -405,6 +405,7 @@ class _SaleInformationCardContent extends StatelessWidget {
       children: [
         _DetailRow(label: 'Sale Date', value: _formatDate(sale.saleDate)),
         _DetailRow(label: 'Payment Method', value: sale.paymentMethod.label),
+        _SaleBuyerInformation(buyerContactId: sale.buyerContactId),
         _DetailRow(
           label: 'Sale Price',
           value: CurrencyFormatter.formatCents(sale.salePriceCents),
@@ -447,6 +448,83 @@ class _SaleInformationCardContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SaleBuyerInformation extends ConsumerWidget {
+  const _SaleBuyerInformation({required this.buyerContactId});
+
+  final String? buyerContactId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactId = buyerContactId?.trim() ?? '';
+
+    if (contactId.isEmpty) {
+      return const _DetailRow(label: 'Buyer', value: 'No buyer linked');
+    }
+
+    final buyerAsync = ref.watch(contactProvider(contactId));
+
+    return buyerAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 6),
+        child: AppLoadingState(message: 'Loading buyer information...'),
+      ),
+      error: (error, stackTrace) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: AppErrorState(
+          message: 'Unable to load buyer information.',
+          details: error.toString(),
+          onRetry: () {
+            ref.invalidate(contactProvider(contactId));
+          },
+        ),
+      ),
+      data: (buyer) {
+        if (buyer == null) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              'A buyer is linked to this sale, but the Contact record is unavailable.',
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _DetailRow(label: 'Buyer', value: buyer.name),
+              _DetailRow(
+                label: 'Buyer Phone',
+                value: _displayOptionalText(buyer.phone),
+              ),
+              _DetailRow(
+                label: 'Buyer Email',
+                value: _displayOptionalText(buyer.email),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('inventoryItemViewBuyerButton'),
+                  onPressed: () {
+                    context.goNamed(
+                      AppRouteNames.contactDetail,
+                      pathParameters: {'contactId': contactId},
+                    );
+                  },
+                  icon: const Icon(Icons.person_outline),
+                  label: const Text('View Buyer'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
