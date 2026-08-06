@@ -9,78 +9,112 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../domain/models/repair_transaction.dart';
 import 'forms/repair_form_controller.dart';
 import 'providers/repair_transaction_controller.dart';
+import 'providers/transaction_providers.dart';
 
-class AddRepairScreen extends ConsumerWidget {
-  const AddRepairScreen({
-    required this.inventoryItemId,
-    this.onSaved,
-    super.key,
-  });
+class EditRepairScreen extends ConsumerWidget {
+  const EditRepairScreen({required this.repairId, super.key});
 
-  final String inventoryItemId;
-  final VoidCallback? onSaved;
+  final String repairId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inventoryItemAsync = ref.watch(
-      inventoryItemProvider(inventoryItemId),
-    );
+    final repairAsync = ref.watch(repairTransactionProvider(repairId));
 
-    return inventoryItemAsync.when(
+    return repairAsync.when(
       loading: () => const AppPage(
-        title: 'Add Repair',
-        child: AppLoadingState(message: 'Loading inventory item...'),
+        title: 'Edit Repair',
+        child: AppLoadingState(message: 'Loading repair...'),
       ),
       error: (error, stackTrace) => AppPage(
-        title: 'Add Repair',
+        title: 'Edit Repair',
         child: AppErrorState(
-          message: 'Unable to load the inventory item.',
+          message: 'Unable to load the repair.',
           details: error.toString(),
           onRetry: () {
-            ref.invalidate(inventoryItemProvider(inventoryItemId));
+            ref.invalidate(repairTransactionProvider(repairId));
           },
         ),
       ),
-      data: (inventoryItem) {
-        if (inventoryItem == null) {
+      data: (repair) {
+        if (repair == null) {
           return const AppPage(
-            title: 'Add Repair',
+            title: 'Edit Repair',
             child: AppEmptyState(
               icon: Icons.build_circle_outlined,
-              title: 'Inventory item not found.',
+              title: 'Repair not found.',
               message:
-                  'A repair cannot be added because the inventory item is unavailable.',
+                  'The repair may have been removed or is no longer available.',
             ),
           );
         }
 
-        return _AddRepairForm(inventoryItem: inventoryItem, onSaved: onSaved);
+        final inventoryItemAsync = ref.watch(
+          inventoryItemProvider(repair.inventoryItemId),
+        );
+
+        return inventoryItemAsync.when(
+          loading: () => const AppPage(
+            title: 'Edit Repair',
+            child: AppLoadingState(message: 'Loading inventory item...'),
+          ),
+          error: (error, stackTrace) => AppPage(
+            title: 'Edit Repair',
+            child: AppErrorState(
+              message: 'Unable to load the linked inventory item.',
+              details: error.toString(),
+              onRetry: () {
+                ref.invalidate(inventoryItemProvider(repair.inventoryItemId));
+              },
+            ),
+          ),
+          data: (inventoryItem) {
+            if (inventoryItem == null) {
+              return const AppPage(
+                title: 'Edit Repair',
+                child: AppEmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Inventory item not found.',
+                  message:
+                      'The repair cannot be edited because its linked inventory item is unavailable.',
+                ),
+              );
+            }
+
+            return _EditRepairForm(
+              repair: repair,
+              inventoryItem: inventoryItem,
+            );
+          },
+        );
       },
     );
   }
 }
 
-class _AddRepairForm extends ConsumerStatefulWidget {
-  const _AddRepairForm({required this.inventoryItem, this.onSaved});
+class _EditRepairForm extends ConsumerStatefulWidget {
+  const _EditRepairForm({required this.repair, required this.inventoryItem});
 
+  final RepairTransaction repair;
   final InventoryItem inventoryItem;
-  final VoidCallback? onSaved;
 
   @override
-  ConsumerState<_AddRepairForm> createState() {
-    return _AddRepairFormState();
+  ConsumerState<_EditRepairForm> createState() {
+    return _EditRepairFormState();
   }
 }
 
-class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
+class _EditRepairFormState extends ConsumerState<_EditRepairForm> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _repairDateController;
   late final TextEditingController _costController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _notesController;
+
+  bool _hasLoadedRepair = false;
 
   String get _inventoryItemId {
     return widget.inventoryItem.id!;
@@ -90,21 +124,40 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
   void initState() {
     super.initState();
 
-    final initialState = ref.read(
-      repairFormControllerProvider(_inventoryItemId),
-    );
-
     _repairDateController = TextEditingController(
-      text: _formatDate(initialState.repairDate),
+      text: _formatDate(widget.repair.repairDate),
     );
 
-    _costController = TextEditingController(text: initialState.costInput);
+    _costController = TextEditingController(
+      text: _formatCentsForInput(widget.repair.costCents),
+    );
 
     _descriptionController = TextEditingController(
-      text: initialState.description,
+      text: widget.repair.description,
     );
 
-    _notesController = TextEditingController(text: initialState.notes);
+    _notesController = TextEditingController(text: widget.repair.notes ?? '');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_hasLoadedRepair) {
+      return;
+    }
+
+    _hasLoadedRepair = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      ref
+          .read(repairFormControllerProvider(_inventoryItemId).notifier)
+          .loadRepair(widget.repair);
+    });
   }
 
   @override
@@ -117,23 +170,15 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
     super.dispose();
   }
 
-  String _formatDate(DateTime date) {
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-
-    return '$month/$day/${date.year}';
-  }
-
   String _inventoryDisplayName() {
-    final item = widget.inventoryItem;
-    final model = item.model?.trim();
+    final model = widget.inventoryItem.model?.trim();
 
     final equipmentName = model == null || model.isEmpty
-        ? item.brand
-        : '${item.brand} $model';
+        ? widget.inventoryItem.brand
+        : '${widget.inventoryItem.brand} $model';
 
     final inventoryNumber =
-        item.inventoryNumber ?? 'Inventory number not assigned';
+        widget.inventoryItem.inventoryNumber ?? 'Inventory number not assigned';
 
     return '$inventoryNumber — $equipmentName';
   }
@@ -168,41 +213,35 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
 
     final formProvider = repairFormControllerProvider(_inventoryItemId);
 
-    final formController = ref.read(formProvider.notifier);
-
     try {
-      final repair = formController.buildRepairTransaction();
+      final updatedRepair = ref
+          .read(formProvider.notifier)
+          .buildRepairTransaction();
 
-      await ref
+      final savedRepair = await ref
           .read(repairTransactionControllerProvider.notifier)
-          .createRepair(repair);
+          .updateRepair(updatedRepair);
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Repair was added successfully.')),
+        const SnackBar(content: Text('Repair was updated successfully.')),
       );
 
-      widget.onSaved?.call();
-
-      if (!mounted) {
-        return;
-      }
-
       context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': _inventoryItemId},
+        AppRouteNames.repairDetail,
+        pathParameters: {'repairId': savedRepair.id!},
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unable to add repair: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update repair: $error')),
+      );
     }
   }
 
@@ -212,16 +251,14 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
 
     final formState = ref.watch(formProvider);
 
-    final repairControllerState = ref.watch(
-      repairTransactionControllerProvider,
-    );
+    final operationState = ref.watch(repairTransactionControllerProvider);
 
     final formController = ref.read(formProvider.notifier);
 
-    final isSaving = repairControllerState.isLoading;
+    final isSaving = operationState.isLoading;
 
     return AppPage(
-      title: 'Add Repair',
+      title: 'Edit Repair',
       subtitle: _inventoryDisplayName(),
       child: Form(
         key: _formKey,
@@ -229,14 +266,14 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextFormField(
-              key: const Key('addRepairInventoryItemField'),
+              key: const Key('editRepairInventoryItemField'),
               initialValue: _inventoryDisplayName(),
               enabled: false,
               decoration: const InputDecoration(labelText: 'Inventory Item'),
             ),
             const SizedBox(height: 16),
             TextFormField(
-              key: const Key('addRepairDateField'),
+              key: const Key('editRepairDateField'),
               controller: _repairDateController,
               enabled: !isSaving,
               readOnly: true,
@@ -248,7 +285,7 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
             ),
             const SizedBox(height: 16),
             TextFormField(
-              key: const Key('addRepairCostField'),
+              key: const Key('editRepairCostField'),
               controller: _costController,
               enabled: !isSaving,
               keyboardType: const TextInputType.numberWithOptions(
@@ -265,7 +302,7 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
             ),
             const SizedBox(height: 16),
             TextFormField(
-              key: const Key('addRepairDescriptionField'),
+              key: const Key('editRepairDescriptionField'),
               controller: _descriptionController,
               enabled: !isSaving,
               textInputAction: TextInputAction.next,
@@ -281,7 +318,7 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
             ),
             const SizedBox(height: 16),
             TextFormField(
-              key: const Key('addRepairNotesField'),
+              key: const Key('editRepairNotesField'),
               controller: _notesController,
               enabled: !isSaving,
               minLines: 3,
@@ -295,7 +332,7 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              key: const Key('addRepairSubmitButton'),
+              key: const Key('editRepairSubmitButton'),
               onPressed: isSaving ? null : _submit,
               icon: isSaving
                   ? const SizedBox(
@@ -304,11 +341,23 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              label: Text(isSaving ? 'Saving Repair...' : 'Add Repair'),
+              label: Text(isSaving ? 'Saving Repair...' : 'Save Changes'),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+String _formatDate(DateTime date) {
+  final month = date.month.toString().padLeft(2, '0');
+
+  final day = date.day.toString().padLeft(2, '0');
+
+  return '$month/$day/${date.year}';
+}
+
+String _formatCentsForInput(int cents) {
+  return (cents / 100).toStringAsFixed(2);
 }

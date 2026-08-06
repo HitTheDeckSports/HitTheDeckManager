@@ -12,6 +12,7 @@ import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/add_repair_screen.dart';
 import '../features/transactions/presentation/repair_detail_screen.dart';
+import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/transactions/presentation/transaction_detail_screen.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
@@ -93,6 +94,19 @@ final GoRouter appRouter = GoRouter(
             }
 
             return RepairDetailScreen(repairId: repairId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.editRepair,
+          name: AppRouteNames.editRepair,
+          builder: (context, state) {
+            final repairId = state.pathParameters['repairId'];
+
+            if (repairId == null || repairId.isEmpty) {
+              throw StateError('Edit Repair route requires a repair ID.');
+            }
+
+            return EditRepairScreen(repairId: repairId);
           },
         ),
 

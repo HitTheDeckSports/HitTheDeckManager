@@ -142,7 +142,10 @@ class _RepairDetailContent extends ConsumerWidget {
           onPressed: isDeleting
               ? null
               : () {
-                  // Edit navigation will be connected next.
+                  context.goNamed(
+                    AppRouteNames.editRepair,
+                    pathParameters: {'repairId': repair.id!},
+                  );
                 },
           icon: const Icon(Icons.edit_outlined),
           label: const Text('Edit Repair'),
