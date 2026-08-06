@@ -11,7 +11,6 @@ import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/add_repair_screen.dart';
-import '../features/transactions/presentation/create_trade_screen.dart';
 import '../features/transactions/presentation/repair_detail_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
@@ -159,11 +158,6 @@ final GoRouter appRouter = GoRouter(
 
             return EditContactScreen(contactId: contactId);
           },
-        ),
-        GoRoute(
-          path: AppRoutes.createTrade,
-          name: AppRouteNames.createTrade,
-          builder: (context, state) => const CreateTradeScreen(),
         ),
         GoRoute(
           path: AppRoutes.transactions,

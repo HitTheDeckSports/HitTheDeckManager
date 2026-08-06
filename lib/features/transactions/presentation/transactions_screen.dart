@@ -25,16 +25,6 @@ class TransactionsScreen extends ConsumerWidget {
     return AppPage(
       title: 'Transactions',
       subtitle: 'Review purchases, sales, trades, repairs, and disposals.',
-      actions: [
-        FilledButton.icon(
-          key: const Key('createTradeButton'),
-          onPressed: () {
-            context.goNamed(AppRouteNames.createTrade);
-          },
-          icon: const Icon(Icons.swap_horiz_outlined),
-          label: const Text('Create Trade'),
-        ),
-      ],
       child: salesAsync.when(
         loading: () =>
             const AppLoadingState(message: 'Loading transactions...'),
