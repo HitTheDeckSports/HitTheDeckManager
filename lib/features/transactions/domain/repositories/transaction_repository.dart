@@ -1,5 +1,6 @@
 import '../models/repair_transaction.dart';
 import '../models/sale_transaction.dart';
+import '../models/trade_transaction.dart';
 
 abstract interface class TransactionRepository {
   /// Returns all recorded sale transactions.
@@ -57,4 +58,27 @@ abstract interface class TransactionRepository {
 
   /// Permanently removes a repair transaction.
   Future<void> deleteRepair(String id);
+
+  /// Returns all recorded trade transactions.
+  Future<List<TradeTransaction>> getTrades();
+
+  /// Watches trade transactions and emits a new list whenever trades change.
+  Stream<List<TradeTransaction>> watchTrades();
+
+  /// Returns one trade transaction, or null when the ID does not exist.
+  Future<TradeTransaction?> getTrade(String id);
+
+  /// Returns every trade containing an inventory item.
+  Future<List<TradeTransaction>> getTradesForInventoryItem(
+    String inventoryItemId,
+  );
+
+  /// Creates a trade transaction and returns the saved record.
+  Future<TradeTransaction> createTrade(TradeTransaction transaction);
+
+  /// Saves changes to an existing trade transaction.
+  Future<TradeTransaction> updateTrade(TradeTransaction transaction);
+
+  /// Permanently removes a trade transaction.
+  Future<void> deleteTrade(String id);
 }

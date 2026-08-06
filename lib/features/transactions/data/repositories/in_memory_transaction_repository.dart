@@ -5,25 +5,31 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../domain/models/repair_transaction.dart';
 import '../../domain/models/sale_transaction.dart';
+import '../../domain/models/trade_transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
 
 class InMemoryTransactionRepository implements TransactionRepository {
   InMemoryTransactionRepository({
     List<SaleTransaction> initialSales = const [],
     List<RepairTransaction> initialRepairs = const [],
+    List<TradeTransaction> initialTrades = const [],
     Uuid? uuid,
   }) : _sales = [...initialSales],
        _repairs = [...initialRepairs],
+       _trades = [...initialTrades],
        _uuid = uuid ?? const Uuid();
 
   final List<SaleTransaction> _sales;
   final List<RepairTransaction> _repairs;
+  final List<TradeTransaction> _trades;
   final Uuid _uuid;
 
   final StreamController<List<SaleTransaction>> _salesController =
       StreamController<List<SaleTransaction>>.broadcast();
   final StreamController<List<RepairTransaction>> _repairsController =
       StreamController<List<RepairTransaction>>.broadcast();
+  final StreamController<List<TradeTransaction>> _tradesController =
+      StreamController<List<TradeTransaction>>.broadcast();
 
   @override
   Future<List<SaleTransaction>> getSales() async {
@@ -258,6 +264,118 @@ class InMemoryTransactionRepository implements TransactionRepository {
     _notifyRepairsChanged();
   }
 
+  @override
+  Future<List<TradeTransaction>> getTrades() async {
+    final trades = [..._trades]
+      ..sort((first, second) => second.tradeDate.compareTo(first.tradeDate));
+
+    return List.unmodifiable(trades);
+  }
+
+  @override
+  Stream<List<TradeTransaction>> watchTrades() {
+    return Stream<List<TradeTransaction>>.multi((controller) {
+      final subscription = _tradesController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+
+      getTrades().then(controller.add);
+      controller.onCancel = subscription.cancel;
+    });
+  }
+
+  @override
+  Future<TradeTransaction?> getTrade(String id) async {
+    for (final trade in _trades) {
+      if (trade.id == id) {
+        return trade;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<List<TradeTransaction>> getTradesForInventoryItem(
+    String inventoryItemId,
+  ) async {
+    final trades = _trades.where(
+      (trade) =>
+          trade.outgoingInventoryItemIds.contains(inventoryItemId) ||
+          trade.incomingInventoryItemIds.contains(inventoryItemId),
+    ).toList()
+      ..sort((first, second) => second.tradeDate.compareTo(first.tradeDate));
+
+    return List.unmodifiable(trades);
+  }
+
+  @override
+  Future<TradeTransaction> createTrade(TradeTransaction transaction) async {
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The trade transaction contains invalid information.',
+      );
+    }
+
+    final transactionId = transaction.id ?? _uuid.v4();
+
+    if (_trades.any((trade) => trade.id == transactionId)) {
+      throw DuplicateException(
+        'A trade transaction with ID $transactionId already exists.',
+      );
+    }
+
+    final savedTransaction = transaction.copyWith(id: transactionId);
+    _trades.add(savedTransaction);
+    _notifyTradesChanged();
+
+    return savedTransaction;
+  }
+
+  @override
+  Future<TradeTransaction> updateTrade(TradeTransaction transaction) async {
+    final transactionId = transaction.id;
+
+    if (transactionId == null || transactionId.trim().isEmpty) {
+      throw const ValidationException(
+        'A trade transaction must have an ID before it can be updated.',
+      );
+    }
+
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The trade transaction contains invalid information.',
+      );
+    }
+
+    final index = _trades.indexWhere((trade) => trade.id == transactionId);
+
+    if (index == -1) {
+      throw NotFoundException(
+        'No trade transaction exists with ID $transactionId.',
+      );
+    }
+
+    _trades[index] = transaction;
+    _notifyTradesChanged();
+
+    return transaction;
+  }
+
+  @override
+  Future<void> deleteTrade(String id) async {
+    final originalLength = _trades.length;
+    _trades.removeWhere((trade) => trade.id == id);
+
+    if (_trades.length == originalLength) {
+      throw NotFoundException('No trade transaction exists with ID $id.');
+    }
+
+    _notifyTradesChanged();
+  }
+
   void _notifySalesChanged() {
     _salesController.add(List.unmodifiable(_sales));
   }
@@ -266,8 +384,13 @@ class InMemoryTransactionRepository implements TransactionRepository {
     _repairsController.add(List.unmodifiable(_repairs));
   }
 
+  void _notifyTradesChanged() {
+    getTrades().then(_tradesController.add);
+  }
+
   Future<void> dispose() async {
     await _salesController.close();
     await _repairsController.close();
+    await _tradesController.close();
   }
 }

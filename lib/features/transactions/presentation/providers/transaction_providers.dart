@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/in_memory_transaction_repository.dart';
 import '../../domain/models/repair_transaction.dart';
 import '../../domain/models/sale_transaction.dart';
+import '../../domain/models/trade_transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
 
 final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
@@ -52,4 +53,27 @@ final repairsForInventoryItemProvider =
       final repository = ref.watch(transactionRepositoryProvider);
 
       return repository.getRepairsForInventoryItem(inventoryItemId);
+    });
+
+final tradeTransactionsProvider = StreamProvider<List<TradeTransaction>>((ref) {
+  final repository = ref.watch(transactionRepositoryProvider);
+
+  return repository.watchTrades();
+});
+
+final tradeTransactionProvider =
+    FutureProvider.family<TradeTransaction?, String>((ref, tradeId) {
+      final repository = ref.watch(transactionRepositoryProvider);
+
+      return repository.getTrade(tradeId);
+    });
+
+final tradesForInventoryItemProvider =
+    FutureProvider.family<List<TradeTransaction>, String>((
+      ref,
+      inventoryItemId,
+    ) {
+      final repository = ref.watch(transactionRepositoryProvider);
+
+      return repository.getTradesForInventoryItem(inventoryItemId);
     });
