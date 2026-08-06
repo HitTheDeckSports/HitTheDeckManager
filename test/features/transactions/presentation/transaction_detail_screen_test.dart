@@ -81,7 +81,7 @@ void main() {
 
     expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
 
-    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsNWidgets(2));
     expect(find.text(r'$200.00'), findsOneWidget);
     expect(find.text(r'$125.00'), findsOneWidget);
     expect(find.text('38.5%'), findsOneWidget);
@@ -172,7 +172,7 @@ void main() {
 
     expect(find.text('missing-item'), findsNothing);
     expect(find.text('Card'), findsOneWidget);
-    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsNWidgets(2));
   });
   testWidgets('transaction without a buyer displays no buyer linked', (
     WidgetTester tester,

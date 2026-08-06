@@ -9,6 +9,7 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
+import '../../inventory/domain/models/inventory_enums.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/sale_transaction.dart';
@@ -184,6 +185,10 @@ class _TransactionDetailView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _BuyerInformationSection(buyerContactId: transaction.buyerContactId),
+          if (transaction.id != null && transaction.id!.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _TradeInInformationSection(saleTransactionId: transaction.id!),
+          ],
           const SizedBox(height: 16),
           Card(
             child: Padding(
@@ -197,9 +202,23 @@ class _TransactionDetailView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _TransactionDetailRow(
-                    label: 'Revenue',
+                    label: 'Total Sale Price',
                     value: CurrencyFormatter.formatCents(
                       transaction.salePriceCents,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _TransactionDetailRow(
+                    label: 'Trade-In Credit',
+                    value: CurrencyFormatter.formatCents(
+                      transaction.tradeInCreditCents,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _TransactionDetailRow(
+                    label: 'Cash Received',
+                    value: CurrencyFormatter.formatCents(
+                      transaction.cashReceivedCents,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -247,6 +266,194 @@ class _TransactionDetailView extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _TradeInInformationSection extends ConsumerWidget {
+  const _TradeInInformationSection({required this.saleTransactionId});
+
+  final String saleTransactionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tradesAsync = ref.watch(tradeTransactionsProvider);
+    final inventoryAsync = ref.watch(inventoryItemsProvider);
+
+    return tradesAsync.when(
+      loading: () => const _TradeInInformationCard(
+        children: [AppLoadingState(message: 'Loading trade-in information...')],
+      ),
+      error: (error, stackTrace) => _TradeInInformationCard(
+        children: [
+          AppErrorState(
+            message: 'Unable to load trade-in information.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(tradeTransactionsProvider);
+            },
+          ),
+        ],
+      ),
+      data: (trades) {
+        final linkedTrades = trades
+            .where((trade) => trade.saleTransactionId == saleTransactionId)
+            .toList();
+
+        if (linkedTrades.isEmpty) {
+          return const _TradeInInformationCard(
+            children: [Text('No trade-in items were included with this sale.')],
+          );
+        }
+
+        final incomingItemIds = <String>{
+          for (final trade in linkedTrades) ...trade.incomingInventoryItemIds,
+        }.toList();
+
+        return inventoryAsync.when(
+          loading: () => const _TradeInInformationCard(
+            children: [
+              AppLoadingState(message: 'Loading trade-in inventory...'),
+            ],
+          ),
+          error: (error, stackTrace) => _TradeInInformationCard(
+            children: [
+              AppErrorState(
+                message: 'Unable to load trade-in inventory.',
+                details: error.toString(),
+                onRetry: () {
+                  ref.invalidate(inventoryItemsProvider);
+                },
+              ),
+            ],
+          ),
+          data: (inventoryItems) {
+            final inventoryById = <String, InventoryItem>{
+              for (final item in inventoryItems)
+                if (item.id != null) item.id!: item,
+            };
+
+            return _TradeInInformationCard(
+              children: [
+                _TransactionDetailRow(
+                  label: 'Trade-In Items',
+                  value: incomingItemIds.length.toString(),
+                ),
+                const SizedBox(height: 12),
+                for (
+                  var index = 0;
+                  index < incomingItemIds.length;
+                  index++
+                ) ...[
+                  if (index > 0) const Divider(height: 32),
+                  _TradeInInventoryEntry(
+                    inventoryItemId: incomingItemIds[index],
+                    item: inventoryById[incomingItemIds[index]],
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _TradeInInformationCard extends StatelessWidget {
+  const _TradeInInformationCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('transactionTradeInInformationCard'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Trade-In Information',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TradeInInventoryEntry extends StatelessWidget {
+  const _TradeInInventoryEntry({
+    required this.inventoryItemId,
+    required this.item,
+  });
+
+  final String inventoryItemId;
+  final InventoryItem? item;
+
+  @override
+  Widget build(BuildContext context) {
+    final inventoryItem = item;
+
+    if (inventoryItem == null) {
+      return Column(
+        key: ValueKey('tradeInInventoryEntry-$inventoryItemId'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: const [
+          Text('The linked trade-in inventory record is unavailable.'),
+        ],
+      );
+    }
+
+    final model = inventoryItem.model?.trim();
+    final displayName = model == null || model.isEmpty
+        ? inventoryItem.brand
+        : '${inventoryItem.brand} $model';
+
+    return Column(
+      key: ValueKey('tradeInInventoryEntry-$inventoryItemId'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TransactionDetailRow(
+          label: 'Inventory Item',
+          value:
+              '${inventoryItem.inventoryNumber ?? 'Not assigned'} â€” $displayName',
+        ),
+        const SizedBox(height: 8),
+        _TransactionDetailRow(
+          label: 'Condition',
+          value: inventoryItem.condition?.label ?? 'Not specified',
+        ),
+        const SizedBox(height: 8),
+        _TransactionDetailRow(
+          label: 'Acquisition Value',
+          value: CurrencyFormatter.formatCents(
+            inventoryItem.acquisitionValueCents,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: ValueKey(
+              'transactionTradeInViewInventoryButton-$inventoryItemId',
+            ),
+            onPressed: () {
+              context.goNamed(
+                AppRouteNames.inventoryDetail,
+                pathParameters: {'itemId': inventoryItemId},
+              );
+            },
+            icon: const Icon(Icons.inventory_2_outlined),
+            label: const Text('View Inventory Item'),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -361,6 +361,16 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                 ),
                 const SizedBox(height: 24),
                 const SaleTradeInSection(),
+                const SizedBox(height: 16),
+                _TradeAccountingSummary(
+                  salePriceCents: formState.salePriceCents,
+                  tradeInCreditCents: ref
+                      .watch(saleTradeInFormControllerProvider)
+                      .fold<int>(
+                        0,
+                        (total, item) => total + item.acquisitionValueCents,
+                      ),
+                ),
                 const SizedBox(height: 24),
                 Card(
                   child: Padding(
@@ -503,6 +513,74 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
 
 class _SummaryRow extends StatelessWidget {
   const _SummaryRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        const SizedBox(width: 16),
+        Text(value, style: Theme.of(context).textTheme.titleSmall),
+      ],
+    );
+  }
+}
+
+class _TradeAccountingSummary extends StatelessWidget {
+  const _TradeAccountingSummary({
+    required this.salePriceCents,
+    required this.tradeInCreditCents,
+  });
+
+  final int? salePriceCents;
+  final int tradeInCreditCents;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalSalePriceCents = salePriceCents ?? 0;
+    final cashDueCents = totalSalePriceCents - tradeInCreditCents;
+    final hasInvalidCredit = cashDueCents < 0;
+
+    return Card(
+      key: const Key('sellTradeAccountingSummary'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Sale Payment Summary',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            _SellSummaryRow(
+              label: 'Total Sale Price',
+              value: CurrencyFormatter.formatCents(totalSalePriceCents),
+            ),
+            const SizedBox(height: 8),
+            _SellSummaryRow(
+              label: 'Trade-In Credit',
+              value: CurrencyFormatter.formatCents(tradeInCreditCents),
+            ),
+            const SizedBox(height: 8),
+            _SellSummaryRow(
+              label: 'Cash Due',
+              value: hasInvalidCredit
+                  ? 'Trade-in credit exceeds sale price'
+                  : CurrencyFormatter.formatCents(cashDueCents),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SellSummaryRow extends StatelessWidget {
+  const _SellSummaryRow({required this.label, required this.value});
 
   final String label;
   final String value;

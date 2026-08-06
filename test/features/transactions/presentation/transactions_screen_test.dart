@@ -277,6 +277,6 @@ void main() {
 
     expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
 
-    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
   });
 }

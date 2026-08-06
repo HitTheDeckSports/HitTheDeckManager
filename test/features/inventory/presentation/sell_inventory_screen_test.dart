@@ -172,8 +172,13 @@ void main() {
 
     expect(salePriceField.initialValue, '325.00');
 
-    expect(find.text(r'$325.00'), findsOneWidget);
-
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sellTradeAccountingSummary')),
+        matching: find.text(r'$325.00'),
+      ),
+      findsNWidgets(2),
+    );
     expect(find.textContaining(r'Asking Price: $325.00'), findsOneWidget);
     expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
     expect(find.text(r'$125.00'), findsOneWidget);

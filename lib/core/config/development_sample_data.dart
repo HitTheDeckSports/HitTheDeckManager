@@ -1,9 +1,47 @@
+import '../../features/contacts/domain/models/contact.dart';
 import '../../features/inventory/domain/models/inventory_enums.dart';
 import '../../features/inventory/domain/models/inventory_item.dart';
+import '../../features/transactions/domain/models/repair_transaction.dart';
 import '../../features/transactions/domain/models/sale_transaction.dart';
+import '../../features/transactions/domain/models/trade_transaction.dart';
 import '../../features/transactions/domain/models/transaction_enums.dart';
 
 abstract final class DevelopmentSampleData {
+  static List<Contact> createContacts() {
+    return const [
+      Contact(
+        id: 'sample-contact-alex',
+        name: 'Alex Johnson',
+        phone: '555-210-1001',
+        email: 'alex.johnson@example.com',
+        address: '1207 Oak Ridge Drive, Houston, TX 77084',
+        notes: 'Repeat customer who buys BBCOR bats.',
+      ),
+      Contact(
+        id: 'sample-contact-taylor',
+        name: 'Taylor Morgan',
+        phone: '555-210-1002',
+        email: 'taylor.morgan@example.com',
+        address: '4450 Westfield Lane, Katy, TX 77449',
+        notes: 'Bought the sample Meta and traded in a Wilson A2000.',
+      ),
+      Contact(
+        id: 'sample-contact-jordan',
+        name: 'Jordan Lee',
+        phone: '555-210-1003',
+        email: 'jordan.lee@example.com',
+        address: '987 Pine Hollow Road, Cypress, TX 77429',
+        notes: 'Consignment customer for catcherâ€™s equipment.',
+      ),
+      Contact(
+        id: 'sample-contact-casey',
+        name: 'Casey Ramirez',
+        phone: '555-210-1004',
+        notes: 'Sample contact with only a name and phone.',
+      ),
+    ];
+  }
+
   static List<InventoryItem> createInventoryItems() {
     return [
       InventoryItem(
@@ -20,6 +58,7 @@ abstract final class DevelopmentSampleData {
         newValueCents: 49999,
         askingPriceCents: 32500,
         minimumPriceCents: 27500,
+        sellerContactId: 'sample-contact-alex',
         notes: 'Development sample: available BBCOR bat.',
         lengthInches: 32,
         weightOunces: 29,
@@ -36,11 +75,12 @@ abstract final class DevelopmentSampleData {
         acquisitionValueCents: 14000,
         condition: InventoryCondition.good,
         status: InventoryStatus.available,
-        purchaseDate: DateTime(2026, 8, 2),
+        purchaseDate: DateTime(2026, 8, 3),
         newValueCents: 29999,
         askingPriceCents: 22500,
         minimumPriceCents: 19000,
-        notes: 'Development sample: available infield glove.',
+        sellerContactId: 'sample-contact-taylor',
+        notes: 'Development sample: trade-in received with the Meta sale.',
         gloveSizeInches: 11.5,
         handOrientation: 'Right Hand Throw',
       ),
@@ -57,6 +97,7 @@ abstract final class DevelopmentSampleData {
         purchaseDate: DateTime(2026, 7, 25),
         newValueCents: 7999,
         askingPriceCents: 6500,
+        sellerContactId: 'sample-contact-casey',
         notes: 'Development sample: inactive helmet.',
       ),
       InventoryItem(
@@ -72,6 +113,7 @@ abstract final class DevelopmentSampleData {
         purchaseDate: DateTime(2026, 7, 20),
         newValueCents: 34999,
         askingPriceCents: 22500,
+        sellerContactId: 'sample-contact-alex',
         notes: 'Development sample: broken bat requiring review.',
         lengthInches: 31,
         weightOunces: 26,
@@ -92,7 +134,8 @@ abstract final class DevelopmentSampleData {
         newValueCents: 49999,
         askingPriceCents: 34000,
         minimumPriceCents: 30000,
-        notes: 'Development sample: sold BBCOR bat.',
+        sellerContactId: 'sample-contact-alex',
+        notes: 'Development sample: sold BBCOR bat with a trade-in.',
         lengthInches: 33,
         weightOunces: 30,
         drop: -3,
@@ -112,7 +155,8 @@ abstract final class DevelopmentSampleData {
         newValueCents: 39999,
         askingPriceCents: 26000,
         minimumPriceCents: 22500,
-        notes: 'Development sample: sold catcher’s gear set.',
+        sellerContactId: 'sample-contact-jordan',
+        notes: 'Development sample: sold catcherâ€™s gear set.',
         catchersGearSize: 'Intermediate',
       ),
     ];
@@ -126,6 +170,8 @@ abstract final class DevelopmentSampleData {
         salePriceCents: 32500,
         saleDate: DateTime(2026, 8, 3),
         paymentMethod: PaymentMethod.venmo,
+        buyerContactId: 'sample-contact-taylor',
+        tradeInCreditCents: 14000,
         notes: 'Development sample sale completed at a tournament.',
         acquisitionValueCents: 21000,
       ),
@@ -135,8 +181,43 @@ abstract final class DevelopmentSampleData {
         salePriceCents: 25000,
         saleDate: DateTime(2026, 8, 2),
         paymentMethod: PaymentMethod.cash,
-        notes: 'Development sample sale for catcher’s gear.',
+        buyerContactId: 'sample-contact-casey',
+        notes: 'Development sample sale for catcherâ€™s gear.',
         acquisitionValueCents: 15000,
+      ),
+    ];
+  }
+
+  static List<RepairTransaction> createRepairs() {
+    return [
+      RepairTransaction(
+        id: 'sample-repair-broken-bat',
+        inventoryItemId: 'sample-item-broken-bat',
+        repairDate: DateTime(2026, 7, 28),
+        costCents: 3500,
+        description: 'Replaced damaged grip and inspected barrel.',
+        notes: 'Bat remains broken pending a final barrel decision.',
+      ),
+      RepairTransaction(
+        id: 'sample-repair-available-bat',
+        inventoryItemId: 'sample-item-available-bat',
+        repairDate: DateTime(2026, 8, 2),
+        costCents: 1200,
+        description: 'Installed a new premium bat grip.',
+      ),
+    ];
+  }
+
+  static List<TradeTransaction> createTrades() {
+    return [
+      TradeTransaction(
+        id: 'sample-trade-meta-sale',
+        saleTransactionId: 'sample-sale-bat',
+        outgoingInventoryItemIds: const ['sample-item-sold-bat'],
+        incomingInventoryItemIds: const ['sample-item-available-glove'],
+        tradeDate: DateTime(2026, 8, 3),
+        contactId: 'sample-contact-taylor',
+        notes: 'Wilson A2000 received as part of the Meta sale.',
       ),
     ];
   }

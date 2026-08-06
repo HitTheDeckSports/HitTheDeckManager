@@ -80,7 +80,18 @@ class SaleCompletionController extends AsyncNotifier<void> {
     final createdTradeInItems = <InventoryItem>[];
 
     try {
-      savedSale = await transactionRepository.createSale(sale);
+      final tradeInCreditCents = tradeInItems.fold<int>(
+        0,
+        (total, draft) => total + draft.acquisitionValueCents,
+      );
+
+      if (tradeInCreditCents > sale.salePriceCents) {
+        throw StateError('Trade-in credit cannot exceed the total sale price.');
+      }
+
+      savedSale = await transactionRepository.createSale(
+        sale.copyWith(tradeInCreditCents: tradeInCreditCents),
+      );
 
       for (final draft in tradeInItems) {
         final createdItem = await inventoryRepository.createInventoryItem(

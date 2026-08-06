@@ -10,6 +10,7 @@ class SaleTransaction {
     this.buyerContactId,
     this.notes,
     this.acquisitionValueCents,
+    this.tradeInCreditCents = 0,
   });
 
   final String? id;
@@ -25,6 +26,12 @@ class SaleTransaction {
   /// Keeping this value on the transaction preserves historical profit data
   /// even if the inventory item is edited later.
   final int? acquisitionValueCents;
+
+  /// Historical value credited for all trade-in items included in the sale.
+  final int tradeInCreditCents;
+
+  /// Cash portion collected after applying trade-in credit.
+  int get cashReceivedCents => salePriceCents - tradeInCreditCents;
 
   int? get profitCents {
     final acquisitionValue = acquisitionValueCents;
@@ -49,6 +56,8 @@ class SaleTransaction {
   bool get isValid {
     return inventoryItemId.trim().isNotEmpty &&
         salePriceCents >= 0 &&
+        tradeInCreditCents >= 0 &&
+        tradeInCreditCents <= salePriceCents &&
         acquisitionValueCents != null &&
         acquisitionValueCents! >= 0;
   }
@@ -62,6 +71,7 @@ class SaleTransaction {
     Object? buyerContactId = _unset,
     Object? notes = _unset,
     Object? acquisitionValueCents = _unset,
+    int? tradeInCreditCents,
   }) {
     return SaleTransaction(
       id: id ?? this.id,
@@ -76,6 +86,7 @@ class SaleTransaction {
       acquisitionValueCents: identical(acquisitionValueCents, _unset)
           ? this.acquisitionValueCents
           : acquisitionValueCents as int?,
+      tradeInCreditCents: tradeInCreditCents ?? this.tradeInCreditCents,
     );
   }
 
@@ -90,7 +101,8 @@ class SaleTransaction {
             other.paymentMethod == paymentMethod &&
             other.buyerContactId == buyerContactId &&
             other.notes == notes &&
-            other.acquisitionValueCents == acquisitionValueCents;
+            other.acquisitionValueCents == acquisitionValueCents &&
+            other.tradeInCreditCents == tradeInCreditCents;
   }
 
   @override
@@ -104,6 +116,7 @@ class SaleTransaction {
       buyerContactId,
       notes,
       acquisitionValueCents,
+      tradeInCreditCents,
     );
   }
 }
