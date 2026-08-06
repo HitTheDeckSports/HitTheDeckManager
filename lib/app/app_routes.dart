@@ -8,6 +8,7 @@ abstract final class AppRoutes {
   static const String editContact = '/contacts/:contactId/edit';
   static const String transactions = '/transactions';
   static const String transactionDetail = '/transactions/:transactionId';
+  static const String createTrade = '/trades/new';
   static const String reports = '/reports';
   static const String settings = '/settings';
 
@@ -30,6 +31,7 @@ abstract final class AppRouteNames {
   static const String editContact = 'editContact';
   static const String transactions = 'transactions';
   static const String transactionDetail = 'transactionDetail';
+  static const String createTrade = 'createTrade';
   static const String reports = 'reports';
   static const String settings = 'settings';
 
