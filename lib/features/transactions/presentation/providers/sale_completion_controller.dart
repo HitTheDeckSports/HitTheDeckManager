@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../inventory/domain/models/inventory_enums.dart';
 import '../../../inventory/domain/models/inventory_item.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
+import '../../domain/models/incoming_trade_item_draft.dart';
 import '../../domain/models/sale_transaction.dart';
+import '../../domain/models/trade_transaction.dart';
 import '../../domain/services/sale_completion_result.dart';
 import 'transaction_providers.dart';
 
@@ -19,11 +21,12 @@ class SaleCompletionController extends AsyncNotifier<void> {
   Future<SaleCompletionResult> completeSale({
     required InventoryItem item,
     required SaleTransaction sale,
+    List<IncomingTradeItemDraft> tradeInItems = const [],
   }) async {
     state = const AsyncLoading();
 
     final result = await AsyncValue.guard(
-      () => _completeSale(item: item, sale: sale),
+      () => _completeSale(item: item, sale: sale, tradeInItems: tradeInItems),
     );
 
     state = result.when(
@@ -42,6 +45,7 @@ class SaleCompletionController extends AsyncNotifier<void> {
   Future<SaleCompletionResult> _completeSale({
     required InventoryItem item,
     required SaleTransaction sale,
+    required List<IncomingTradeItemDraft> tradeInItems,
   }) async {
     final itemId = item.id;
 
@@ -61,19 +65,74 @@ class SaleCompletionController extends AsyncNotifier<void> {
       );
     }
 
+    if (tradeInItems.any((draft) => !draft.isValid)) {
+      throw StateError(
+        'Every trade-in item must include a brand and valid acquisition value.',
+      );
+    }
+
     final inventoryRepository = ref.read(inventoryRepositoryProvider);
-
     final transactionRepository = ref.read(transactionRepositoryProvider);
-
     final soldItem = item.copyWith(status: InventoryStatus.sold);
-
     final updatedItem = await inventoryRepository.updateInventoryItem(soldItem);
 
+    SaleTransaction? savedSale;
+    final createdTradeInItems = <InventoryItem>[];
+
     try {
-      final savedSale = await transactionRepository.createSale(sale);
+      savedSale = await transactionRepository.createSale(sale);
+
+      for (final draft in tradeInItems) {
+        final createdItem = await inventoryRepository.createInventoryItem(
+          InventoryItem(
+            category: draft.category,
+            brand: draft.brand.trim(),
+            model: _optionalText(draft.model),
+            acquisitionType: AcquisitionType.traded,
+            condition: draft.condition,
+            status: InventoryStatus.available,
+            acquisitionValueCents: draft.acquisitionValueCents,
+            purchaseDate: sale.saleDate,
+            sellerContactId: _optionalText(sale.buyerContactId),
+          ),
+        );
+
+        createdTradeInItems.add(createdItem);
+      }
+
+      if (createdTradeInItems.isNotEmpty) {
+        await transactionRepository.createTrade(
+          TradeTransaction(
+            saleTransactionId: savedSale.id,
+            outgoingInventoryItemIds: [itemId],
+            incomingInventoryItemIds: [
+              for (final tradeInItem in createdTradeInItems) tradeInItem.id!,
+            ],
+            tradeDate: sale.saleDate,
+            contactId: _optionalText(sale.buyerContactId),
+            notes: 'Trade-in items recorded with this sale.',
+          ),
+        );
+      }
+
+      ref.invalidate(inventoryItemsProvider);
+      ref.invalidate(saleTransactionsProvider);
+      ref.invalidate(tradeTransactionsProvider);
 
       return SaleCompletionResult(sale: savedSale, soldItem: updatedItem);
     } catch (error, stackTrace) {
+      for (final tradeInItem in createdTradeInItems.reversed) {
+        try {
+          await inventoryRepository.deleteInventoryItem(tradeInItem.id!);
+        } catch (_) {}
+      }
+
+      if (savedSale?.id != null) {
+        try {
+          await transactionRepository.deleteSale(savedSale!.id!);
+        } catch (_) {}
+      }
+
       try {
         await inventoryRepository.updateInventoryItem(item);
       } catch (_) {
@@ -88,4 +147,9 @@ class SaleCompletionController extends AsyncNotifier<void> {
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
+}
+
+String? _optionalText(String? value) {
+  final trimmed = value?.trim() ?? '';
+  return trimmed.isEmpty ? null : trimmed;
 }

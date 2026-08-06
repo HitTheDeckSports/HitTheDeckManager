@@ -301,12 +301,17 @@ class InMemoryTransactionRepository implements TransactionRepository {
   Future<List<TradeTransaction>> getTradesForInventoryItem(
     String inventoryItemId,
   ) async {
-    final trades = _trades.where(
-      (trade) =>
-          trade.outgoingInventoryItemIds.contains(inventoryItemId) ||
-          trade.incomingInventoryItemIds.contains(inventoryItemId),
-    ).toList()
-      ..sort((first, second) => second.tradeDate.compareTo(first.tradeDate));
+    final trades =
+        _trades
+            .where(
+              (trade) =>
+                  trade.outgoingInventoryItemIds.contains(inventoryItemId) ||
+                  trade.incomingInventoryItemIds.contains(inventoryItemId),
+            )
+            .toList()
+          ..sort(
+            (first, second) => second.tradeDate.compareTo(first.tradeDate),
+          );
 
     return List.unmodifiable(trades);
   }

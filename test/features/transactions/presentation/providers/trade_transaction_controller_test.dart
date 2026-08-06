@@ -11,9 +11,7 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [
-        transactionRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
 
@@ -51,9 +49,7 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [
-        transactionRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
 

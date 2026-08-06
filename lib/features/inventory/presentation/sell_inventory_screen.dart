@@ -9,8 +9,10 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
+import '../../transactions/presentation/forms/sale_trade_in_form_controller.dart';
 import '../../transactions/presentation/forms/sell_inventory_form_controller.dart';
 import '../../transactions/presentation/providers/sale_completion_controller.dart';
+import '../../transactions/presentation/widgets/sale_trade_in_section.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_providers.dart';
@@ -358,6 +360,8 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                   onChanged: formController.setNotes,
                 ),
                 const SizedBox(height: 24),
+                const SaleTradeInSection(),
+                const SizedBox(height: 24),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -420,7 +424,13 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                           }
 
                           try {
-                            final result = await formController.submit();
+                            final tradeInItems = ref.read(
+                              saleTradeInFormControllerProvider,
+                            );
+
+                            final result = await formController.submit(
+                              tradeInItems: tradeInItems,
+                            );
 
                             if (!context.mounted) {
                               return;
@@ -440,6 +450,12 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                             setState(() {
                               _formKey = GlobalKey<FormState>();
                             });
+
+                            ref
+                                .read(
+                                  saleTradeInFormControllerProvider.notifier,
+                                )
+                                .reset();
 
                             ref.invalidate(inventoryItemsProvider);
 

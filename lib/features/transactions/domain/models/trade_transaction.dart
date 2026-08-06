@@ -3,6 +3,7 @@ import 'transaction_enums.dart';
 class TradeTransaction {
   const TradeTransaction({
     this.id,
+    this.saleTransactionId,
     required this.outgoingInventoryItemIds,
     required this.incomingInventoryItemIds,
     required this.tradeDate,
@@ -14,6 +15,7 @@ class TradeTransaction {
   });
 
   final String? id;
+  final String? saleTransactionId;
   final List<String> outgoingInventoryItemIds;
   final List<String> incomingInventoryItemIds;
   final DateTime tradeDate;
@@ -42,6 +44,7 @@ class TradeTransaction {
 
   TradeTransaction copyWith({
     Object? id = _unset,
+    Object? saleTransactionId = _unset,
     List<String>? outgoingInventoryItemIds,
     List<String>? incomingInventoryItemIds,
     DateTime? tradeDate,
@@ -53,6 +56,9 @@ class TradeTransaction {
   }) {
     return TradeTransaction(
       id: identical(id, _unset) ? this.id : id as String?,
+      saleTransactionId: identical(saleTransactionId, _unset)
+          ? this.saleTransactionId
+          : saleTransactionId as String?,
       outgoingInventoryItemIds:
           outgoingInventoryItemIds ?? this.outgoingInventoryItemIds,
       incomingInventoryItemIds:
@@ -75,6 +81,7 @@ class TradeTransaction {
     return identical(this, other) ||
         other is TradeTransaction &&
             other.id == id &&
+            other.saleTransactionId == saleTransactionId &&
             _listsEqual(
               other.outgoingInventoryItemIds,
               outgoingInventoryItemIds,
@@ -95,6 +102,7 @@ class TradeTransaction {
   int get hashCode {
     return Object.hash(
       id,
+      saleTransactionId,
       Object.hashAll(outgoingInventoryItemIds),
       Object.hashAll(incomingInventoryItemIds),
       tradeDate,
@@ -108,7 +116,10 @@ class TradeTransaction {
 }
 
 List<String> _normalizedIds(List<String> values) {
-  return values.map((value) => value.trim()).where((value) => value.isNotEmpty).toList();
+  return values
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
 }
 
 bool _listsEqual(List<String> first, List<String> second) {

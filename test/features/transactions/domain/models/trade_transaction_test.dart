@@ -24,10 +24,7 @@ void main() {
     );
 
     expect(trade.isValid, isFalse);
-    expect(
-      trade.copyWith(paymentMethod: PaymentMethod.cash).isValid,
-      isTrue,
-    );
+    expect(trade.copyWith(paymentMethod: PaymentMethod.cash).isValid, isTrue);
   });
 
   test('cash paid and received cannot both be positive', () {

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../inventory/domain/models/inventory_item.dart';
+import '../../domain/models/incoming_trade_item_draft.dart';
 import '../../domain/models/transaction_enums.dart';
 import '../../domain/services/sale_completion_result.dart';
 import '../providers/sale_completion_controller.dart';
@@ -46,7 +47,9 @@ class SellInventoryFormController extends Notifier<SellInventoryFormState> {
     state = state.copyWith(notes: notes);
   }
 
-  Future<SaleCompletionResult?> submit() async {
+  Future<SaleCompletionResult?> submit({
+    List<IncomingTradeItemDraft> tradeInItems = const [],
+  }) async {
     final item = state.selectedItem;
     final transaction = state.toSaleTransaction();
 
@@ -56,7 +59,11 @@ class SellInventoryFormController extends Notifier<SellInventoryFormState> {
 
     final result = await ref
         .read(saleCompletionControllerProvider.notifier)
-        .completeSale(item: item, sale: transaction);
+        .completeSale(
+          item: item,
+          sale: transaction,
+          tradeInItems: tradeInItems,
+        );
 
     state = SellInventoryFormState(saleDate: DateTime.now());
 
