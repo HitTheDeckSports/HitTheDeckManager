@@ -1,0 +1,93 @@
+class Deal {
+  const Deal({
+    required this.parentSaleTransactionId,
+    required this.childInventoryItemIds,
+    this.id,
+    this.notes,
+  });
+
+  final String? id;
+
+  /// The original sale that created this Deal.
+  final String parentSaleTransactionId;
+
+  /// Inventory received directly through the parent sale.
+  ///
+  /// Version 1.0 supports exactly one Deal level. A child item may later be
+  /// sold, but that later sale does not create grandchildren under this Deal.
+  final List<String> childInventoryItemIds;
+
+  final String? notes;
+
+  bool get isValid {
+    final parentId = parentSaleTransactionId.trim();
+    final childIds = _normalizedIds(childInventoryItemIds);
+
+    return parentId.isNotEmpty &&
+        childIds.isNotEmpty &&
+        childIds.length == childIds.toSet().length;
+  }
+
+  Deal copyWith({
+    Object? id = _unset,
+    String? parentSaleTransactionId,
+    List<String>? childInventoryItemIds,
+    Object? notes = _unset,
+  }) {
+    return Deal(
+      id: identical(id, _unset) ? this.id : id as String?,
+      parentSaleTransactionId:
+          parentSaleTransactionId ?? this.parentSaleTransactionId,
+      childInventoryItemIds:
+          childInventoryItemIds ?? this.childInventoryItemIds,
+      notes: identical(notes, _unset) ? this.notes : notes as String?,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is Deal &&
+            other.id == id &&
+            other.parentSaleTransactionId == parentSaleTransactionId &&
+            _listsEqual(other.childInventoryItemIds, childInventoryItemIds) &&
+            other.notes == notes;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      id,
+      parentSaleTransactionId,
+      Object.hashAll(childInventoryItemIds),
+      notes,
+    );
+  }
+}
+
+List<String> _normalizedIds(List<String> values) {
+  return values
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+}
+
+bool _listsEqual(List<String> first, List<String> second) {
+  if (identical(first, second)) {
+    return true;
+  }
+
+  if (first.length != second.length) {
+    return false;
+  }
+
+  for (var index = 0; index < first.length; index++) {
+    if (first[index] != second[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+const _unset = Object();
