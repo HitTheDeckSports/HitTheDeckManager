@@ -11,6 +11,7 @@ import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/add_repair_screen.dart';
+import '../features/transactions/presentation/deal_detail_screen.dart';
 import '../features/transactions/presentation/repair_detail_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
@@ -177,6 +178,19 @@ final GoRouter appRouter = GoRouter(
             }
 
             return TransactionDetailScreen(transactionId: transactionId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.dealDetail,
+          name: AppRouteNames.dealDetail,
+          builder: (context, state) {
+            final dealId = state.pathParameters['dealId'];
+
+            if (dealId == null || dealId.isEmpty) {
+              throw StateError('Deal detail route requires a Deal ID.');
+            }
+
+            return DealDetailScreen(dealId: dealId);
           },
         ),
         GoRoute(
