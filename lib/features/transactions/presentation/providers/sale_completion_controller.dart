@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../inventory/domain/models/inventory_enums.dart';
 import '../../../inventory/domain/models/inventory_item.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
+import '../../domain/models/consignment_transaction.dart';
 import '../../domain/models/deal.dart';
 import '../../domain/models/incoming_trade_item_draft.dart';
 import '../../domain/models/sale_transaction.dart';
@@ -76,12 +77,38 @@ class SaleCompletionController extends AsyncNotifier<void> {
     final inventoryRepository = ref.read(inventoryRepositoryProvider);
     final transactionRepository = ref.read(transactionRepositoryProvider);
     final dealRepository = ref.read(dealRepositoryProvider);
+
+    ConsignmentTransaction? originalConsignment;
+    if (item.acquisitionType == AcquisitionType.consignment) {
+      originalConsignment = await transactionRepository
+          .getConsignmentForInventoryItem(itemId);
+
+      if (originalConsignment == null) {
+        throw StateError(
+          'A consignment agreement must be recorded before this item can be sold.',
+        );
+      }
+
+      if (originalConsignment.isCompleted) {
+        throw StateError(
+          'This consignment agreement is already linked to a completed sale.',
+        );
+      }
+
+      if (originalConsignment.commissionCents > sale.salePriceCents) {
+        throw StateError(
+          'Consignment commission cannot exceed the total sale price.',
+        );
+      }
+    }
+
     final soldItem = item.copyWith(status: InventoryStatus.sold);
     final updatedItem = await inventoryRepository.updateInventoryItem(soldItem);
 
     SaleTransaction? savedSale;
     TradeTransaction? savedTrade;
     Deal? savedDeal;
+    ConsignmentTransaction? updatedConsignment;
     final createdTradeInItems = <InventoryItem>[];
 
     try {
@@ -94,9 +121,24 @@ class SaleCompletionController extends AsyncNotifier<void> {
         throw StateError('Trade-in credit cannot exceed the total sale price.');
       }
 
-      savedSale = await transactionRepository.createSale(
-        sale.copyWith(tradeInCreditCents: tradeInCreditCents),
-      );
+      var saleToSave = sale.copyWith(tradeInCreditCents: tradeInCreditCents);
+
+      if (originalConsignment != null) {
+        final consignorPayoutCents = originalConsignment
+            .consignorPayoutCentsForSale(sale.salePriceCents);
+
+        saleToSave = saleToSave.copyWith(
+          acquisitionValueCents: consignorPayoutCents,
+        );
+      }
+
+      savedSale = await transactionRepository.createSale(saleToSave);
+
+      if (originalConsignment != null) {
+        updatedConsignment = await transactionRepository.updateConsignment(
+          originalConsignment.copyWith(saleTransactionId: savedSale.id),
+        );
+      }
 
       for (final draft in tradeInItems) {
         final createdItem = await inventoryRepository.createInventoryItem(
@@ -144,6 +186,8 @@ class SaleCompletionController extends AsyncNotifier<void> {
       ref.invalidate(inventoryItemsProvider);
       ref.invalidate(saleTransactionsProvider);
       ref.invalidate(tradeTransactionsProvider);
+      ref.invalidate(consignmentTransactionsProvider);
+      ref.invalidate(consignmentForInventoryItemProvider(itemId));
       ref.invalidate(dealsProvider);
 
       return SaleCompletionResult(sale: savedSale, soldItem: updatedItem);
@@ -163,6 +207,12 @@ class SaleCompletionController extends AsyncNotifier<void> {
       for (final tradeInItem in createdTradeInItems.reversed) {
         try {
           await inventoryRepository.deleteInventoryItem(tradeInItem.id!);
+        } catch (_) {}
+      }
+
+      if (updatedConsignment != null && originalConsignment != null) {
+        try {
+          await transactionRepository.updateConsignment(originalConsignment);
         } catch (_) {}
       }
 

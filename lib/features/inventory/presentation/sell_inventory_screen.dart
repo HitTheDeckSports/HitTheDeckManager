@@ -12,6 +12,7 @@ import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/forms/sale_trade_in_form_controller.dart';
 import '../../transactions/presentation/forms/sell_inventory_form_controller.dart';
 import '../../transactions/presentation/providers/sale_completion_controller.dart';
+import '../../transactions/presentation/providers/transaction_providers.dart';
 import '../../transactions/presentation/widgets/sale_trade_in_section.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
@@ -199,6 +200,12 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                     ),
                   ),
                 ],
+                if (selectedItem != null &&
+                    selectedItem.acquisitionType ==
+                        AcquisitionType.consignment) ...[
+                  const SizedBox(height: 16),
+                  _ConsignmentSaleAgreementCard(item: selectedItem),
+                ],
                 const SizedBox(height: 16),
                 TextFormField(
                   key: const Key('sellInventorySalePriceField'),
@@ -372,53 +379,12 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                       ),
                 ),
                 const SizedBox(height: 24),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Live Sale Summary',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        _SummaryRow(
-                          label: 'Sale Price',
-                          value: formState.salePriceCents == null
-                              ? '—'
-                              : CurrencyFormatter.formatCents(
-                                  formState.salePriceCents!,
-                                ),
-                        ),
-                        const SizedBox(height: 8),
-                        _SummaryRow(
-                          label: 'Acquisition Value',
-                          value: selectedItem == null
-                              ? '—'
-                              : CurrencyFormatter.formatCents(
-                                  selectedItem.acquisitionValueCents,
-                                ),
-                        ),
-                        const SizedBox(height: 8),
-                        _SummaryRow(
-                          label: 'Profit',
-                          value: formState.profitCents == null
-                              ? '—'
-                              : CurrencyFormatter.formatCents(
-                                  formState.profitCents!,
-                                ),
-                        ),
-                        const SizedBox(height: 8),
-                        _SummaryRow(
-                          label: 'Gross Margin',
-                          value: formState.grossMargin == null
-                              ? '—'
-                              : _formatMargin(formState.grossMargin!),
-                        ),
-                      ],
-                    ),
-                  ),
+                _LiveSaleSummary(
+                  selectedItem: selectedItem,
+                  salePriceCents: formState.salePriceCents,
+                  standardProfitCents: formState.profitCents,
+                  standardGrossMargin: formState.grossMargin,
+                  formatMargin: _formatMargin,
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
@@ -506,6 +472,242 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ConsignmentSaleAgreementCard extends ConsumerWidget {
+  const _ConsignmentSaleAgreementCard({required this.item});
+
+  final InventoryItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemId = item.id;
+
+    if (itemId == null || itemId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final consignmentAsync = ref.watch(
+      consignmentForInventoryItemProvider(itemId),
+    );
+
+    return consignmentAsync.when(
+      loading: () => const Card(
+        key: Key('sellConsignmentAgreementCard'),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: AppLoadingState(message: 'Loading consignment agreement...'),
+        ),
+      ),
+      error: (error, stackTrace) => Card(
+        key: const Key('sellConsignmentAgreementCard'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppErrorState(
+            message: 'Unable to load consignment agreement.',
+            details: error.toString(),
+          ),
+        ),
+      ),
+      data: (consignment) {
+        if (consignment == null) {
+          return const Card(
+            key: Key('sellConsignmentAgreementCard'),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Consignment agreement required before this item can be sold.',
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          key: const Key('sellConsignmentAgreementCard'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Consignment Agreement',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                _SummaryRow(
+                  label: 'Hit the Deck Commission',
+                  value: CurrencyFormatter.formatCents(
+                    consignment.commissionCents,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'The consignor payout will be the final sale price minus this commission.',
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LiveSaleSummary extends ConsumerWidget {
+  const _LiveSaleSummary({
+    required this.selectedItem,
+    required this.salePriceCents,
+    required this.standardProfitCents,
+    required this.standardGrossMargin,
+    required this.formatMargin,
+  });
+
+  final InventoryItem? selectedItem;
+  final int? salePriceCents;
+  final int? standardProfitCents;
+  final double? standardGrossMargin;
+  final String Function(double) formatMargin;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final item = selectedItem;
+
+    if (item == null ||
+        item.acquisitionType != AcquisitionType.consignment ||
+        item.id == null) {
+      return _SaleSummaryCard(
+        salePriceCents: salePriceCents,
+        costLabel: 'Acquisition Value',
+        costCents: item?.acquisitionValueCents,
+        profitCents: standardProfitCents,
+        grossMargin: standardGrossMargin,
+        formatMargin: formatMargin,
+      );
+    }
+
+    final consignmentAsync = ref.watch(
+      consignmentForInventoryItemProvider(item.id!),
+    );
+
+    return consignmentAsync.when(
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: AppLoadingState(
+            message: 'Calculating consignment sale summary...',
+          ),
+        ),
+      ),
+      error: (error, stackTrace) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppErrorState(
+            message: 'Unable to calculate consignment sale summary.',
+            details: error.toString(),
+          ),
+        ),
+      ),
+      data: (consignment) {
+        final price = salePriceCents;
+
+        if (consignment == null || price == null) {
+          return _SaleSummaryCard(
+            salePriceCents: price,
+            costLabel: 'Consignor Payout',
+            costCents: null,
+            profitCents: null,
+            grossMargin: null,
+            formatMargin: formatMargin,
+          );
+        }
+
+        int? payout;
+        int? profit;
+        double? margin;
+
+        if (consignment.commissionCents <= price) {
+          payout = consignment.consignorPayoutCentsForSale(price);
+          profit = consignment.commissionCents;
+
+          if (price != 0) {
+            margin = profit / price;
+          }
+        }
+
+        return _SaleSummaryCard(
+          salePriceCents: price,
+          costLabel: 'Consignor Payout',
+          costCents: payout,
+          profitCents: profit,
+          grossMargin: margin,
+          formatMargin: formatMargin,
+        );
+      },
+    );
+  }
+}
+
+class _SaleSummaryCard extends StatelessWidget {
+  const _SaleSummaryCard({
+    required this.salePriceCents,
+    required this.costLabel,
+    required this.costCents,
+    required this.profitCents,
+    required this.grossMargin,
+    required this.formatMargin,
+  });
+
+  final int? salePriceCents;
+  final String costLabel;
+  final int? costCents;
+  final int? profitCents;
+  final double? grossMargin;
+  final String Function(double) formatMargin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('liveSaleSummary'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Live Sale Summary',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            _SummaryRow(
+              label: 'Sale Price',
+              value: salePriceCents == null
+                  ? 'â€”'
+                  : CurrencyFormatter.formatCents(salePriceCents!),
+            ),
+            const SizedBox(height: 8),
+            _SummaryRow(
+              label: costLabel,
+              value: costCents == null
+                  ? 'â€”'
+                  : CurrencyFormatter.formatCents(costCents!),
+            ),
+            const SizedBox(height: 8),
+            _SummaryRow(
+              label: 'Profit',
+              value: profitCents == null
+                  ? 'â€”'
+                  : CurrencyFormatter.formatCents(profitCents!),
+            ),
+            const SizedBox(height: 8),
+            _SummaryRow(
+              label: 'Gross Margin',
+              value: grossMargin == null ? 'â€”' : formatMargin(grossMargin!),
+            ),
+          ],
+        ),
       ),
     );
   }

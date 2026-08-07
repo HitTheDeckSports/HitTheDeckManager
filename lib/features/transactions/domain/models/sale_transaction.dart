@@ -21,10 +21,11 @@ class SaleTransaction {
   final String? buyerContactId;
   final String? notes;
 
-  /// Snapshot of the item's acquisition value when the sale is completed.
+  /// Snapshot of the cost basis used for this completed sale.
   ///
-  /// Keeping this value on the transaction preserves historical profit data
-  /// even if the inventory item is edited later.
+  /// Purchased/traded inventory uses the item's acquisition value. Consigned
+  /// inventory uses the consignor payout so historical profit equals the
+  /// agreed Hit the Deck commission.
   final int? acquisitionValueCents;
 
   /// Historical value credited for all trade-in items included in the sale.

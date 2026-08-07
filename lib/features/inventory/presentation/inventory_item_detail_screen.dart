@@ -9,6 +9,7 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
+import '../../transactions/domain/models/consignment_transaction.dart';
 import '../../transactions/domain/models/disposal_reason.dart';
 import '../../transactions/domain/models/disposal_transaction.dart';
 import '../../transactions/domain/models/repair_transaction.dart';
@@ -238,6 +239,11 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SellerInformationSection(sellerContactId: item.sellerContactId),
+          if (item.acquisitionType == AcquisitionType.consignment &&
+              item.id != null) ...[
+            const SizedBox(height: 24),
+            _ConsignmentSection(item: item),
+          ],
           const SizedBox(height: 24),
           _DetailSection(
             title: 'Pricing',
@@ -297,6 +303,156 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ConsignmentSection extends ConsumerWidget {
+  const _ConsignmentSection({required this.item});
+
+  final InventoryItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemId = item.id!;
+    final consignmentAsync = ref.watch(
+      consignmentForInventoryItemProvider(itemId),
+    );
+
+    return consignmentAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Consignment',
+        children: [
+          AppLoadingState(message: 'Loading consignment agreement...'),
+        ],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Consignment',
+        children: [
+          AppErrorState(
+            message: 'Unable to load consignment agreement.',
+            details: error.toString(),
+            onRetry: () {
+              ref.invalidate(consignmentForInventoryItemProvider(itemId));
+            },
+          ),
+        ],
+      ),
+      data: (consignment) {
+        if (consignment == null) {
+          return _DetailSection(
+            title: 'Consignment',
+            children: [
+              const Text(
+                'No commission agreement has been recorded for this consigned item.',
+              ),
+              if (item.status != InventoryStatus.sold &&
+                  item.status != InventoryStatus.disposed) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const Key('recordConsignmentAgreementButton'),
+                    onPressed: () {
+                      context.goNamed(
+                        AppRouteNames.recordConsignment,
+                        pathParameters: {'itemId': itemId},
+                      );
+                    },
+                    icon: const Icon(Icons.assignment_outlined),
+                    label: const Text('Record Consignment Agreement'),
+                  ),
+                ),
+              ],
+            ],
+          );
+        }
+
+        return _ConsignmentAgreementDetails(consignment: consignment);
+      },
+    );
+  }
+}
+
+class _ConsignmentAgreementDetails extends ConsumerWidget {
+  const _ConsignmentAgreementDetails({required this.consignment});
+
+  final ConsignmentTransaction consignment;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saleId = consignment.saleTransactionId;
+
+    if (saleId == null || saleId.trim().isEmpty) {
+      return _DetailSection(
+        title: 'Consignment',
+        children: [
+          _DetailRow(
+            label: 'Agreement Date',
+            value: _formatDate(consignment.consignmentDate),
+          ),
+          _DetailRow(
+            label: 'Hit the Deck Commission',
+            value: CurrencyFormatter.formatCents(consignment.commissionCents),
+          ),
+          const _DetailRow(label: 'Status', value: 'Awaiting Sale'),
+          if (consignment.notes != null && consignment.notes!.trim().isNotEmpty)
+            _DetailRow(label: 'Notes', value: consignment.notes!),
+        ],
+      );
+    }
+
+    final saleAsync = ref.watch(saleTransactionProvider(saleId));
+
+    return saleAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Consignment',
+        children: [
+          AppLoadingState(message: 'Loading completed consignment sale...'),
+        ],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Consignment',
+        children: [
+          AppErrorState(
+            message: 'Unable to load completed consignment sale.',
+            details: error.toString(),
+          ),
+        ],
+      ),
+      data: (sale) {
+        final payoutCents = sale == null
+            ? null
+            : consignment.consignorPayoutCentsForSale(sale.salePriceCents);
+
+        return _DetailSection(
+          title: 'Consignment',
+          children: [
+            _DetailRow(
+              label: 'Agreement Date',
+              value: _formatDate(consignment.consignmentDate),
+            ),
+            _DetailRow(
+              label: 'Hit the Deck Commission',
+              value: CurrencyFormatter.formatCents(consignment.commissionCents),
+            ),
+            const _DetailRow(label: 'Status', value: 'Sold / Completed'),
+            if (sale != null)
+              _DetailRow(
+                label: 'Sale Price',
+                value: CurrencyFormatter.formatCents(sale.salePriceCents),
+              ),
+            if (payoutCents != null)
+              _DetailRow(
+                label: 'Consignor Payout',
+                value: CurrencyFormatter.formatCents(payoutCents),
+              ),
+            if (consignment.notes != null &&
+                consignment.notes!.trim().isNotEmpty)
+              _DetailRow(label: 'Notes', value: consignment.notes!),
+          ],
+        );
+      },
     );
   }
 }
