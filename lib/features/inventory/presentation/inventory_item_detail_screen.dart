@@ -17,6 +17,7 @@ import '../../transactions/domain/models/trade_transaction.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/providers/deal_providers.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
+import '../../transactions/presentation/providers/warranty_replacement_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
@@ -682,11 +683,89 @@ class _DisposalHistoryEntry extends StatelessWidget {
           _DetailRow(label: 'Notes', value: disposal.notes!),
         if (disposal.requiresReplacementDeal) ...[
           const SizedBox(height: 8),
-          const Text(
-            'Warranty replacement: replacement Deal follow-up required.',
-          ),
+          _WarrantyReplacementDealEntry(disposal: disposal),
         ],
       ],
+    );
+  }
+}
+
+class _WarrantyReplacementDealEntry extends ConsumerWidget {
+  const _WarrantyReplacementDealEntry({required this.disposal});
+
+  final DisposalTransaction disposal;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disposalId = disposal.id;
+
+    if (disposalId == null || disposalId.trim().isEmpty) {
+      return const Text(
+        'Warranty replacement: replacement Deal follow-up required.',
+      );
+    }
+
+    final dealAsync = ref.watch(
+      warrantyReplacementDealForDisposalProvider(disposalId),
+    );
+
+    return dealAsync.when(
+      loading: () => const AppLoadingState(
+        message: 'Loading warranty replacement Deal...',
+      ),
+      error: (error, stackTrace) => AppErrorState(
+        message: 'Unable to load warranty replacement Deal.',
+        details: error.toString(),
+      ),
+      data: (deal) {
+        if (deal == null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Warranty replacement: replacement Deal follow-up required.',
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: ValueKey('createWarrantyReplacementButton-$disposalId'),
+                  onPressed: () {
+                    context.goNamed(
+                      AppRouteNames.warrantyReplacement,
+                      pathParameters: {'disposalId': disposalId},
+                    );
+                  },
+                  icon: const Icon(Icons.autorenew_outlined),
+                  label: const Text('Create Replacement'),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Warranty Replacement Deal completed.'),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: ValueKey('viewWarrantyReplacementItemButton-${deal.id}'),
+                onPressed: () {
+                  context.goNamed(
+                    AppRouteNames.inventoryDetail,
+                    pathParameters: {'itemId': deal.replacementInventoryItemId},
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('View Replacement Item'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

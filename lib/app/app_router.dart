@@ -14,6 +14,7 @@ import '../features/transactions/presentation/add_repair_screen.dart';
 import '../features/transactions/presentation/deal_detail_screen.dart';
 import '../features/transactions/presentation/dispose_inventory_screen.dart';
 import '../features/transactions/presentation/repair_detail_screen.dart';
+import '../features/transactions/presentation/warranty_replacement_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/transactions/presentation/transaction_detail_screen.dart';
@@ -96,6 +97,21 @@ final GoRouter appRouter = GoRouter(
               );
             }
             return DisposeInventoryScreen(inventoryItemId: itemId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.warrantyReplacement,
+          name: AppRouteNames.warrantyReplacement,
+          builder: (context, state) {
+            final disposalId = state.pathParameters['disposalId'];
+
+            if (disposalId == null || disposalId.isEmpty) {
+              throw StateError(
+                'Warranty Replacement route requires a disposal ID.',
+              );
+            }
+
+            return WarrantyReplacementScreen(disposalId: disposalId);
           },
         ),
         GoRoute(
