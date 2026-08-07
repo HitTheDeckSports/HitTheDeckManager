@@ -10,8 +10,12 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../domain/models/deal.dart';
+import '../domain/models/deal_status.dart';
+import '../domain/models/deal_summary.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/transaction_enums.dart';
+import 'providers/deal_providers.dart';
 import 'providers/transaction_providers.dart';
 
 class TransactionsScreen extends ConsumerWidget {
@@ -21,6 +25,7 @@ class TransactionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final salesAsync = ref.watch(saleTransactionsProvider);
     final inventoryAsync = ref.watch(inventoryItemsProvider);
+    final dealsAsync = ref.watch(dealsProvider);
 
     return AppPage(
       title: 'Transactions',
@@ -69,9 +74,10 @@ class TransactionsScreen extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _DealsSection(dealsAsync: dealsAsync),
+                  const SizedBox(height: 24),
                   Text(
-                    '${sortedSales.length} transaction'
-                    '${sortedSales.length == 1 ? '' : 's'}',
+                    'Sales (${sortedSales.length})',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
@@ -88,6 +94,219 @@ class TransactionsScreen extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _DealsSection extends StatelessWidget {
+  const _DealsSection({required this.dealsAsync});
+
+  final AsyncValue<List<Deal>> dealsAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return dealsAsync.when(
+      loading: () => const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHeading(title: 'Deals'),
+          SizedBox(height: 12),
+          AppLoadingState(message: 'Loading Deals...'),
+        ],
+      ),
+      error: (error, stackTrace) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SectionHeading(title: 'Deals'),
+          const SizedBox(height: 12),
+          AppErrorState(
+            message: 'Unable to load Deals.',
+            details: error.toString(),
+          ),
+        ],
+      ),
+      data: (deals) {
+        return Column(
+          key: const Key('transactionsDealsSection'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionHeading(title: 'Deals (${deals.length})'),
+            const SizedBox(height: 12),
+            if (deals.isEmpty)
+              const Text(
+                'No Deals yet. Deals are created automatically when a sale includes trade-in inventory.',
+              )
+            else
+              for (final deal in deals) ...[
+                _DealTransactionCard(deal: deal),
+                const SizedBox(height: 12),
+              ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(title, style: Theme.of(context).textTheme.titleLarge);
+  }
+}
+
+class _DealTransactionCard extends ConsumerWidget {
+  const _DealTransactionCard({required this.deal});
+
+  final Deal deal;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dealId = deal.id;
+
+    if (dealId == null || dealId.trim().isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('A Deal record is missing its ID.'),
+        ),
+      );
+    }
+
+    final summaryAsync = ref.watch(dealSummaryProvider(dealId));
+
+    return summaryAsync.when(
+      loading: () => Card(
+        key: ValueKey('dealTransactionCard-$dealId'),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: AppLoadingState(message: 'Loading Deal summary...'),
+        ),
+      ),
+      error: (error, stackTrace) => Card(
+        key: ValueKey('dealTransactionCard-$dealId'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppErrorState(
+            message: 'Unable to load Deal summary.',
+            details: error.toString(),
+          ),
+        ),
+      ),
+      data: (summary) {
+        if (summary == null) {
+          return Card(
+            key: ValueKey('dealTransactionCard-$dealId'),
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Deal summary is unavailable.'),
+            ),
+          );
+        }
+
+        return _DealSummaryCard(summary: summary);
+      },
+    );
+  }
+}
+
+class _DealSummaryCard extends StatelessWidget {
+  const _DealSummaryCard({required this.summary});
+
+  final DealSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final dealId = summary.deal.id!;
+
+    return Card(
+      key: ValueKey('dealTransactionCard-$dealId'),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('dealTransactionCardTap-$dealId'),
+        onTap: () {
+          context.goNamed(
+            AppRouteNames.dealDetail,
+            pathParameters: {'dealId': dealId},
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.handshake_outlined, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Deal',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(summary.status.label),
+                      ],
+                    ),
+                  ),
+                  _DealStatusChip(status: summary.status),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _TransactionDetailRow(
+                label: 'Child Inventory',
+                value: summary.deal.childInventoryItemIds.length.toString(),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Realized Deal Profit',
+                value: CurrencyFormatter.formatCents(
+                  summary.realizedDealProfitCents,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Projected Deal Profit',
+                value: CurrencyFormatter.formatCents(
+                  summary.projectedDealProfitCents,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Tap to review Deal details',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DealStatusChip extends StatelessWidget {
+  const _DealStatusChip({required this.status});
+
+  final DealStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      key: ValueKey('dealStatus-${status.name}'),
+      label: Text(status.label),
     );
   }
 }

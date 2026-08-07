@@ -112,7 +112,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('2 transactions'), findsOneWidget);
+    expect(find.text('Sales (2)'), findsOneWidget);
     expect(find.text('Sale'), findsNWidgets(2));
 
     expect(find.text('08/03/2026'), findsOneWidget);
