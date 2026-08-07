@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../domain/models/disposal_transaction.dart';
 import '../../domain/models/repair_transaction.dart';
 import '../../domain/models/sale_transaction.dart';
 import '../../domain/models/trade_transaction.dart';
@@ -13,15 +14,18 @@ class InMemoryTransactionRepository implements TransactionRepository {
     List<SaleTransaction> initialSales = const [],
     List<RepairTransaction> initialRepairs = const [],
     List<TradeTransaction> initialTrades = const [],
+    List<DisposalTransaction> initialDisposals = const [],
     Uuid? uuid,
   }) : _sales = [...initialSales],
        _repairs = [...initialRepairs],
        _trades = [...initialTrades],
+       _disposals = [...initialDisposals],
        _uuid = uuid ?? const Uuid();
 
   final List<SaleTransaction> _sales;
   final List<RepairTransaction> _repairs;
   final List<TradeTransaction> _trades;
+  final List<DisposalTransaction> _disposals;
   final Uuid _uuid;
 
   final StreamController<List<SaleTransaction>> _salesController =
@@ -30,6 +34,8 @@ class InMemoryTransactionRepository implements TransactionRepository {
       StreamController<List<RepairTransaction>>.broadcast();
   final StreamController<List<TradeTransaction>> _tradesController =
       StreamController<List<TradeTransaction>>.broadcast();
+  final StreamController<List<DisposalTransaction>> _disposalsController =
+      StreamController<List<DisposalTransaction>>.broadcast();
 
   @override
   Future<List<SaleTransaction>> getSales() async {
@@ -265,6 +271,119 @@ class InMemoryTransactionRepository implements TransactionRepository {
   }
 
   @override
+  Future<List<DisposalTransaction>> getDisposals() async {
+    final disposals = [..._disposals]
+      ..sort((a, b) => b.disposalDate.compareTo(a.disposalDate));
+    return List.unmodifiable(disposals);
+  }
+
+  @override
+  Stream<List<DisposalTransaction>> watchDisposals() {
+    return Stream<List<DisposalTransaction>>.multi((controller) {
+      final subscription = _disposalsController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      getDisposals().then(controller.add);
+      controller.onCancel = subscription.cancel;
+    });
+  }
+
+  @override
+  Future<DisposalTransaction?> getDisposal(String id) async {
+    for (final disposal in _disposals) {
+      if (disposal.id == id) {
+        return disposal;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<DisposalTransaction>> getDisposalsForInventoryItem(
+    String inventoryItemId,
+  ) async {
+    final disposals =
+        _disposals.where((d) => d.inventoryItemId == inventoryItemId).toList()
+          ..sort((a, b) => b.disposalDate.compareTo(a.disposalDate));
+    return List.unmodifiable(disposals);
+  }
+
+  @override
+  Future<DisposalTransaction> createDisposal(
+    DisposalTransaction transaction,
+  ) async {
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The disposal transaction contains invalid information.',
+      );
+    }
+    final id = transaction.id ?? _uuid.v4();
+    if (_disposals.any((d) => d.id == id)) {
+      throw DuplicateException(
+        'A disposal transaction with ID $id already exists.',
+      );
+    }
+    if (_disposals.any(
+      (d) => d.inventoryItemId == transaction.inventoryItemId,
+    )) {
+      throw DuplicateException(
+        'Inventory item ${transaction.inventoryItemId} already has a disposal transaction.',
+      );
+    }
+    final saved = transaction.copyWith(id: id);
+    _disposals.add(saved);
+    _notifyDisposalsChanged();
+    return saved;
+  }
+
+  @override
+  Future<DisposalTransaction> updateDisposal(
+    DisposalTransaction transaction,
+  ) async {
+    final id = transaction.id;
+    if (id == null || id.trim().isEmpty) {
+      throw const ValidationException(
+        'A disposal transaction must have an ID before it can be updated.',
+      );
+    }
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The disposal transaction contains invalid information.',
+      );
+    }
+    final index = _disposals.indexWhere((d) => d.id == id);
+
+    if (index == -1) {
+      throw NotFoundException('No disposal transaction exists with ID $id.');
+    }
+    if (_disposals.any(
+      (d) => d.id != id && d.inventoryItemId == transaction.inventoryItemId,
+    )) {
+      throw DuplicateException(
+        'Inventory item ${transaction.inventoryItemId} already has a disposal transaction.',
+      );
+    }
+    _disposals[index] = transaction;
+    _notifyDisposalsChanged();
+    return transaction;
+  }
+
+  @override
+  Future<void> deleteDisposal(String id) async {
+    final length = _disposals.length;
+
+    _disposals.removeWhere((d) => d.id == id);
+
+    if (_disposals.length == length) {
+      throw NotFoundException('No disposal transaction exists with ID $id.');
+    }
+
+    _notifyDisposalsChanged();
+  }
+
+  @override
   Future<List<TradeTransaction>> getTrades() async {
     final trades = [..._trades]
       ..sort((first, second) => second.tradeDate.compareTo(first.tradeDate));
@@ -393,9 +512,14 @@ class InMemoryTransactionRepository implements TransactionRepository {
     getTrades().then(_tradesController.add);
   }
 
+  void _notifyDisposalsChanged() {
+    getDisposals().then(_disposalsController.add);
+  }
+
   Future<void> dispose() async {
     await _salesController.close();
     await _repairsController.close();
     await _tradesController.close();
+    await _disposalsController.close();
   }
 }

@@ -1,3 +1,4 @@
+import '../models/disposal_transaction.dart';
 import '../models/repair_transaction.dart';
 import '../models/sale_transaction.dart';
 import '../models/trade_transaction.dart';
@@ -58,6 +59,23 @@ abstract interface class TransactionRepository {
 
   /// Permanently removes a repair transaction.
   Future<void> deleteRepair(String id);
+
+  /// Returns all recorded disposal transactions.
+  Future<List<DisposalTransaction>> getDisposals();
+
+  Stream<List<DisposalTransaction>> watchDisposals();
+
+  Future<DisposalTransaction?> getDisposal(String id);
+
+  Future<List<DisposalTransaction>> getDisposalsForInventoryItem(
+    String inventoryItemId,
+  );
+
+  Future<DisposalTransaction> createDisposal(DisposalTransaction transaction);
+
+  Future<DisposalTransaction> updateDisposal(DisposalTransaction transaction);
+
+  Future<void> deleteDisposal(String id);
 
   /// Returns all recorded trade transactions.
   Future<List<TradeTransaction>> getTrades();
