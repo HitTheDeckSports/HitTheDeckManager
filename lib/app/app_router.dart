@@ -12,6 +12,7 @@ import '../features/reports/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/add_repair_screen.dart';
 import '../features/transactions/presentation/deal_detail_screen.dart';
+import '../features/transactions/presentation/dispose_inventory_screen.dart';
 import '../features/transactions/presentation/repair_detail_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
@@ -82,6 +83,19 @@ final GoRouter appRouter = GoRouter(
             }
 
             return AddRepairScreen(inventoryItemId: itemId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.disposeInventory,
+          name: AppRouteNames.disposeInventory,
+          builder: (context, state) {
+            final itemId = state.pathParameters['itemId'];
+            if (itemId == null || itemId.isEmpty) {
+              throw StateError(
+                'Dispose Inventory route requires an inventory item ID.',
+              );
+            }
+            return DisposeInventoryScreen(inventoryItemId: itemId);
           },
         ),
         GoRoute(

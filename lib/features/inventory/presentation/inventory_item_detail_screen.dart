@@ -9,6 +9,8 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
+import '../../transactions/domain/models/disposal_reason.dart';
+import '../../transactions/domain/models/disposal_transaction.dart';
 import '../../transactions/domain/models/repair_transaction.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/trade_transaction.dart';
@@ -169,7 +171,7 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),
-        if (item.id != null)
+        if (item.id != null && item.status != InventoryStatus.disposed)
           OutlinedButton.icon(
             key: const Key('inventoryItemAddRepairButton'),
             onPressed: isUpdatingStatus
@@ -182,6 +184,22 @@ class _InventoryItemDetailContent extends ConsumerWidget {
                   },
             icon: const Icon(Icons.build_outlined),
             label: const Text('Add Repair'),
+          ),
+        if (item.id != null &&
+            item.status != InventoryStatus.sold &&
+            item.status != InventoryStatus.disposed)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemDisposeButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.disposeInventory,
+                      pathParameters: {'itemId': item.id!},
+                    );
+                  },
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Dispose'),
           ),
       ],
       child: Column(
@@ -249,6 +267,8 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               inventoryItemId: item.id!,
               acquisitionValueCents: item.acquisitionValueCents,
             ),
+            const SizedBox(height: 24),
+            _DisposalHistorySection(inventoryItemId: item.id!),
           ],
           if (item.status == InventoryStatus.sold && item.id != null) ...[
             const SizedBox(height: 24),
@@ -591,6 +611,81 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
             label: const Text('View Inventory Item'),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _DisposalHistorySection extends ConsumerWidget {
+  const _DisposalHistorySection({required this.inventoryItemId});
+  final String inventoryItemId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disposalsAsync = ref.watch(
+      disposalsForInventoryItemProvider(inventoryItemId),
+    );
+    return disposalsAsync.when(
+      loading: () => const _DetailSection(
+        title: 'Disposal History',
+        children: [AppLoadingState(message: 'Loading disposal history...')],
+      ),
+      error: (error, stackTrace) => _DetailSection(
+        title: 'Disposal History',
+        children: [
+          AppErrorState(
+            message: 'Unable to load disposal history.',
+            details: error.toString(),
+            onRetry: () => ref.invalidate(
+              disposalsForInventoryItemProvider(inventoryItemId),
+            ),
+          ),
+        ],
+      ),
+      data: (disposals) {
+        if (disposals.isEmpty) {
+          return const _DetailSection(
+            title: 'Disposal History',
+            children: [Text('This inventory item has not been disposed.')],
+          );
+        }
+        return _DetailSection(
+          title: 'Disposal History',
+          children: [
+            for (var index = 0; index < disposals.length; index++) ...[
+              if (index > 0) const Divider(height: 32),
+              _DisposalHistoryEntry(disposal: disposals[index]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DisposalHistoryEntry extends StatelessWidget {
+  const _DisposalHistoryEntry({required this.disposal});
+  final DisposalTransaction disposal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: ValueKey('inventoryDisposalHistoryEntry-${disposal.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DetailRow(
+          label: 'Disposal Date',
+          value: _formatDate(disposal.disposalDate),
+        ),
+        _DetailRow(label: 'Reason', value: disposal.reason.label),
+        if (disposal.notes != null && disposal.notes!.trim().isNotEmpty)
+          _DetailRow(label: 'Notes', value: disposal.notes!),
+        if (disposal.requiresReplacementDeal) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Warranty replacement: replacement Deal follow-up required.',
+          ),
+        ],
       ],
     );
   }
