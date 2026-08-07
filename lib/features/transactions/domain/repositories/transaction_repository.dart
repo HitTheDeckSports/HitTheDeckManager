@@ -1,3 +1,4 @@
+import '../models/consignment_transaction.dart';
 import '../models/disposal_transaction.dart';
 import '../models/repair_transaction.dart';
 import '../models/sale_transaction.dart';
@@ -59,6 +60,35 @@ abstract interface class TransactionRepository {
 
   /// Permanently removes a repair transaction.
   Future<void> deleteRepair(String id);
+
+  /// Returns all recorded consignment transactions.
+  Future<List<ConsignmentTransaction>> getConsignments();
+
+  /// Watches consignment transactions and emits when records change.
+  Stream<List<ConsignmentTransaction>> watchConsignments();
+
+  /// Returns one consignment transaction, or null when the ID does not exist.
+  Future<ConsignmentTransaction?> getConsignment(String id);
+
+  /// Returns the consignment transaction for an inventory item.
+  ///
+  /// Version 1.0 allows one consignment agreement per inventory item.
+  Future<ConsignmentTransaction?> getConsignmentForInventoryItem(
+    String inventoryItemId,
+  );
+
+  /// Creates a consignment transaction and returns the saved record.
+  Future<ConsignmentTransaction> createConsignment(
+    ConsignmentTransaction transaction,
+  );
+
+  /// Saves changes to an existing consignment transaction.
+  Future<ConsignmentTransaction> updateConsignment(
+    ConsignmentTransaction transaction,
+  );
+
+  /// Permanently removes a consignment transaction.
+  Future<void> deleteConsignment(String id);
 
   /// Returns all recorded disposal transactions.
   Future<List<DisposalTransaction>> getDisposals();

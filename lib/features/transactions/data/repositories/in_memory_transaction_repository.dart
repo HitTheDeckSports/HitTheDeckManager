@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../domain/models/consignment_transaction.dart';
 import '../../domain/models/disposal_transaction.dart';
 import '../../domain/models/repair_transaction.dart';
 import '../../domain/models/sale_transaction.dart';
@@ -15,17 +16,20 @@ class InMemoryTransactionRepository implements TransactionRepository {
     List<RepairTransaction> initialRepairs = const [],
     List<TradeTransaction> initialTrades = const [],
     List<DisposalTransaction> initialDisposals = const [],
+    List<ConsignmentTransaction> initialConsignments = const [],
     Uuid? uuid,
   }) : _sales = [...initialSales],
        _repairs = [...initialRepairs],
        _trades = [...initialTrades],
        _disposals = [...initialDisposals],
+       _consignments = [...initialConsignments],
        _uuid = uuid ?? const Uuid();
 
   final List<SaleTransaction> _sales;
   final List<RepairTransaction> _repairs;
   final List<TradeTransaction> _trades;
   final List<DisposalTransaction> _disposals;
+  final List<ConsignmentTransaction> _consignments;
   final Uuid _uuid;
 
   final StreamController<List<SaleTransaction>> _salesController =
@@ -36,6 +40,8 @@ class InMemoryTransactionRepository implements TransactionRepository {
       StreamController<List<TradeTransaction>>.broadcast();
   final StreamController<List<DisposalTransaction>> _disposalsController =
       StreamController<List<DisposalTransaction>>.broadcast();
+  final StreamController<List<ConsignmentTransaction>> _consignmentsController =
+      StreamController<List<ConsignmentTransaction>>.broadcast();
 
   @override
   Future<List<SaleTransaction>> getSales() async {
@@ -268,6 +274,148 @@ class InMemoryTransactionRepository implements TransactionRepository {
     }
 
     _notifyRepairsChanged();
+  }
+
+  @override
+  Future<List<ConsignmentTransaction>> getConsignments() async {
+    final consignments = [..._consignments]
+      ..sort(
+        (first, second) =>
+            second.consignmentDate.compareTo(first.consignmentDate),
+      );
+
+    return List.unmodifiable(consignments);
+  }
+
+  @override
+  Stream<List<ConsignmentTransaction>> watchConsignments() {
+    return Stream<List<ConsignmentTransaction>>.multi((controller) {
+      final subscription = _consignmentsController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+
+      getConsignments().then(controller.add);
+      controller.onCancel = subscription.cancel;
+    });
+  }
+
+  @override
+  Future<ConsignmentTransaction?> getConsignment(String id) async {
+    for (final consignment in _consignments) {
+      if (consignment.id == id) {
+        return consignment;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<ConsignmentTransaction?> getConsignmentForInventoryItem(
+    String inventoryItemId,
+  ) async {
+    for (final consignment in _consignments) {
+      if (consignment.inventoryItemId == inventoryItemId) {
+        return consignment;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<ConsignmentTransaction> createConsignment(
+    ConsignmentTransaction transaction,
+  ) async {
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The consignment transaction contains invalid information.',
+      );
+    }
+
+    final transactionId = transaction.id ?? _uuid.v4();
+
+    if (_consignments.any((consignment) => consignment.id == transactionId)) {
+      throw DuplicateException(
+        'A consignment transaction with ID $transactionId already exists.',
+      );
+    }
+
+    final existing = await getConsignmentForInventoryItem(
+      transaction.inventoryItemId,
+    );
+
+    if (existing != null) {
+      throw DuplicateException(
+        'Inventory item ${transaction.inventoryItemId} already has a consignment transaction.',
+      );
+    }
+
+    final saved = transaction.copyWith(id: transactionId);
+    _consignments.add(saved);
+    _notifyConsignmentsChanged();
+
+    return saved;
+  }
+
+  @override
+  Future<ConsignmentTransaction> updateConsignment(
+    ConsignmentTransaction transaction,
+  ) async {
+    final transactionId = transaction.id;
+
+    if (transactionId == null || transactionId.trim().isEmpty) {
+      throw const ValidationException(
+        'A consignment transaction must have an ID before it can be updated.',
+      );
+    }
+
+    if (!transaction.isValid) {
+      throw const ValidationException(
+        'The consignment transaction contains invalid information.',
+      );
+    }
+
+    final index = _consignments.indexWhere(
+      (consignment) => consignment.id == transactionId,
+    );
+
+    if (index == -1) {
+      throw NotFoundException(
+        'No consignment transaction exists with ID $transactionId.',
+      );
+    }
+
+    final duplicateInventoryConsignment = _consignments.any(
+      (consignment) =>
+          consignment.id != transactionId &&
+          consignment.inventoryItemId == transaction.inventoryItemId,
+    );
+
+    if (duplicateInventoryConsignment) {
+      throw DuplicateException(
+        'Inventory item ${transaction.inventoryItemId} already has a consignment transaction.',
+      );
+    }
+
+    _consignments[index] = transaction;
+    _notifyConsignmentsChanged();
+
+    return transaction;
+  }
+
+  @override
+  Future<void> deleteConsignment(String id) async {
+    final originalLength = _consignments.length;
+    _consignments.removeWhere((consignment) => consignment.id == id);
+
+    if (_consignments.length == originalLength) {
+      throw NotFoundException('No consignment transaction exists with ID $id.');
+    }
+
+    _notifyConsignmentsChanged();
   }
 
   @override
@@ -516,10 +664,15 @@ class InMemoryTransactionRepository implements TransactionRepository {
     getDisposals().then(_disposalsController.add);
   }
 
+  void _notifyConsignmentsChanged() {
+    getConsignments().then(_consignmentsController.add);
+  }
+
   Future<void> dispose() async {
     await _salesController.close();
     await _repairsController.close();
     await _tradesController.close();
     await _disposalsController.close();
+    await _consignmentsController.close();
   }
 }
