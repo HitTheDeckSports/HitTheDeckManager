@@ -13,6 +13,7 @@ import '../../transactions/domain/models/repair_transaction.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/trade_transaction.dart';
 import '../../transactions/domain/models/transaction_enums.dart';
+import '../../transactions/presentation/providers/deal_providers.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
@@ -256,6 +257,11 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           if (item.id != null) ...[
             const SizedBox(height: 24),
             _TradeHistorySection(inventoryItemId: item.id!),
+            const SizedBox(height: 24),
+            _InventoryDealSection(
+              inventoryItemId: item.id!,
+              status: item.status,
+            ),
           ],
           const SizedBox(height: 24),
           _DetailSection(
@@ -270,6 +276,114 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InventoryDealSection extends ConsumerWidget {
+  const _InventoryDealSection({
+    required this.inventoryItemId,
+    required this.status,
+  });
+
+  final String inventoryItemId;
+  final InventoryStatus status;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final childDealAsync = ref.watch(
+      dealForChildInventoryItemProvider(inventoryItemId),
+    );
+
+    return childDealAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (childDeal) {
+        if (childDeal != null) {
+          return _DealLinkSection(
+            dealId: childDeal.id,
+            message: 'This inventory item is a direct child of a Deal.',
+          );
+        }
+
+        if (status != InventoryStatus.sold) {
+          return const SizedBox.shrink();
+        }
+
+        final saleAsync = ref.watch(
+          saleForInventoryItemProvider(inventoryItemId),
+        );
+
+        return saleAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (error, stackTrace) => const SizedBox.shrink(),
+          data: (sale) {
+            final saleId = sale?.id;
+
+            if (saleId == null || saleId.trim().isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            final parentDealAsync = ref.watch(
+              dealForParentSaleProvider(saleId),
+            );
+
+            return parentDealAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (error, stackTrace) => const SizedBox.shrink(),
+              data: (parentDeal) {
+                if (parentDeal == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return _DealLinkSection(
+                  dealId: parentDeal.id,
+                  message:
+                      'This sold inventory item is the parent item for a Deal.',
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DealLinkSection extends StatelessWidget {
+  const _DealLinkSection({required this.dealId, required this.message});
+
+  final String? dealId;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = dealId?.trim() ?? '';
+
+    if (id.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return _DetailSection(
+      title: 'Deal',
+      children: [
+        Text(message),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('inventoryViewDealButton'),
+            onPressed: () {
+              context.goNamed(
+                AppRouteNames.dealDetail,
+                pathParameters: {'dealId': id},
+              );
+            },
+            icon: const Icon(Icons.handshake_outlined),
+            label: const Text('View Deal'),
+          ),
+        ),
+      ],
     );
   }
 }

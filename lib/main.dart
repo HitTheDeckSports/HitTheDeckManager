@@ -8,7 +8,9 @@ import 'features/contacts/data/repositories/in_memory_contact_repository.dart';
 import 'features/contacts/presentation/providers/contact_providers.dart';
 import 'features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'features/inventory/presentation/providers/inventory_providers.dart';
+import 'features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'features/transactions/presentation/providers/deal_providers.dart';
 import 'features/transactions/presentation/providers/transaction_providers.dart';
 
 void main() {
@@ -23,6 +25,12 @@ void main() {
   final inventoryRepository = InMemoryInventoryRepository(
     initialItems: DevelopmentConfig.useSampleData
         ? DevelopmentSampleData.createInventoryItems()
+        : const [],
+  );
+
+  final dealRepository = InMemoryDealRepository(
+    initialDeals: DevelopmentConfig.useSampleData
+        ? DevelopmentSampleData.createDeals()
         : const [],
   );
 
@@ -44,6 +52,7 @@ void main() {
         contactRepositoryProvider.overrideWithValue(contactRepository),
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
+        dealRepositoryProvider.overrideWithValue(dealRepository),
       ],
       child: const HitTheDeckApp(),
     ),

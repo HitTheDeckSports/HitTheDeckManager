@@ -1,6 +1,7 @@
 import '../../features/contacts/domain/models/contact.dart';
 import '../../features/inventory/domain/models/inventory_enums.dart';
 import '../../features/inventory/domain/models/inventory_item.dart';
+import '../../features/transactions/domain/models/deal.dart';
 import '../../features/transactions/domain/models/repair_transaction.dart';
 import '../../features/transactions/domain/models/sale_transaction.dart';
 import '../../features/transactions/domain/models/trade_transaction.dart';
@@ -204,6 +205,18 @@ abstract final class DevelopmentSampleData {
         repairDate: DateTime(2026, 8, 2),
         costCents: 1200,
         description: 'Installed a new premium bat grip.',
+      ),
+    ];
+  }
+
+  static List<Deal> createDeals() {
+    return const [
+      Deal(
+        id: 'sample-deal-meta-sale',
+        parentSaleTransactionId: 'sample-sale-bat',
+        childInventoryItemIds: ['sample-item-available-glove'],
+        notes:
+            'Development sample Deal for the Meta and Wilson A2000 trade-in.',
       ),
     ];
   }

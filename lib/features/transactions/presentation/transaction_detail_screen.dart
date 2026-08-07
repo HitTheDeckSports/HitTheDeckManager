@@ -14,6 +14,7 @@ import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/transaction_enums.dart';
+import 'providers/deal_providers.dart';
 import 'providers/transaction_providers.dart';
 
 class TransactionDetailScreen extends ConsumerWidget {
@@ -188,6 +189,8 @@ class _TransactionDetailView extends StatelessWidget {
           if (transaction.id != null && transaction.id!.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
             _TradeInInformationSection(saleTransactionId: transaction.id!),
+            const SizedBox(height: 16),
+            _SaleDealSection(saleTransactionId: transaction.id!),
           ],
           const SizedBox(height: 16),
           Card(
@@ -266,6 +269,57 @@ class _TransactionDetailView extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SaleDealSection extends ConsumerWidget {
+  const _SaleDealSection({required this.saleTransactionId});
+
+  final String saleTransactionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dealAsync = ref.watch(dealForParentSaleProvider(saleTransactionId));
+
+    return dealAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (deal) {
+        final dealId = deal?.id;
+
+        if (dealId == null || dealId.trim().isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Card(
+          key: const Key('saleDealCard'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'This sale is the parent transaction for a Deal.',
+                  ),
+                ),
+                const SizedBox(width: 16),
+                OutlinedButton.icon(
+                  key: const Key('saleViewDealButton'),
+                  onPressed: () {
+                    context.goNamed(
+                      AppRouteNames.dealDetail,
+                      pathParameters: {'dealId': dealId},
+                    );
+                  },
+                  icon: const Icon(Icons.handshake_outlined),
+                  label: const Text('View Deal'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
