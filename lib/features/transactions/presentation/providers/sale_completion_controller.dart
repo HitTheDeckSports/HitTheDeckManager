@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../inventory/domain/models/inventory_enums.dart';
 import '../../../inventory/domain/models/inventory_item.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
+import '../../domain/models/deal.dart';
 import '../../domain/models/incoming_trade_item_draft.dart';
 import '../../domain/models/sale_transaction.dart';
 import '../../domain/models/trade_transaction.dart';
 import '../../domain/services/sale_completion_result.dart';
+import 'deal_providers.dart';
 import 'transaction_providers.dart';
 
 final saleCompletionControllerProvider =
@@ -73,10 +75,13 @@ class SaleCompletionController extends AsyncNotifier<void> {
 
     final inventoryRepository = ref.read(inventoryRepositoryProvider);
     final transactionRepository = ref.read(transactionRepositoryProvider);
+    final dealRepository = ref.read(dealRepositoryProvider);
     final soldItem = item.copyWith(status: InventoryStatus.sold);
     final updatedItem = await inventoryRepository.updateInventoryItem(soldItem);
 
     SaleTransaction? savedSale;
+    TradeTransaction? savedTrade;
+    Deal? savedDeal;
     final createdTradeInItems = <InventoryItem>[];
 
     try {
@@ -112,16 +117,26 @@ class SaleCompletionController extends AsyncNotifier<void> {
       }
 
       if (createdTradeInItems.isNotEmpty) {
-        await transactionRepository.createTrade(
+        final childInventoryItemIds = [
+          for (final tradeInItem in createdTradeInItems) tradeInItem.id!,
+        ];
+
+        savedTrade = await transactionRepository.createTrade(
           TradeTransaction(
             saleTransactionId: savedSale.id,
             outgoingInventoryItemIds: [itemId],
-            incomingInventoryItemIds: [
-              for (final tradeInItem in createdTradeInItems) tradeInItem.id!,
-            ],
+            incomingInventoryItemIds: childInventoryItemIds,
             tradeDate: sale.saleDate,
             contactId: _optionalText(sale.buyerContactId),
             notes: 'Trade-in items recorded with this sale.',
+          ),
+        );
+
+        savedDeal = await dealRepository.createDeal(
+          Deal(
+            parentSaleTransactionId: savedSale.id!,
+            childInventoryItemIds: childInventoryItemIds,
+            notes: 'Automatically created from trade-in sale.',
           ),
         );
       }
@@ -129,9 +144,22 @@ class SaleCompletionController extends AsyncNotifier<void> {
       ref.invalidate(inventoryItemsProvider);
       ref.invalidate(saleTransactionsProvider);
       ref.invalidate(tradeTransactionsProvider);
+      ref.invalidate(dealsProvider);
 
       return SaleCompletionResult(sale: savedSale, soldItem: updatedItem);
     } catch (error, stackTrace) {
+      if (savedDeal?.id != null) {
+        try {
+          await dealRepository.deleteDeal(savedDeal!.id!);
+        } catch (_) {}
+      }
+
+      if (savedTrade?.id != null) {
+        try {
+          await transactionRepository.deleteTrade(savedTrade!.id!);
+        } catch (_) {}
+      }
+
       for (final tradeInItem in createdTradeInItems.reversed) {
         try {
           await inventoryRepository.deleteInventoryItem(tradeInItem.id!);
