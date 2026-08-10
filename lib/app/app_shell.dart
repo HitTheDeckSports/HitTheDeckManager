@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/authentication/presentation/providers/authentication_controller.dart';
 import 'app_routes.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({required this.child, super.key});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentLocation = GoRouterState.of(context).uri.path;
 
     return LayoutBuilder(
@@ -29,6 +31,14 @@ class AppShell extends StatelessWidget {
                   leading: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Icon(Icons.sports_baseball, size: 32),
+                  ),
+                  trailing: Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: IconButton(
+                      tooltip: 'Sign out',
+                      icon: const Icon(Icons.logout),
+                      onPressed: () => _signOut(context, ref),
+                    ),
                   ),
                   destinations: const [
                     NavigationRailDestination(
@@ -76,7 +86,16 @@ class AppShell extends StatelessWidget {
         }
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Hit the Deck Manager')),
+          appBar: AppBar(
+            title: const Text('Hit the Deck Manager'),
+            actions: [
+              IconButton(
+                tooltip: 'Sign out',
+                icon: const Icon(Icons.logout),
+                onPressed: () => _signOut(context, ref),
+              ),
+            ],
+          ),
           drawer: NavigationDrawer(
             selectedIndex: _selectedIndex(currentLocation),
             onDestinationSelected: (index) {
@@ -132,6 +151,20 @@ class AppShell extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(authenticationControllerProvider.notifier).signOut();
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to sign out. Please try again.')),
+      );
+    }
   }
 
   int _selectedIndex(String location) {

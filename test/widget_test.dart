@@ -1,15 +1,35 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/app/app.dart';
-import 'package:flutter/material.dart';
-import 'package:hit_the_deck_manager/app/app_router.dart';
-import 'package:hit_the_deck_manager/app/app_routes.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/auth_user.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/authenticated_session.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/authorized_user.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/authorization_providers.dart';
+
+const testOwnerSession = AuthenticatedSession(
+  user: AuthUser(
+    id: 'test-owner-id',
+    email: 'sales.hitthedecksports@gmail.com',
+    displayName: 'Hit the Deck Sports',
+  ),
+  authorization: AuthorizedUser(
+    email: 'sales.hitthedecksports@gmail.com',
+    role: AuthorizedUserRole.owner,
+    active: true,
+  ),
+);
+
+Widget buildAuthorizedApp() {
+  return ProviderScope(
+    overrides: [
+      authenticatedSessionProvider.overrideWith(
+        (ref) => Stream.value(testOwnerSession),
+      ),
+    ],
+    child: const HitTheDeckApp(),
+  );
+}
 
 void main() {
   testWidgets('app loads home screen and navigates between sections', (
@@ -23,8 +43,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    appRouter.go(AppRoutes.home);
-    await tester.pumpWidget(const ProviderScope(child: HitTheDeckApp()));
+    await tester.pumpWidget(buildAuthorizedApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory Management'), findsOneWidget);
@@ -41,6 +60,7 @@ void main() {
 
     expect(find.text('Inventory'), findsWidgets);
   });
+
   testWidgets('home action buttons open inventory workflows', (
     WidgetTester tester,
   ) async {
@@ -52,9 +72,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    appRouter.go(AppRoutes.home);
-
-    await tester.pumpWidget(const ProviderScope(child: HitTheDeckApp()));
+    await tester.pumpWidget(buildAuthorizedApp());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Buy Inventory'));
