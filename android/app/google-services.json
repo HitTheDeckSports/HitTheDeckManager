@@ -12,7 +12,20 @@
           "package_name": "com.hitthedecksports.manager"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "88697282371-gn1ce4cbjp8eu43inhup447dflodja36.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hitthedecksports.manager",
+            "certificate_hash": "cdf8c214372186506ca02e2d776c04c4d09cd395"
+          }
+        },
+        {
+          "client_id": "88697282371-5k7aq093spo9l0dlme6118ml0s8s9jlf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC1yldHBVyOicu3nFZm-LkXN7Hui_rUJu4"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "88697282371-5k7aq093spo9l0dlme6118ml0s8s9jlf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "88697282371-k2lo4uvvu37dhlsl7hd8jli1gvbp0ors.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hitTheDeckManager"
+              }
+            }
+          ]
         }
       }
     }
