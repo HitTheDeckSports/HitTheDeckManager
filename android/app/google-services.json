@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88697282371",
+    "project_id": "hit-the-deck-manager",
+    "storage_bucket": "hit-the-deck-manager.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88697282371:android:dd6875401b0cf1786659f6",
+        "android_client_info": {
+          "package_name": "com.hitthedecksports.manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1yldHBVyOicu3nFZm-LkXN7Hui_rUJu4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
