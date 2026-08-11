@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/firestore_authorization_repository.dart';
 import '../../domain/models/authenticated_session.dart';
+import '../../domain/models/authorized_user.dart';
 import '../../domain/repositories/authorization_repository.dart';
 import 'authentication_providers.dart';
 
@@ -40,4 +41,14 @@ final authenticatedSessionProvider = StreamProvider<AuthenticatedSession?>((
 
     return AuthenticatedSession(user: user, authorization: authorization);
   });
+});
+
+/// Streams the full authorized-user list.
+///
+/// Firestore security rules only allow the permanent owner to read this
+/// collection.
+final authorizedUsersProvider = StreamProvider<List<AuthorizedUser>>((ref) {
+  final repository = ref.watch(authorizationRepositoryProvider);
+
+  return repository.watchAuthorizedUsers();
 });

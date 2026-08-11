@@ -5,10 +5,6 @@ import '../../domain/models/auth_user.dart';
 import '../../domain/models/authorized_user.dart';
 import '../../domain/repositories/authorization_repository.dart';
 
-/// Firestore-backed authorization repository.
-///
-/// Approved users are stored in the `authorized_users` collection using their
-/// normalized email address as the document ID.
 class FirestoreAuthorizationRepository implements AuthorizationRepository {
   FirestoreAuthorizationRepository({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -23,9 +19,6 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
   Future<AuthorizedUser?> getAuthorization(AuthUser user) async {
     final email = _normalizeEmail(user.email);
 
-    // The business owner is the permanent root administrator. This safeguard
-    // prevents an accidental Firestore document change from locking the owner
-    // out of the application.
     if (email == rootOwnerEmail) {
       return const AuthorizedUser(
         email: rootOwnerEmail,
@@ -56,32 +49,9 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
         return null;
       }
 
-      final roleValue = data['role'];
-
-      return AuthorizedUser(
-        email: email,
-        role: _parseRole(roleValue),
-        active: active,
-      );
+      return _authorizedUserFromData(email: email, data: data);
     } on FirebaseException catch (error) {
-      if (error.code == 'permission-denied') {
-        throw PermissionException(
-          'Unable to verify access to Hit the Deck Manager.',
-          cause: error,
-        );
-      }
-
-      if (error.code == 'unavailable') {
-        throw NetworkException(
-          'Unable to verify access. Check your internet connection.',
-          cause: error,
-        );
-      }
-
-      throw UnexpectedException(
-        'An error occurred while verifying application access.',
-        cause: error,
-      );
+      throw _mapFirebaseException(error);
     } catch (error) {
       if (error is AppException) {
         rethrow;
@@ -94,13 +64,172 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
     }
   }
 
+  @override
+  Stream<List<AuthorizedUser>> watchAuthorizedUsers() {
+    try {
+      return _firestore
+          .collection(_collectionName)
+          .orderBy('email')
+          .snapshots()
+          .map((snapshot) {
+            return snapshot.docs.map((document) {
+              return _authorizedUserFromData(
+                email: document.id,
+                data: document.data(),
+              );
+            }).toList();
+          });
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseException(error);
+    }
+  }
+
+  @override
+  Future<void> addAuthorizedUser({required String email}) async {
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (normalizedEmail.isEmpty) {
+      throw const ValidationException('An email address is required.');
+    }
+
+    if (normalizedEmail == rootOwnerEmail) {
+      throw const ValidationException(
+        'The owner account is already permanently authorized.',
+      );
+    }
+
+    try {
+      final reference = _firestore
+          .collection(_collectionName)
+          .doc(normalizedEmail);
+
+      final existing = await reference.get();
+
+      if (existing.exists) {
+        throw const DuplicateException(
+          'This user already has an access record.',
+        );
+      }
+
+      await reference.set({
+        'email': normalizedEmail,
+        'role': 'user',
+        'active': true,
+        'addedAt': FieldValue.serverTimestamp(),
+        'addedBy': rootOwnerEmail,
+      });
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseException(error);
+    }
+  }
+
+  @override
+  Future<void> disableAuthorizedUser(String email) async {
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (normalizedEmail == rootOwnerEmail) {
+      throw const PermissionException('The owner account cannot be disabled.');
+    }
+
+    try {
+      final reference = _firestore
+          .collection(_collectionName)
+          .doc(normalizedEmail);
+
+      final existing = await reference.get();
+
+      if (!existing.exists) {
+        throw const NotFoundException('Authorized user not found.');
+      }
+
+      await reference.update({
+        'active': false,
+        'disabledAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseException(error);
+    }
+  }
+
+  @override
+  Future<void> restoreAuthorizedUser(String email) async {
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (normalizedEmail == rootOwnerEmail) {
+      return;
+    }
+
+    try {
+      final reference = _firestore
+          .collection(_collectionName)
+          .doc(normalizedEmail);
+
+      final existing = await reference.get();
+
+      if (!existing.exists) {
+        throw const NotFoundException('Authorized user not found.');
+      }
+
+      await reference.update({
+        'active': true,
+        'restoredAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseException(error);
+    }
+  }
+
+  AuthorizedUser _authorizedUserFromData({
+    required String email,
+    required Map<String, dynamic> data,
+  }) {
+    final active = data['active'];
+    final role = data['role'];
+
+    return AuthorizedUser(
+      email: _normalizeEmail(email),
+      role: _parseRole(role),
+      active: active is bool ? active : false,
+    );
+  }
+
   AuthorizedUserRole _parseRole(Object? value) {
     switch (value) {
       case 'owner':
         return AuthorizedUserRole.owner;
+      case 'admin':
+        return AuthorizedUserRole.admin;
       case 'user':
       default:
         return AuthorizedUserRole.user;
+    }
+  }
+
+  AppException _mapFirebaseException(FirebaseException error) {
+    switch (error.code) {
+      case 'permission-denied':
+        return PermissionException(
+          'You do not have permission to manage user access.',
+          cause: error,
+        );
+
+      case 'unavailable':
+        return NetworkException(
+          'Unable to reach Firebase. Check your internet connection.',
+          cause: error,
+        );
+
+      case 'not-found':
+        return NotFoundException(
+          'The requested access record could not be found.',
+          cause: error,
+        );
+
+      default:
+        return UnexpectedException(
+          'An error occurred while managing user access.',
+          cause: error,
+        );
     }
   }
 
