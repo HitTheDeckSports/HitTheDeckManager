@@ -7,8 +7,6 @@ import 'core/config/development_config.dart';
 import 'core/config/development_sample_data.dart';
 import 'features/contacts/data/repositories/in_memory_contact_repository.dart';
 import 'features/contacts/presentation/providers/contact_providers.dart';
-import 'features/inventory/data/repositories/in_memory_inventory_repository.dart';
-import 'features/inventory/presentation/providers/inventory_providers.dart';
 import 'features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'features/transactions/presentation/providers/deal_providers.dart';
@@ -23,12 +21,6 @@ Future<void> main() async {
   final contactRepository = InMemoryContactRepository(
     initialContacts: DevelopmentConfig.useSampleData
         ? DevelopmentSampleData.createContacts()
-        : const [],
-  );
-
-  final inventoryRepository = InMemoryInventoryRepository(
-    initialItems: DevelopmentConfig.useSampleData
-        ? DevelopmentSampleData.createInventoryItems()
         : const [],
   );
 
@@ -54,7 +46,6 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         contactRepositoryProvider.overrideWithValue(contactRepository),
-        inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
         dealRepositoryProvider.overrideWithValue(dealRepository),
       ],
