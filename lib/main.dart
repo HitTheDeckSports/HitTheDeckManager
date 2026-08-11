@@ -5,8 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'core/config/development_config.dart';
 import 'core/config/development_sample_data.dart';
-import 'features/contacts/data/repositories/in_memory_contact_repository.dart';
-import 'features/contacts/presentation/providers/contact_providers.dart';
 import 'features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'features/transactions/presentation/providers/deal_providers.dart';
@@ -17,12 +15,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  final contactRepository = InMemoryContactRepository(
-    initialContacts: DevelopmentConfig.useSampleData
-        ? DevelopmentSampleData.createContacts()
-        : const [],
-  );
 
   final dealRepository = InMemoryDealRepository(
     initialDeals: DevelopmentConfig.useSampleData
@@ -45,7 +37,6 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        contactRepositoryProvider.overrideWithValue(contactRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
         dealRepositoryProvider.overrideWithValue(dealRepository),
       ],
