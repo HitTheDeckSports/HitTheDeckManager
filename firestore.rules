@@ -96,6 +96,18 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
+    match /contacts/{contactId} {
+      // All active Hit the Deck Manager users may read contacts.
+      allow read: if isAuthorizedAppUser();
+
+      // Active application users may create and update contacts.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Permanent contact deletion is blocked during Phase 3.
+      // Contacts may be referenced by inventory and transaction records.
+      allow delete: if false;
+    }
+
     // Everything else remains denied until deliberately opened.
     match /{document=**} {
       allow read, write: if false;
