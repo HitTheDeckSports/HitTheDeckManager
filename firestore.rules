@@ -108,6 +108,36 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /sales/{saleId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /repairs/{repairId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /consignments/{consignmentId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /disposals/{disposalId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /trades/{tradeId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
     // Everything else remains denied until deliberately opened.
     match /{document=**} {
       allow read, write: if false;
