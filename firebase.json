@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"hit-the-deck-manager","appId":"1:88697282371:android:dd6875401b0cf1786659f6","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"hit-the-deck-manager","configurations":{"android":"1:88697282371:android:dd6875401b0cf1786659f6","ios":"1:88697282371:ios:2fda9f7b18f5974d6659f6","web":"1:88697282371:web:5f94e9c800e8c40e6659f6"}}}}}}
+{
+    "flutter":  {
+                    "platforms":  {
+                                      "android":  {
+                                                      "default":  {
+                                                                      "projectId":  "hit-the-deck-manager",
+                                                                      "appId":  "1:88697282371:android:dd6875401b0cf1786659f6",
+                                                                      "fileOutput":  "android/app/google-services.json"
+                                                                  }
+                                                  },
+                                      "dart":  {
+                                                   "lib/firebase_options.dart":  {
+                                                                                     "projectId":  "hit-the-deck-manager",
+                                                                                     "configurations":  {
+                                                                                                            "android":  "1:88697282371:android:dd6875401b0cf1786659f6",
+                                                                                                            "ios":  "1:88697282371:ios:2fda9f7b18f5974d6659f6",
+                                                                                                            "web":  "1:88697282371:web:5f94e9c800e8c40e6659f6"
+                                                                                                        }
+                                                                                 }
+                                               }
+                                  }
+                },
+    "firestore":  {
+                      "rules":  "firestore.rules"
+                  }
+}
