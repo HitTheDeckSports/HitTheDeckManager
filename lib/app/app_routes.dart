@@ -1,4 +1,5 @@
 abstract final class AppRoutes {
+  static const String login = '/login';
   static const String home = '/';
   static const String dashboard = '/dashboard';
   static const String inventory = '/inventory';
@@ -11,6 +12,7 @@ abstract final class AppRoutes {
   static const String dealDetail = '/deals/:dealId';
   static const String reports = '/reports';
   static const String settings = '/settings';
+  static const String userAccess = '/settings/user-access';
 
   static const String buyInventory = '/inventory/buy';
   static const String sellInventory = '/inventory/sell';
@@ -26,6 +28,7 @@ abstract final class AppRoutes {
 }
 
 abstract final class AppRouteNames {
+  static const String login = 'login';
   static const String home = 'home';
   static const String dashboard = 'dashboard';
   static const String inventory = 'inventory';
@@ -38,6 +41,7 @@ abstract final class AppRouteNames {
   static const String dealDetail = 'dealDetail';
   static const String reports = 'reports';
   static const String settings = 'settings';
+  static const String userAccess = 'userAccess';
 
   static const String buyInventory = 'buyInventory';
   static const String sellInventory = 'sellInventory';

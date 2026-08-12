@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/repositories/in_memory_transaction_repository.dart';
+import '../../data/repositories/firestore_transaction_repository.dart';
 import '../../domain/models/consignment_transaction.dart';
 import '../../domain/models/disposal_transaction.dart';
 import '../../domain/models/repair_transaction.dart';
@@ -9,7 +9,7 @@ import '../../domain/models/trade_transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
 
 final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
-  return InMemoryTransactionRepository();
+  return FirestoreTransactionRepository();
 });
 
 final saleTransactionsProvider = StreamProvider<List<SaleTransaction>>((ref) {

@@ -12,14 +12,26 @@ import 'package:hit_the_deck_manager/features/contacts/domain/models/contact.dar
 import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
 
 void main() {
+  late InMemoryInventoryRepository inventoryRepository;
+  late InMemoryContactRepository contactRepository;
   late ProviderContainer container;
 
   setUp(() {
-    container = ProviderContainer();
+    inventoryRepository = InMemoryInventoryRepository();
+    contactRepository = InMemoryContactRepository();
+
+    container = ProviderContainer(
+      overrides: [
+        inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        contactRepositoryProvider.overrideWithValue(contactRepository),
+      ],
+    );
   });
 
-  tearDown(() {
+  tearDown(() async {
     container.dispose();
+    await inventoryRepository.dispose();
+    await contactRepository.dispose();
   });
 
   Widget createTestApp() {

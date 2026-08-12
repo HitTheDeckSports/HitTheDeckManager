@@ -1,4 +1,4 @@
-package com.example.hit_the_deck_manager
+package com.hitthedecksports.manager
 
 import io.flutter.embedding.android.FlutterActivity
 

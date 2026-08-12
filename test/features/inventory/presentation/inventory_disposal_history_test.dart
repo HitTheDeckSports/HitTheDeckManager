@@ -7,9 +7,11 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/presentation/inventory_item_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_warranty_replacement_deal_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/disposal_reason.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/disposal_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/warranty_replacement_providers.dart';
 
 void main() {
   const disposedItem = InventoryItem(
@@ -38,8 +40,12 @@ void main() {
         ),
       ],
     );
+    final warrantyReplacementRepository =
+        InMemoryWarrantyReplacementDealRepository();
+
     addTearDown(inventoryRepository.dispose);
     addTearDown(transactionRepository.dispose);
+    addTearDown(warrantyReplacementRepository.dispose);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -47,6 +53,9 @@ void main() {
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
+          ),
+          warrantyReplacementDealRepositoryProvider.overrideWithValue(
+            warrantyReplacementRepository,
           ),
         ],
         child: const MaterialApp(

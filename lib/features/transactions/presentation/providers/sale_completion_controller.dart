@@ -184,6 +184,8 @@ class SaleCompletionController extends AsyncNotifier<void> {
       }
 
       ref.invalidate(inventoryItemsProvider);
+
+      ref.invalidate(inventoryItemProvider(itemId));
       ref.invalidate(saleTransactionsProvider);
       ref.invalidate(tradeTransactionsProvider);
       ref.invalidate(consignmentTransactionsProvider);
@@ -224,6 +226,8 @@ class SaleCompletionController extends AsyncNotifier<void> {
 
       try {
         await inventoryRepository.updateInventoryItem(item);
+        ref.invalidate(inventoryItemsProvider);
+        ref.invalidate(inventoryItemProvider(itemId));
       } catch (_) {
         Error.throwWithStackTrace(
           StateError(

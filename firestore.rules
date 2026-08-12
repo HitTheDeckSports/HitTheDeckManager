@@ -1,0 +1,170 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasVerifiedEmail() {
+      return isSignedIn()
+          && request.auth.token.email != null
+          && request.auth.token.email_verified == true;
+    }
+
+    function userEmail() {
+      return request.auth.token.email;
+    }
+
+    function isRootOwner() {
+      return hasVerifiedEmail()
+          && userEmail() == 'sales.hitthedecksports@gmail.com';
+    }
+
+    function currentAccessRecordExists() {
+      return hasVerifiedEmail()
+          && exists(
+            /databases/$(database)/documents/authorized_users/$(userEmail())
+          );
+    }
+
+    function currentAccessRecord() {
+      return get(
+        /databases/$(database)/documents/authorized_users/$(userEmail())
+      );
+    }
+
+    function isActiveAuthorizedUser() {
+      return currentAccessRecordExists()
+          && currentAccessRecord().data.active == true;
+    }
+
+    function isAuthorizedAppUser() {
+      return isRootOwner() || isActiveAuthorizedUser();
+    }
+
+    function isAdmin() {
+      return isRootOwner()
+          || (
+            isActiveAuthorizedUser()
+            && currentAccessRecord().data.role == 'admin'
+          );
+    }
+
+    match /authorized_users/{userEmailDocument} {
+
+      // Owner and active admins may view the access-management list.
+      allow read: if isAdmin();
+
+      // Any verified user may read only their own authorization record.
+      allow get: if hasVerifiedEmail()
+          && userEmail() == userEmailDocument;
+
+      // Owner or admin may create ordinary user records.
+      allow create: if isAdmin()
+          && userEmailDocument != 'sales.hitthedecksports@gmail.com'
+          && request.resource.data.role == 'user';
+
+      // Owner or admin may update ordinary user records.
+      allow update: if isAdmin()
+          && userEmailDocument != 'sales.hitthedecksports@gmail.com'
+          && resource.data.role == 'user'
+          && request.resource.data.role == 'user';
+
+      // Access records are disabled/restored instead of deleted.
+      allow delete: if false;
+    }
+
+    match /inventory/{itemId} {
+      // All active Hit the Deck Manager users may read inventory.
+      allow read: if isAuthorizedAppUser();
+
+      // Active application users may create and update inventory.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Business workflows change status rather than permanently deleting.
+      allow delete: if false;
+    }
+
+    match /inventory_number_counters/{counterId} {
+      // Inventory-number generation uses Firestore transactions.
+      allow get: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+
+      // Internal counters are not listed or deleted by the client.
+      allow list, delete: if false;
+    }
+
+    match /contacts/{contactId} {
+      // All active Hit the Deck Manager users may read contacts.
+      allow read: if isAuthorizedAppUser();
+
+      // Active application users may create and update contacts.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Permanent contact deletion is blocked during Phase 3.
+      // Contacts may be referenced by inventory and transaction records.
+      allow delete: if false;
+    }
+
+    match /sales/{saleId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /repairs/{repairId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /consignments/{consignmentId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /disposals/{disposalId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /trades/{tradeId} {
+      allow read: if isAuthorizedAppUser();
+      allow create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
+    match /deals/{dealId} {
+      // All active Hit the Deck Manager users may read Deals.
+      allow read: if isAuthorizedAppUser();
+
+      // Active authorized users may create and update Deal relationships.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Permanent Deal deletion is blocked while Deals can reference
+      // historical sales and inventory records.
+      allow delete: if false;
+    }
+
+    match /warranty_replacement_deals/{warrantyReplacementDealId} {
+      // Active Hit the Deck Manager users may read warranty replacement
+      // relationships so completed replacements survive app restarts.
+      allow read: if isAuthorizedAppUser();
+
+      // Active application users may create and update the relationship.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Historical warranty replacement relationships are retained.
+      allow delete: if false;
+    }
+
+    // Everything else remains denied until deliberately opened.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

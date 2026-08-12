@@ -1,5 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
 import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/contacts/presentation/create_contact_screen.dart';
@@ -22,234 +24,284 @@ import '../features/transactions/presentation/transaction_detail_screen.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
 import '../features/inventory/presentation/edit_inventory_screen.dart';
 import '../features/inventory/presentation/sell_inventory_screen.dart';
+import '../features/authentication/presentation/providers/authorization_providers.dart';
+import '../features/authentication/presentation/user_access_screen.dart';
 import 'app_routes.dart';
 import 'app_shell.dart';
 
-final GoRouter appRouter = GoRouter(
-  initialLocation: AppRoutes.home,
-  routes: [
-    ShellRoute(
-      builder: (context, state, child) {
-        return AppShell(child: child);
-      },
-      routes: [
-        GoRoute(
-          path: AppRoutes.home,
-          name: AppRouteNames.home,
-          builder: (context, state) => const HomeScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.dashboard,
-          name: AppRouteNames.dashboard,
-          builder: (context, state) => const DashboardScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.inventory,
-          name: AppRouteNames.inventory,
-          builder: (context, state) => const InventoryScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.buyInventory,
-          name: AppRouteNames.buyInventory,
-          builder: (context, state) => const BuyInventoryScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.sellInventory,
-          name: AppRouteNames.sellInventory,
-          builder: (context, state) => const SellInventoryScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.inventoryEdit,
-          name: AppRouteNames.inventoryEdit,
-          builder: (context, state) {
-            final itemId = state.pathParameters['itemId'];
+/// Provides the application's router.
+///
+/// Authentication state is watched here so the router is rebuilt when the
+/// user's authorized session changes.
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final sessionState = ref.watch(authenticatedSessionProvider);
 
-            if (itemId == null || itemId.isEmpty) {
-              throw StateError('Inventory edit route requires an item ID.');
-            }
+  return GoRouter(
+    initialLocation: AppRoutes.home,
 
-            return EditInventoryScreen(itemId: itemId);
-          },
-        ),
+    redirect: (context, state) {
+      final isLoginRoute = state.matchedLocation == AppRoutes.login;
 
-        GoRoute(
-          path: AppRoutes.addRepair,
-          name: AppRouteNames.addRepair,
-          builder: (context, state) {
-            final itemId = state.pathParameters['itemId'];
+      // While Firebase restores a previous session or authorization is being
+      // checked, keep the user outside the protected application shell.
+      if (sessionState.isLoading) {
+        return isLoginRoute ? null : AppRoutes.login;
+      }
 
-            if (itemId == null || itemId.isEmpty) {
-              throw StateError(
-                'Add Repair route requires an inventory item ID.',
-              );
-            }
+      // Authentication/authorization errors must never grant application
+      // access. The login screen remains the safe destination.
+      if (sessionState.hasError) {
+        return isLoginRoute ? null : AppRoutes.login;
+      }
 
-            return AddRepairScreen(inventoryItemId: itemId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.disposeInventory,
-          name: AppRouteNames.disposeInventory,
-          builder: (context, state) {
-            final itemId = state.pathParameters['itemId'];
-            if (itemId == null || itemId.isEmpty) {
-              throw StateError(
-                'Dispose Inventory route requires an inventory item ID.',
-              );
-            }
-            return DisposeInventoryScreen(inventoryItemId: itemId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.recordConsignment,
-          name: AppRouteNames.recordConsignment,
-          builder: (context, state) {
-            final itemId = state.pathParameters['itemId'];
+      final session = sessionState.value;
+      final isAuthorized = session != null;
 
-            if (itemId == null || itemId.isEmpty) {
-              throw StateError(
-                'Record Consignment route requires an inventory item ID.',
-              );
-            }
+      if (!isAuthorized) {
+        return isLoginRoute ? null : AppRoutes.login;
+      }
 
-            return RecordConsignmentScreen(inventoryItemId: itemId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.warrantyReplacement,
-          name: AppRouteNames.warrantyReplacement,
-          builder: (context, state) {
-            final disposalId = state.pathParameters['disposalId'];
+      // Once an authorized session exists, the login page is no longer needed.
+      if (isLoginRoute) {
+        return AppRoutes.home;
+      }
 
-            if (disposalId == null || disposalId.isEmpty) {
-              throw StateError(
-                'Warranty Replacement route requires a disposal ID.',
-              );
-            }
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: AppRoutes.login,
+        name: AppRouteNames.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      ShellRoute(
+        builder: (context, state, child) {
+          return AppShell(child: child);
+        },
+        routes: [
+          GoRoute(
+            path: AppRoutes.home,
+            name: AppRouteNames.home,
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.dashboard,
+            name: AppRouteNames.dashboard,
+            builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.inventory,
+            name: AppRouteNames.inventory,
+            builder: (context, state) => const InventoryScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.buyInventory,
+            name: AppRouteNames.buyInventory,
+            builder: (context, state) => const BuyInventoryScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.sellInventory,
+            name: AppRouteNames.sellInventory,
+            builder: (context, state) => const SellInventoryScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.inventoryEdit,
+            name: AppRouteNames.inventoryEdit,
+            builder: (context, state) {
+              final itemId = state.pathParameters['itemId'];
 
-            return WarrantyReplacementScreen(disposalId: disposalId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.repairDetail,
-          name: AppRouteNames.repairDetail,
-          builder: (context, state) {
-            final repairId = state.pathParameters['repairId'];
+              if (itemId == null || itemId.isEmpty) {
+                throw StateError('Inventory edit route requires an item ID.');
+              }
 
-            if (repairId == null || repairId.isEmpty) {
-              throw StateError('Repair detail route requires a repair ID.');
-            }
+              return EditInventoryScreen(itemId: itemId);
+            },
+          ),
 
-            return RepairDetailScreen(repairId: repairId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.editRepair,
-          name: AppRouteNames.editRepair,
-          builder: (context, state) {
-            final repairId = state.pathParameters['repairId'];
+          GoRoute(
+            path: AppRoutes.addRepair,
+            name: AppRouteNames.addRepair,
+            builder: (context, state) {
+              final itemId = state.pathParameters['itemId'];
 
-            if (repairId == null || repairId.isEmpty) {
-              throw StateError('Edit Repair route requires a repair ID.');
-            }
+              if (itemId == null || itemId.isEmpty) {
+                throw StateError(
+                  'Add Repair route requires an inventory item ID.',
+                );
+              }
 
-            return EditRepairScreen(repairId: repairId);
-          },
-        ),
+              return AddRepairScreen(inventoryItemId: itemId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.disposeInventory,
+            name: AppRouteNames.disposeInventory,
+            builder: (context, state) {
+              final itemId = state.pathParameters['itemId'];
+              if (itemId == null || itemId.isEmpty) {
+                throw StateError(
+                  'Dispose Inventory route requires an inventory item ID.',
+                );
+              }
+              return DisposeInventoryScreen(inventoryItemId: itemId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.recordConsignment,
+            name: AppRouteNames.recordConsignment,
+            builder: (context, state) {
+              final itemId = state.pathParameters['itemId'];
 
-        GoRoute(
-          path: AppRoutes.inventoryDetail,
-          name: AppRouteNames.inventoryDetail,
-          builder: (context, state) {
-            final itemId = state.pathParameters['itemId'];
+              if (itemId == null || itemId.isEmpty) {
+                throw StateError(
+                  'Record Consignment route requires an inventory item ID.',
+                );
+              }
 
-            if (itemId == null || itemId.isEmpty) {
-              throw StateError('Inventory detail route requires an item ID.');
-            }
+              return RecordConsignmentScreen(inventoryItemId: itemId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.warrantyReplacement,
+            name: AppRouteNames.warrantyReplacement,
+            builder: (context, state) {
+              final disposalId = state.pathParameters['disposalId'];
 
-            return InventoryItemDetailScreen(itemId: itemId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.contacts,
-          name: AppRouteNames.contacts,
-          builder: (context, state) => const ContactsScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.createContact,
-          name: AppRouteNames.createContact,
-          builder: (context, state) => const CreateContactScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.contactDetail,
-          name: AppRouteNames.contactDetail,
-          builder: (context, state) {
-            final contactId = state.pathParameters['contactId'];
+              if (disposalId == null || disposalId.isEmpty) {
+                throw StateError(
+                  'Warranty Replacement route requires a disposal ID.',
+                );
+              }
 
-            if (contactId == null || contactId.isEmpty) {
-              throw StateError('Contact detail route requires a contact ID.');
-            }
+              return WarrantyReplacementScreen(disposalId: disposalId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.repairDetail,
+            name: AppRouteNames.repairDetail,
+            builder: (context, state) {
+              final repairId = state.pathParameters['repairId'];
 
-            return ContactDetailScreen(contactId: contactId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.editContact,
-          name: AppRouteNames.editContact,
-          builder: (context, state) {
-            final contactId = state.pathParameters['contactId'];
+              if (repairId == null || repairId.isEmpty) {
+                throw StateError('Repair detail route requires a repair ID.');
+              }
 
-            if (contactId == null || contactId.isEmpty) {
-              throw StateError('Edit Contact route requires a contact ID.');
-            }
+              return RepairDetailScreen(repairId: repairId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.editRepair,
+            name: AppRouteNames.editRepair,
+            builder: (context, state) {
+              final repairId = state.pathParameters['repairId'];
 
-            return EditContactScreen(contactId: contactId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.transactions,
-          name: AppRouteNames.transactions,
-          builder: (context, state) => const TransactionsScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.transactionDetail,
-          name: AppRouteNames.transactionDetail,
-          builder: (context, state) {
-            final transactionId = state.pathParameters['transactionId'];
+              if (repairId == null || repairId.isEmpty) {
+                throw StateError('Edit Repair route requires a repair ID.');
+              }
 
-            if (transactionId == null || transactionId.isEmpty) {
-              throw StateError(
-                'Transaction detail route requires a transaction ID.',
-              );
-            }
+              return EditRepairScreen(repairId: repairId);
+            },
+          ),
 
-            return TransactionDetailScreen(transactionId: transactionId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.dealDetail,
-          name: AppRouteNames.dealDetail,
-          builder: (context, state) {
-            final dealId = state.pathParameters['dealId'];
+          GoRoute(
+            path: AppRoutes.inventoryDetail,
+            name: AppRouteNames.inventoryDetail,
+            builder: (context, state) {
+              final itemId = state.pathParameters['itemId'];
 
-            if (dealId == null || dealId.isEmpty) {
-              throw StateError('Deal detail route requires a Deal ID.');
-            }
+              if (itemId == null || itemId.isEmpty) {
+                throw StateError('Inventory detail route requires an item ID.');
+              }
 
-            return DealDetailScreen(dealId: dealId);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.reports,
-          name: AppRouteNames.reports,
-          builder: (context, state) => const ReportScreen(),
-        ),
-        GoRoute(
-          path: AppRoutes.settings,
-          name: AppRouteNames.settings,
-          builder: (context, state) => const SettingsScreen(),
-        ),
-      ],
-    ),
-  ],
-);
+              return InventoryItemDetailScreen(itemId: itemId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.contacts,
+            name: AppRouteNames.contacts,
+            builder: (context, state) => const ContactsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.createContact,
+            name: AppRouteNames.createContact,
+            builder: (context, state) => const CreateContactScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.contactDetail,
+            name: AppRouteNames.contactDetail,
+            builder: (context, state) {
+              final contactId = state.pathParameters['contactId'];
+
+              if (contactId == null || contactId.isEmpty) {
+                throw StateError('Contact detail route requires a contact ID.');
+              }
+
+              return ContactDetailScreen(contactId: contactId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.editContact,
+            name: AppRouteNames.editContact,
+            builder: (context, state) {
+              final contactId = state.pathParameters['contactId'];
+
+              if (contactId == null || contactId.isEmpty) {
+                throw StateError('Edit Contact route requires a contact ID.');
+              }
+
+              return EditContactScreen(contactId: contactId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.transactions,
+            name: AppRouteNames.transactions,
+            builder: (context, state) => const TransactionsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.transactionDetail,
+            name: AppRouteNames.transactionDetail,
+            builder: (context, state) {
+              final transactionId = state.pathParameters['transactionId'];
+
+              if (transactionId == null || transactionId.isEmpty) {
+                throw StateError(
+                  'Transaction detail route requires a transaction ID.',
+                );
+              }
+
+              return TransactionDetailScreen(transactionId: transactionId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.dealDetail,
+            name: AppRouteNames.dealDetail,
+            builder: (context, state) {
+              final dealId = state.pathParameters['dealId'];
+
+              if (dealId == null || dealId.isEmpty) {
+                throw StateError('Deal detail route requires a Deal ID.');
+              }
+
+              return DealDetailScreen(dealId: dealId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.reports,
+            name: AppRouteNames.reports,
+            builder: (context, state) => const ReportScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.settings,
+            name: AppRouteNames.settings,
+            builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.userAccess,
+            name: AppRouteNames.userAccess,
+            builder: (context, state) => const UserAccessScreen(),
+          ),
+        ],
+      ),
+    ],
+  );
+});
