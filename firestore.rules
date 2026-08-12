@@ -138,6 +138,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /deals/{dealId} {
+      // All active Hit the Deck Manager users may read Deals.
+      allow read: if isAuthorizedAppUser();
+
+      // Active authorized users may create and update Deal relationships.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Permanent Deal deletion is blocked while Deals can reference
+      // historical sales and inventory records.
+      allow delete: if false;
+    }
+
     // Everything else remains denied until deliberately opened.
     match /{document=**} {
       allow read, write: if false;
