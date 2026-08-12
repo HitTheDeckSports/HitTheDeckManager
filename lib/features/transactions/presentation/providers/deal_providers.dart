@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/repositories/in_memory_deal_repository.dart';
+import '../../data/repositories/firestore_deal_repository.dart';
 import '../../../inventory/domain/models/inventory_item.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
 import '../../domain/models/deal.dart';
@@ -11,11 +11,7 @@ import '../../domain/services/deal_profit_service.dart';
 import 'transaction_providers.dart';
 
 final dealRepositoryProvider = Provider<DealRepository>((ref) {
-  final repository = InMemoryDealRepository();
-
-  ref.onDispose(repository.dispose);
-
-  return repository;
+  return FirestoreDealRepository();
 });
 
 final dealsProvider = StreamProvider<List<Deal>>((ref) {
