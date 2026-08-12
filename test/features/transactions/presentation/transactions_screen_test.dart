@@ -6,6 +6,7 @@ import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
@@ -19,13 +20,17 @@ void main() {
     WidgetTester tester,
   ) async {
     final repository = InMemoryTransactionRepository();
+    final inventoryRepository = InMemoryInventoryRepository();
 
     addTearDown(repository.dispose);
+    addTearDown(inventoryRepository.dispose);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           transactionRepositoryProvider.overrideWithValue(repository),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
@@ -104,6 +109,7 @@ void main() {
       ProviderScope(
         overrides: [
           transactionRepositoryProvider.overrideWithValue(repository),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
@@ -178,6 +184,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
@@ -256,6 +263,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: MaterialApp.router(routerConfig: router),

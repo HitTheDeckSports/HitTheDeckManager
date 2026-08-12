@@ -9,11 +9,16 @@ import 'package:hit_the_deck_manager/features/inventory/presentation/sell_invent
 import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memory_contact_repository.dart';
 import 'package:hit_the_deck_manager/features/contacts/domain/models/contact.dart';
 import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 
 void main() {
   late InMemoryInventoryRepository inventoryRepository;
+  late InMemoryContactRepository contactRepository;
+  late InMemoryTransactionRepository transactionRepository;
+  late InMemoryDealRepository dealRepository;
   late ProviderContainer container;
 
   const availableItem = InventoryItem(
@@ -32,10 +37,16 @@ void main() {
     inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [availableItem],
     );
+    contactRepository = InMemoryContactRepository();
+    transactionRepository = InMemoryTransactionRepository();
+    dealRepository = InMemoryDealRepository();
 
     container = ProviderContainer(
       overrides: [
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        contactRepositoryProvider.overrideWithValue(contactRepository),
+        transactionRepositoryProvider.overrideWithValue(transactionRepository),
+        dealRepositoryProvider.overrideWithValue(dealRepository),
       ],
     );
   });
@@ -43,6 +54,9 @@ void main() {
   tearDown(() async {
     container.dispose();
     await inventoryRepository.dispose();
+    await contactRepository.dispose();
+    await transactionRepository.dispose();
+    await dealRepository.dispose();
   });
 
   Widget createTestApp() {
@@ -132,6 +146,9 @@ void main() {
     container = ProviderContainer(
       overrides: [
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        contactRepositoryProvider.overrideWithValue(contactRepository),
+        transactionRepositoryProvider.overrideWithValue(transactionRepository),
+        dealRepositoryProvider.overrideWithValue(dealRepository),
       ],
     );
 
@@ -203,6 +220,7 @@ void main() {
     );
 
     final transactionRepository = InMemoryTransactionRepository();
+    final dealRepository = InMemoryDealRepository();
 
     final contactRepository = InMemoryContactRepository(
       initialContacts: const [
@@ -213,6 +231,7 @@ void main() {
 
     addTearDown(inventoryRepository.dispose);
     addTearDown(transactionRepository.dispose);
+    addTearDown(dealRepository.dispose);
     addTearDown(contactRepository.dispose);
 
     await tester.pumpWidget(
@@ -222,6 +241,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealRepositoryProvider.overrideWithValue(dealRepository),
           contactRepositoryProvider.overrideWithValue(contactRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: SellInventoryScreen())),
@@ -261,6 +281,7 @@ void main() {
     );
 
     final transactionRepository = InMemoryTransactionRepository();
+    final dealRepository = InMemoryDealRepository();
 
     final contactRepository = InMemoryContactRepository(
       initialContacts: const [Contact(id: 'contact-1', name: 'Taylor Morgan')],
@@ -268,6 +289,7 @@ void main() {
 
     addTearDown(inventoryRepository.dispose);
     addTearDown(transactionRepository.dispose);
+    addTearDown(dealRepository.dispose);
     addTearDown(contactRepository.dispose);
 
     await tester.pumpWidget(
@@ -277,6 +299,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealRepositoryProvider.overrideWithValue(dealRepository),
           contactRepositoryProvider.overrideWithValue(contactRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: SellInventoryScreen())),
@@ -342,10 +365,12 @@ void main() {
     );
 
     final transactionRepository = InMemoryTransactionRepository();
+    final dealRepository = InMemoryDealRepository();
     final contactRepository = InMemoryContactRepository();
 
     addTearDown(inventoryRepository.dispose);
     addTearDown(transactionRepository.dispose);
+    addTearDown(dealRepository.dispose);
     addTearDown(contactRepository.dispose);
 
     await tester.pumpWidget(
@@ -355,6 +380,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealRepositoryProvider.overrideWithValue(dealRepository),
           contactRepositoryProvider.overrideWithValue(contactRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: SellInventoryScreen())),

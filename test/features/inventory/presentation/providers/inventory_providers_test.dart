@@ -8,15 +8,25 @@ import 'package:hit_the_deck_manager/features/inventory/presentation/providers/i
 
 void main() {
   group('Inventory providers', () {
-    test('repository provider returns an inventory repository', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+    test(
+      'repository provider can be overridden with an inventory repository',
+      () {
+        final repository = InMemoryInventoryRepository();
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
 
-      final repository = container.read(inventoryRepositoryProvider);
+        addTearDown(container.dispose);
+        addTearDown(repository.dispose);
 
-      expect(repository, isA<InventoryRepository>());
-      expect(repository, isA<InMemoryInventoryRepository>());
-    });
+        final resolvedRepository = container.read(inventoryRepositoryProvider);
+
+        expect(resolvedRepository, isA<InventoryRepository>());
+        expect(resolvedRepository, same(repository));
+      },
+    );
 
     test('inventory items provider returns repository items', () async {
       const item = InventoryItem(

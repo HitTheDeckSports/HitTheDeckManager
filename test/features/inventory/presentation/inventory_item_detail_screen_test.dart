@@ -26,8 +26,13 @@ void main() {
     required InMemoryInventoryRepository repository,
     required String itemId,
   }) {
+    final transactionRepository = InMemoryTransactionRepository();
+
     return ProviderScope(
-      overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        inventoryRepositoryProvider.overrideWithValue(repository),
+        transactionRepositoryProvider.overrideWithValue(transactionRepository),
+      ],
       child: MaterialApp(
         home: Scaffold(body: InventoryItemDetailScreen(itemId: itemId)),
       ),
