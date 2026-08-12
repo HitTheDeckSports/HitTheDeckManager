@@ -150,6 +150,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /warranty_replacement_deals/{warrantyReplacementDealId} {
+      // Active Hit the Deck Manager users may read warranty replacement
+      // relationships so completed replacements survive app restarts.
+      allow read: if isAuthorizedAppUser();
+
+      // Active application users may create and update the relationship.
+      allow create, update: if isAuthorizedAppUser();
+
+      // Historical warranty replacement relationships are retained.
+      allow delete: if false;
+    }
+
     // Everything else remains denied until deliberately opened.
     match /{document=**} {
       allow read, write: if false;
