@@ -1,0 +1,30 @@
+{
+  "name": "hitthedeckmanager",
+  "version": "1.0.0",
+  "description": "Hit The Deck Sports Inventory Manager App",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HitTheDeckSports/HitTheDeckManager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/HitTheDeckSports/HitTheDeckManager/issues"
+  },
+  "homepage": "https://github.com/HitTheDeckSports/HitTheDeckManager#readme",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.17.1"
+  }
+}
