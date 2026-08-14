@@ -11,6 +11,7 @@ class InventoryPhotoSection extends StatelessWidget {
     required this.onTakePhoto,
     required this.onChoosePhoto,
     required this.onRemovePendingPhoto,
+    this.onRemoveStoredPhoto,
     this.isBusy = false,
     super.key,
   });
@@ -20,6 +21,7 @@ class InventoryPhotoSection extends StatelessWidget {
   final VoidCallback onTakePhoto;
   final VoidCallback onChoosePhoto;
   final ValueChanged<String> onRemovePendingPhoto;
+  final ValueChanged<String>? onRemoveStoredPhoto;
   final bool isBusy;
 
   int get _photoCount => storedPhotoUrls.length + pendingPhotos.length;
@@ -89,7 +91,11 @@ class InventoryPhotoSection extends StatelessWidget {
               for (var index = 0; index < storedPhotoUrls.length; index++)
                 _StoredPhotoThumbnail(
                   key: Key('storedInventoryPhoto-$index'),
+                  index: index,
                   url: storedPhotoUrls[index],
+                  onRemove: onRemoveStoredPhoto == null || isBusy
+                      ? null
+                      : () => onRemoveStoredPhoto!(storedPhotoUrls[index]),
                 ),
               for (final photo in pendingPhotos)
                 _PendingPhotoThumbnail(
@@ -108,28 +114,52 @@ class InventoryPhotoSection extends StatelessWidget {
 }
 
 class _StoredPhotoThumbnail extends StatelessWidget {
-  const _StoredPhotoThumbnail({required this.url, super.key});
+  const _StoredPhotoThumbnail({
+    required this.index,
+    required this.url,
+    required this.onRemove,
+    super.key,
+  });
 
+  final int index;
   final String url;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 104,
-        height: 104,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return const ColoredBox(
-              color: Color(0xFFE0E0E0),
-              child: Center(child: Icon(Icons.broken_image_outlined)),
-            );
-          },
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 104,
+            height: 104,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const ColoredBox(
+                  color: Color(0xFFE0E0E0),
+                  child: Center(child: Icon(Icons.broken_image_outlined)),
+                );
+              },
+            ),
+          ),
         ),
-      ),
+        if (onRemove != null)
+          Positioned(
+            top: -8,
+            right: -8,
+            child: IconButton.filled(
+              key: Key('removeStoredInventoryPhoto-$index'),
+              tooltip: 'Remove saved photo',
+              visualDensity: VisualDensity.compact,
+              onPressed: onRemove,
+              icon: const Icon(Icons.delete_outline, size: 18),
+            ),
+          ),
+      ],
     );
   }
 }

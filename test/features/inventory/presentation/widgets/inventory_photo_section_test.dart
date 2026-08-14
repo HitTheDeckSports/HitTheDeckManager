@@ -25,6 +25,7 @@ void main() {
     VoidCallback? onTakePhoto,
     VoidCallback? onChoosePhoto,
     ValueChanged<String>? onRemovePendingPhoto,
+    ValueChanged<String>? onRemoveStoredPhoto,
     bool isBusy = false,
   }) {
     return MaterialApp(
@@ -36,6 +37,7 @@ void main() {
             onTakePhoto: onTakePhoto ?? () {},
             onChoosePhoto: onChoosePhoto ?? () {},
             onRemovePendingPhoto: onRemovePendingPhoto ?? (_) {},
+            onRemoveStoredPhoto: onRemoveStoredPhoto,
             isBusy: isBusy,
           ),
         ),
@@ -102,6 +104,40 @@ void main() {
     expect(find.byKey(const Key('inventoryPhotoLimitMessage')), findsOneWidget);
   });
 
+  testWidgets('does not show stored photo removal without a callback', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildSection(
+        storedPhotoUrls: const ['https://example.invalid/photo.jpg'],
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('removeStoredInventoryPhoto-0')), findsNothing);
+  });
+
+  testWidgets('shows and invokes stored photo removal', (tester) async {
+    String? removedUrl;
+
+    await tester.pumpWidget(
+      buildSection(
+        storedPhotoUrls: const ['https://example.invalid/photo.jpg'],
+        onRemoveStoredPhoto: (url) {
+          removedUrl = url;
+        },
+      ),
+    );
+    await tester.pump();
+
+    final removeButton = find.byKey(const Key('removeStoredInventoryPhoto-0'));
+
+    expect(removeButton, findsOneWidget);
+
+    await tester.tap(removeButton);
+
+    expect(removedUrl, 'https://example.invalid/photo.jpg');
+  });
   testWidgets('invokes camera and gallery callbacks', (tester) async {
     var cameraPressed = false;
     var galleryPressed = false;

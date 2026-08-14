@@ -39,6 +39,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final List<PendingInventoryPhoto> _pendingPhotos = [];
   InventoryItem? _savedItemForPhotoRetry;
   bool _isUploadingPhotos = false;
+  bool _isDeletingStoredPhoto = false;
 
   @override
   void initState() {
@@ -143,6 +144,114 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     setState(() {
       _pendingPhotos.removeWhere((photo) => photo.id == photoId);
     });
+  }
+
+  Future<void> _removeStoredInventoryPhoto({
+    required String photoUrl,
+    required BuyInventoryFormController formController,
+  }) async {
+    final existingItem = widget.existingItem;
+
+    if (existingItem == null) {
+      return;
+    }
+
+    final shouldRemove = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Remove Photo?'),
+          content: const Text(
+            'This permanently removes the saved photo from this inventory item.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('confirmRemoveStoredInventoryPhotoButton'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldRemove != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeletingStoredPhoto = true;
+    });
+
+    try {
+      final formState = ref.read(buyInventoryFormControllerProvider);
+
+      if (!formState.photoUrls.contains(photoUrl)) {
+        return;
+      }
+
+      final sourceItem = existingItem.copyWith(
+        photoUrls: List<String>.unmodifiable(formState.photoUrls),
+      );
+
+      final itemWithoutPhoto = sourceItem.copyWith(
+        photoUrls: formState.photoUrls
+            .where((storedUrl) => storedUrl != photoUrl)
+            .toList(growable: false),
+      );
+
+      final persistedItem = await ref
+          .read(inventoryControllerProvider.notifier)
+          .updateItem(itemWithoutPhoto);
+
+      formController.setPhotoUrls(persistedItem.photoUrls);
+
+      if (persistedItem.id != null) {
+        ref.invalidate(inventoryItemProvider(persistedItem.id!));
+      }
+
+      var cleanupFailed = false;
+
+      try {
+        await ref
+            .read(inventoryPhotoWorkflowProvider)
+            .removeStoredPhoto(item: sourceItem, photoUrl: photoUrl);
+      } catch (_) {
+        cleanupFailed = true;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            cleanupFailed
+                ? 'Photo was removed from the inventory item, but Storage cleanup failed.'
+                : 'Photo removed.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to remove photo: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingStoredPhoto = false;
+        });
+      }
+    }
   }
 
   Future<void> _saveInventoryWithPhotos({
@@ -365,7 +474,10 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
 
     final contactsAsync = ref.watch(contactsProvider);
 
-    final isSaving = inventoryControllerState.isLoading || _isUploadingPhotos;
+    final isSaving =
+        inventoryControllerState.isLoading ||
+        _isUploadingPhotos ||
+        _isDeletingStoredPhoto;
 
     return AppPage(
       title: widget.isEditing ? 'Edit Inventory' : 'Buy Inventory',
@@ -875,6 +987,12 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               onTakePhoto: () => _pickInventoryPhoto(PhotoSource.camera),
               onChoosePhoto: () => _pickInventoryPhoto(PhotoSource.gallery),
               onRemovePendingPhoto: _removePendingPhoto,
+              onRemoveStoredPhoto: widget.isEditing
+                  ? (photoUrl) => _removeStoredInventoryPhoto(
+                      photoUrl: photoUrl,
+                      formController: formController,
+                    )
+                  : null,
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
