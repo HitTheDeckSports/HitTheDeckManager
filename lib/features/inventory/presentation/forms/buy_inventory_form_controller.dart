@@ -167,7 +167,7 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     state = state.copyWith(photoUrls: photoUrls);
   }
 
-  Future<InventoryItem?> submit() async {
+  Future<InventoryItem?> submit({bool resetAfterSave = true}) async {
     final item = state.toInventoryItem();
 
     if (item == null) {
@@ -178,12 +178,17 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
         .read(inventoryControllerProvider.notifier)
         .createItem(item);
 
-    state = const BuyInventoryFormState();
+    if (resetAfterSave) {
+      state = const BuyInventoryFormState();
+    }
 
     return savedItem;
   }
 
-  Future<InventoryItem?> submitUpdate(InventoryItem existingItem) async {
+  Future<InventoryItem?> submitUpdate(
+    InventoryItem existingItem, {
+    bool resetAfterSave = true,
+  }) async {
     final editedItem = state.toInventoryItem();
 
     if (editedItem == null) {
@@ -200,7 +205,9 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
         .read(inventoryControllerProvider.notifier)
         .updateItem(itemToUpdate);
 
-    state = const BuyInventoryFormState();
+    if (resetAfterSave) {
+      state = const BuyInventoryFormState();
+    }
 
     return updatedItem;
   }

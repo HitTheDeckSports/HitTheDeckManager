@@ -243,6 +243,32 @@ void main() {
       },
     );
 
+    test('keeps form state when resetAfterSave is false', () async {
+      final repository = InMemoryInventoryRepository();
+
+      final container = ProviderContainer(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      addTearDown(container.dispose);
+      addTearDown(repository.dispose);
+
+      final controller = container.read(
+        buyInventoryFormControllerProvider.notifier,
+      );
+
+      controller.setBrand('Combat');
+      controller.setAcquisitionValue('200.00');
+
+      final savedItem = await controller.submit(resetAfterSave: false);
+
+      expect(savedItem, isNotNull);
+
+      final state = container.read(buyInventoryFormControllerProvider);
+
+      expect(state.brand, 'Combat');
+      expect(state.acquisitionValue, '200.00');
+    });
     test('reset restores the default form state', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);

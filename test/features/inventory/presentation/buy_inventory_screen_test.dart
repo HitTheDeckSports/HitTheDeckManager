@@ -65,6 +65,10 @@ void main() {
     expect(find.text('Bat Weight'), findsOneWidget);
     expect(find.text('Certification'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('0 of 10 photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryTakePhotoButton')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryChoosePhotoButton')), findsOneWidget);
     expect(find.text('Save Inventory'), findsOneWidget);
 
     expect(find.byKey(const Key('buyInventoryCategoryField')), findsOneWidget);
@@ -129,7 +133,7 @@ void main() {
     );
   });
 
-  testWidgets('shows catcher-specific field when Catcher’s Gear is selected', (
+  testWidgets("shows catcher-specific field when Catcher's Gear is selected", (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createTestApp());
@@ -617,7 +621,7 @@ void main() {
     expect(savedItem.handOrientation, 'Right Hand Throw');
   });
 
-  testWidgets('saves catcher’s gear size', (WidgetTester tester) async {
+  testWidgets("saves catcher's gear size", (WidgetTester tester) async {
     await tester.pumpWidget(createTestApp());
     await tester.pumpAndSettle();
 

@@ -5,12 +5,16 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../../shared/media/photo_source.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
+import '../application/photos/inventory_photo_workflow.dart';
 import 'forms/buy_inventory_form_controller.dart';
 import 'providers/inventory_controller.dart';
 import 'providers/inventory_providers.dart';
+import 'providers/inventory_photo_providers.dart';
+import 'widgets/inventory_photo_section.dart';
 
 class BuyInventoryScreen extends ConsumerStatefulWidget {
   const BuyInventoryScreen({this.existingItem, super.key});
@@ -31,6 +35,10 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
   final _dropController = TextEditingController();
 
   bool _isFormInitialized = false;
+  bool _isPickingPhoto = false;
+  final List<PendingInventoryPhoto> _pendingPhotos = [];
+  InventoryItem? _savedItemForPhotoRetry;
+  bool _isUploadingPhotos = false;
 
   @override
   void initState() {
@@ -85,6 +93,200 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
 
     if (selectedDate != null) {
       formController.setPurchaseDate(selectedDate);
+    }
+  }
+
+  Future<void> _pickInventoryPhoto(PhotoSource source) async {
+    if (_isPickingPhoto) {
+      return;
+    }
+
+    setState(() {
+      _isPickingPhoto = true;
+    });
+
+    try {
+      final formState = ref.read(buyInventoryFormControllerProvider);
+      final workflow = ref.read(inventoryPhotoWorkflowProvider);
+
+      final selectedPhoto = await workflow.pickPhoto(
+        source: source,
+        storedPhotoCount: formState.photoUrls.length,
+        pendingPhotoCount: _pendingPhotos.length,
+      );
+
+      if (!mounted || selectedPhoto == null) {
+        return;
+      }
+
+      setState(() {
+        _pendingPhotos.add(selectedPhoto);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to add photo: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingPhoto = false;
+        });
+      }
+    }
+  }
+
+  void _removePendingPhoto(String photoId) {
+    setState(() {
+      _pendingPhotos.removeWhere((photo) => photo.id == photoId);
+    });
+  }
+
+  Future<void> _saveInventoryWithPhotos({
+    required BuyInventoryFormController formController,
+  }) async {
+    final retryItem = _savedItemForPhotoRetry;
+
+    if (retryItem == null) {
+      final isValid = _formKey.currentState?.validate() ?? false;
+
+      if (!isValid) {
+        return;
+      }
+    }
+
+    setState(() {
+      _isUploadingPhotos = true;
+    });
+
+    try {
+      InventoryItem? savedItem = retryItem;
+
+      if (savedItem == null) {
+        savedItem = widget.isEditing
+            ? await formController.submitUpdate(
+                widget.existingItem!,
+                resetAfterSave: false,
+              )
+            : await formController.submit(resetAfterSave: false);
+
+        if (!mounted) {
+          return;
+        }
+
+        if (savedItem == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.isEditing
+                    ? 'Unable to update the inventory item.'
+                    : 'Unable to create the inventory item.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      var completedItem = savedItem;
+
+      if (_pendingPhotos.isNotEmpty) {
+        _savedItemForPhotoRetry = savedItem;
+
+        final workflow = ref.read(inventoryPhotoWorkflowProvider);
+        final uploadResult = await workflow.uploadPendingPhotos(
+          item: savedItem,
+          pendingPhotos: List<PendingInventoryPhoto>.unmodifiable(
+            _pendingPhotos,
+          ),
+        );
+
+        completedItem = uploadResult.updatedItem;
+
+        if (uploadResult.uploadedPhotos.isNotEmpty) {
+          completedItem = await ref
+              .read(inventoryControllerProvider.notifier)
+              .updateItem(completedItem);
+        }
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _pendingPhotos
+            ..clear()
+            ..addAll(uploadResult.failedPhotos);
+        });
+
+        if (uploadResult.hasFailures) {
+          _savedItemForPhotoRetry = completedItem;
+          formController.initializeFromItem(completedItem);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Inventory item ${completedItem.inventoryNumber} was saved, '
+                'but ${uploadResult.failedPhotos.length} photo upload(s) failed. '
+                'Retry the failed photo uploads.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      _savedItemForPhotoRetry = null;
+      formController.reset();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pendingPhotos.clear();
+      });
+
+      _formKey.currentState?.reset();
+      _lengthController.clear();
+      _weightController.clear();
+      _dropController.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isEditing
+                ? 'Inventory item ${completedItem.inventoryNumber} was updated.'
+                : 'Inventory item ${completedItem.inventoryNumber} was created.',
+          ),
+        ),
+      );
+
+      if (widget.isEditing && completedItem.id != null) {
+        ref.invalidate(inventoryItemProvider(completedItem.id!));
+
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': completedItem.id!},
+        );
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save inventory: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhotos = false;
+        });
+      }
     }
   }
 
@@ -163,7 +365,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
 
     final contactsAsync = ref.watch(contactsProvider);
 
-    final isSaving = inventoryControllerState.isLoading;
+    final isSaving = inventoryControllerState.isLoading || _isUploadingPhotos;
 
     return AppPage(
       title: widget.isEditing ? 'Edit Inventory' : 'Buy Inventory',
@@ -625,7 +827,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                 key: const Key('buyInventoryCatchersGearSizeField'),
                 initialValue: formState.catchersGearSize,
                 decoration: const InputDecoration(
-                  labelText: "Catcher’s Gear Size",
+                  labelText: "Catcher's Gear Size",
                   hintText: 'Example: Adult, Intermediate, or Youth',
                   border: OutlineInputBorder(),
                 ),
@@ -651,79 +853,40 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               onChanged: formController.setNotes,
             ),
             const SizedBox(height: 24),
+            if (_savedItemForPhotoRetry != null) ...[
+              Container(
+                key: const Key('inventoryPhotoRetryMessage'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'The inventory item is saved. One or more photo uploads '
+                  'failed; use Retry Photo Uploads to finish attaching them.',
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            InventoryPhotoSection(
+              storedPhotoUrls: formState.photoUrls,
+              pendingPhotos: _pendingPhotos,
+              isBusy: isSaving || _isPickingPhoto,
+              onTakePhoto: () => _pickInventoryPhoto(PhotoSource.camera),
+              onChoosePhoto: () => _pickInventoryPhoto(PhotoSource.gallery),
+              onRemovePendingPhoto: _removePendingPhoto,
+            ),
+            const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('buyInventorySubmitButton'),
               onPressed: isSaving
                   ? null
-                  : () async {
-                      final isValid =
-                          _formKey.currentState?.validate() ?? false;
-
-                      if (!isValid) {
-                        return;
-                      }
-
-                      try {
-                        final savedItem = widget.isEditing
-                            ? await formController.submitUpdate(
-                                widget.existingItem!,
-                              )
-                            : await formController.submit();
-
-                        if (!context.mounted) {
-                          return;
-                        }
-
-                        if (savedItem == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                widget.isEditing
-                                    ? 'Unable to update the inventory item.'
-                                    : 'Unable to create the inventory item.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-
-                        _formKey.currentState?.reset();
-
-                        _lengthController.clear();
-                        _weightController.clear();
-                        _dropController.clear();
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              widget.isEditing
-                                  ? 'Inventory item ${savedItem.inventoryNumber} was updated.'
-                                  : 'Inventory item ${savedItem.inventoryNumber} was created.',
-                            ),
-                          ),
-                        );
-
-                        if (widget.isEditing && savedItem.id != null) {
-                          ref.invalidate(inventoryItemProvider(savedItem.id!));
-
-                          context.goNamed(
-                            AppRouteNames.inventoryDetail,
-                            pathParameters: {'itemId': savedItem.id!},
-                          );
-                        }
-                      } catch (error) {
-                        if (!context.mounted) {
-                          return;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Unable to save inventory: $error'),
-                          ),
-                        );
-                      }
-                    },
-              icon: isSaving
+                  : () => _saveInventoryWithPhotos(
+                      formController: formController,
+                    ),
+              icon: _savedItemForPhotoRetry != null
+                  ? const Icon(Icons.refresh)
+                  : isSaving
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -731,7 +894,11 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                     )
                   : const Icon(Icons.save_outlined),
               label: Text(
-                isSaving
+                _savedItemForPhotoRetry != null
+                    ? isSaving
+                          ? 'Retrying Photo Uploads...'
+                          : 'Retry Photo Uploads'
+                    : isSaving
                     ? widget.isEditing
                           ? 'Saving Changes...'
                           : 'Saving Inventory...'
