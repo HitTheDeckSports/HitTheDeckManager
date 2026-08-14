@@ -50,7 +50,7 @@ abstract interface class PhotoStorageService {
     required Uint8List jpegBytes,
   });
 
-  Future<void> deletePhoto(String storagePath);
+  Future<void> deletePhoto(String storageReference);
 }
 
 final class FirebasePhotoStorageService implements PhotoStorageService {
@@ -92,14 +92,24 @@ final class FirebasePhotoStorageService implements PhotoStorageService {
   }
 
   @override
-  Future<void> deletePhoto(String storagePath) async {
-    final normalizedPath = storagePath.trim();
+  Future<void> deletePhoto(String storageReference) async {
+    final normalizedReference = storageReference.trim();
 
-    if (normalizedPath.isEmpty) {
-      throw ArgumentError.value(storagePath, 'storagePath', 'Cannot be empty.');
+    if (normalizedReference.isEmpty) {
+      throw ArgumentError.value(
+        storageReference,
+        'storageReference',
+        'Cannot be empty.',
+      );
     }
 
-    await _storage.ref(normalizedPath).delete();
+    final reference =
+        normalizedReference.startsWith('https://') ||
+            normalizedReference.startsWith('gs://')
+        ? _storage.refFromURL(normalizedReference)
+        : _storage.ref(normalizedReference);
+
+    await reference.delete();
   }
 
   Future<StoredPhoto> _upload({

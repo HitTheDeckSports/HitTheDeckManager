@@ -148,6 +148,76 @@ void main() {
       );
     });
   });
+
+  group('InventoryPhotoWorkflow.removeStoredPhoto', () {
+    test('requires a saved inventory item ID', () async {
+      final workflow = _workflow();
+
+      final item = _item(photoUrls: const ['https://example.com/photo-1.jpg']);
+
+      expect(
+        () => workflow.removeStoredPhoto(
+          item: item,
+          photoUrl: 'https://example.com/photo-1.jpg',
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('requires the photo to belong to the inventory item', () async {
+      final workflow = _workflow();
+
+      final item = _item(
+        id: 'inventory-1',
+        photoUrls: const ['https://example.com/photo-1.jpg'],
+      );
+
+      expect(
+        () => workflow.removeStoredPhoto(
+          item: item,
+          photoUrl: 'https://example.com/other.jpg',
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('deletes storage object and removes URL from item', () async {
+      final storage = _FakePhotoStorage();
+      final workflow = _workflow(storage: storage);
+
+      const removedUrl = 'https://example.com/photo-1.jpg';
+      const keptUrl = 'https://example.com/photo-2.jpg';
+
+      final item = _item(
+        id: 'inventory-1',
+        photoUrls: const [removedUrl, keptUrl],
+      );
+
+      final updatedItem = await workflow.removeStoredPhoto(
+        item: item,
+        photoUrl: removedUrl,
+      );
+
+      expect(storage.deletedReferences, [removedUrl]);
+      expect(updatedItem.photoUrls, [keptUrl]);
+      expect(item.photoUrls, [removedUrl, keptUrl]);
+    });
+
+    test('does not change item if storage deletion fails', () async {
+      const removedUrl = 'https://example.com/photo-1.jpg';
+      final storage = _FakePhotoStorage(failingDeleteReferences: {removedUrl});
+      final workflow = _workflow(storage: storage);
+
+      final item = _item(id: 'inventory-1', photoUrls: const [removedUrl]);
+
+      await expectLater(
+        workflow.removeStoredPhoto(item: item, photoUrl: removedUrl),
+        throwsStateError,
+      );
+
+      expect(item.photoUrls, [removedUrl]);
+    });
+  });
 }
 
 InventoryPhotoWorkflow _workflow({
@@ -204,11 +274,16 @@ final class _FakePhotoCompression implements PhotoCompressionService {
 }
 
 final class _FakePhotoStorage implements PhotoStorageService {
-  _FakePhotoStorage({Set<String>? failingPhotoIds})
-    : failingPhotoIds = failingPhotoIds ?? <String>{};
+  _FakePhotoStorage({
+    Set<String>? failingPhotoIds,
+    Set<String>? failingDeleteReferences,
+  }) : failingPhotoIds = failingPhotoIds ?? <String>{},
+       failingDeleteReferences = failingDeleteReferences ?? <String>{};
 
   final Set<String> failingPhotoIds;
+  final Set<String> failingDeleteReferences;
   final List<String> uploadedPhotoIds = [];
+  final List<String> deletedReferences = [];
 
   @override
   Future<StoredPhoto> uploadInventoryPhoto({
@@ -238,5 +313,11 @@ final class _FakePhotoStorage implements PhotoStorageService {
   }
 
   @override
-  Future<void> deletePhoto(String storagePath) async {}
+  Future<void> deletePhoto(String storageReference) async {
+    if (failingDeleteReferences.contains(storageReference)) {
+      throw StateError('delete failed for $storageReference');
+    }
+
+    deletedReferences.add(storageReference);
+  }
 }

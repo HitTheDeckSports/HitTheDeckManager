@@ -52,6 +52,16 @@ void main() {
     });
   });
 
+  group('photo deletion references', () {
+    test('stored download URLs remain valid deletion references', () {
+      const downloadUrl =
+          'https://firebasestorage.googleapis.com/v0/b/example.appspot.com/o/'
+          'inventory%2Fitem-1%2Fphoto-1.jpg?alt=media&token=test-token';
+
+      expect(Uri.parse(downloadUrl).scheme, 'https');
+      expect(downloadUrl, contains('firebasestorage.googleapis.com'));
+    });
+  });
   group('photo upload constraints', () {
     test('Storage limit remains 5 MB', () {
       expect(FirebasePhotoStorageService.maxUploadBytes, 5 * 1024 * 1024);

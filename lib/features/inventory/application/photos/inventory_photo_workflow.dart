@@ -158,6 +158,38 @@ final class InventoryPhotoWorkflow {
     );
   }
 
+  Future<InventoryItem> removeStoredPhoto({
+    required InventoryItem item,
+    required String photoUrl,
+  }) async {
+    final itemId = item.id?.trim() ?? '';
+    final normalizedUrl = photoUrl.trim();
+
+    if (itemId.isEmpty) {
+      throw StateError(
+        'Stored inventory photos cannot be removed until the item has been saved.',
+      );
+    }
+
+    if (normalizedUrl.isEmpty) {
+      throw ArgumentError.value(photoUrl, 'photoUrl', 'Cannot be empty.');
+    }
+
+    if (!item.photoUrls.contains(normalizedUrl)) {
+      throw StateError(
+        'The requested photo is not attached to this inventory item.',
+      );
+    }
+
+    await _photoStorage.deletePhoto(normalizedUrl);
+
+    return item.copyWith(
+      photoUrls: item.photoUrls
+          .where((storedUrl) => storedUrl != normalizedUrl)
+          .toList(growable: false),
+    );
+  }
+
   void _validatePhotoCount({
     required int storedPhotoCount,
     required int pendingPhotoCount,
