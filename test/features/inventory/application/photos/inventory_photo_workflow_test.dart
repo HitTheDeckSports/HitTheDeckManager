@@ -101,6 +101,28 @@ void main() {
       expect(storage.uploadedPhotoIds, ['photo-1', 'photo-2']);
     });
 
+    test(
+      'retries one transient upload failure before reporting success',
+      () async {
+        final storage = _FakePhotoStorage(
+          transientFailureCounts: {'photo-1': 1},
+        );
+        final workflow = _workflow(storage: storage);
+
+        final item = _item(id: 'inventory-1');
+
+        final result = await workflow.uploadPendingPhotos(
+          item: item,
+          pendingPhotos: [_pending('photo-1')],
+        );
+
+        expect(result.hasFailures, isFalse);
+        expect(result.failedPhotos, isEmpty);
+        expect(result.uploadedPhotos, hasLength(1));
+        expect(storage.uploadAttemptCounts['photo-1'], 2);
+        expect(storage.uploadedPhotoIds, ['photo-1']);
+      },
+    );
     test('preserves failed photos for retry while keeping successes', () async {
       final storage = _FakePhotoStorage(failingPhotoIds: {'photo-2'});
       final workflow = _workflow(storage: storage);
@@ -277,13 +299,19 @@ final class _FakePhotoStorage implements PhotoStorageService {
   _FakePhotoStorage({
     Set<String>? failingPhotoIds,
     Set<String>? failingDeleteReferences,
+    Map<String, int>? transientFailureCounts,
   }) : failingPhotoIds = failingPhotoIds ?? <String>{},
-       failingDeleteReferences = failingDeleteReferences ?? <String>{};
+       failingDeleteReferences = failingDeleteReferences ?? <String>{},
+       transientFailureCounts = Map<String, int>.from(
+         transientFailureCounts ?? const <String, int>{},
+       );
 
   final Set<String> failingPhotoIds;
   final Set<String> failingDeleteReferences;
+  final Map<String, int> transientFailureCounts;
   final List<String> uploadedPhotoIds = [];
   final List<String> deletedReferences = [];
+  final Map<String, int> uploadAttemptCounts = {};
 
   @override
   Future<StoredPhoto> uploadInventoryPhoto({
@@ -291,6 +319,18 @@ final class _FakePhotoStorage implements PhotoStorageService {
     required String photoId,
     required Uint8List jpegBytes,
   }) async {
+    uploadAttemptCounts.update(
+      photoId,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
+
+    final remainingTransientFailures = transientFailureCounts[photoId] ?? 0;
+    if (remainingTransientFailures > 0) {
+      transientFailureCounts[photoId] = remainingTransientFailures - 1;
+      throw StateError('transient upload failed for $photoId');
+    }
+
     if (failingPhotoIds.contains(photoId)) {
       throw StateError('upload failed for $photoId');
     }

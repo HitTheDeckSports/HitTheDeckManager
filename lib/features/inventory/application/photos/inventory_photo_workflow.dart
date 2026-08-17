@@ -60,6 +60,8 @@ final class InventoryPhotoWorkflow {
   }) : _uuid = uuid ?? const Uuid();
 
   static const int maxPhotos = 10;
+  static const int maxUploadAttempts = 2;
+  static const Duration uploadRetryDelay = Duration(seconds: 1);
 
   final PhotoPickerService _photoPicker;
   final PhotoCompressionService _photoCompression;
@@ -118,25 +120,51 @@ final class InventoryPhotoWorkflow {
     final failedPhotos = <PendingInventoryPhoto>[];
 
     for (final pendingPhoto in pendingPhotos) {
+      Uint8List compressedBytes;
+
       try {
-        final compressedBytes = await _photoCompression.compressPhoto(
+        compressedBytes = await _photoCompression.compressPhoto(
           pendingPhoto.file,
         );
 
         _validateCompressedBytes(compressedBytes);
-
-        final storedPhoto = await _photoStorage.uploadInventoryPhoto(
-          itemId: itemId,
-          photoId: pendingPhoto.id,
-          jpegBytes: compressedBytes,
-        );
-
-        uploadedPhotos.add(storedPhoto);
       } catch (error) {
         failedPhotos.add(
           pendingPhoto.copyWith(
             status: PendingInventoryPhotoStatus.failed,
             errorMessage: error.toString(),
+          ),
+        );
+        continue;
+      }
+
+      Object? finalUploadError;
+
+      for (var attempt = 1; attempt <= maxUploadAttempts; attempt++) {
+        try {
+          final storedPhoto = await _photoStorage.uploadInventoryPhoto(
+            itemId: itemId,
+            photoId: pendingPhoto.id,
+            jpegBytes: compressedBytes,
+          );
+
+          uploadedPhotos.add(storedPhoto);
+          finalUploadError = null;
+          break;
+        } catch (error) {
+          finalUploadError = error;
+
+          if (attempt < maxUploadAttempts) {
+            await Future<void>.delayed(uploadRetryDelay);
+          }
+        }
+      }
+
+      if (finalUploadError != null) {
+        failedPhotos.add(
+          pendingPhoto.copyWith(
+            status: PendingInventoryPhotoStatus.failed,
+            errorMessage: finalUploadError.toString(),
           ),
         );
       }

@@ -95,6 +95,36 @@ void main() {
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
+  testWidgets('displays saved inventory photos on the detail screen', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-with-photos',
+      inventoryNumber: 'BAT-2608-0099',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      photoUrls: [
+        'https://example.invalid/primary.jpg',
+        'https://example.invalid/secondary.jpg',
+      ],
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'item-with-photos'),
+    );
+
+    await tester.pump();
+
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPrimaryPhoto')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
+    expect(find.text('2 photos'), findsOneWidget);
+  });
   testWidgets('displays glove-specific inventory details', (
     WidgetTester tester,
   ) async {

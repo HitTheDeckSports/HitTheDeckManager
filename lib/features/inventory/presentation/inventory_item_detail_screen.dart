@@ -237,6 +237,10 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.photoUrls.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _InventoryPhotosSection(photoUrls: item.photoUrls),
+          ],
           const SizedBox(height: 24),
           _SellerInformationSection(sellerContactId: item.sellerContactId),
           if (item.acquisitionType == AcquisitionType.consignment &&
@@ -303,6 +307,81 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InventoryPhotosSection extends StatelessWidget {
+  const _InventoryPhotosSection({required this.photoUrls});
+
+  final List<String> photoUrls;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailSection(
+      title: 'Photos',
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Image.network(
+              photoUrls.first,
+              key: const Key('inventoryPrimaryPhoto'),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const ColoredBox(
+                  color: Color(0xFFE0E0E0),
+                  child: Center(
+                    child: Icon(Icons.broken_image_outlined, size: 40),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (photoUrls.length > 1) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photoUrls.length - 1,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final photoIndex = index + 1;
+
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Image.network(
+                      photoUrls[photoIndex],
+                      key: Key('inventoryPhotoThumbnail-$photoIndex'),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const ColoredBox(
+                          color: Color(0xFFE0E0E0),
+                          child: Center(
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          '${photoUrls.length} ${photoUrls.length == 1 ? 'photo' : 'photos'}',
+          key: const Key('inventoryPhotoCountLabel'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }
