@@ -31,6 +31,56 @@ void main() {
       find.text('Use Buy Inventory to add your first item.'),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('inventoryScanQrButton')), findsOneWidget);
+    expect(find.text('Scan QR'), findsOneWidget);
+  });
+  testWidgets('Scan QR button opens the inventory scanner route', (
+    WidgetTester tester,
+  ) async {
+    final repository = InMemoryInventoryRepository();
+    addTearDown(repository.dispose);
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.inventory,
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventory,
+          name: AppRouteNames.inventory,
+          builder: (context, state) {
+            return const Scaffold(body: InventoryScreen());
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryScanner,
+          name: AppRouteNames.inventoryScanner,
+          builder: (context, state) {
+            return const Scaffold(
+              body: Center(child: Text('Inventory scanner destination')),
+            );
+          },
+        ),
+      ],
+    );
+
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final scanButton = find.byKey(const Key('inventoryScanQrButton'));
+
+    expect(scanButton, findsOneWidget);
+
+    await tester.tap(scanButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inventory scanner destination'), findsOneWidget);
   });
 
   testWidgets('InventoryScreen displays repository items', (

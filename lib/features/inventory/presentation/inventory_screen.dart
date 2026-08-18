@@ -20,6 +20,16 @@ class InventoryScreen extends ConsumerWidget {
     return AppPage(
       title: 'Inventory',
       subtitle: 'Review and manage available, sold, and inactive equipment.',
+      actions: [
+        FilledButton.icon(
+          key: const Key('inventoryScanQrButton'),
+          onPressed: () {
+            context.goNamed(AppRouteNames.inventoryScanner);
+          },
+          icon: const Icon(Icons.qr_code_scanner),
+          label: const Text('Scan QR'),
+        ),
+      ],
       child: inventoryAsync.when(
         loading: () => const AppLoadingState(message: 'Loading inventory...'),
         error: (error, stackTrace) => AppErrorState(

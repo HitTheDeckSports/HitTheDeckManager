@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
+import '../features/inventory/presentation/inventory_qr_scanner_screen.dart';
 import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/contacts/presentation/create_contact_screen.dart';
 import '../features/contacts/presentation/edit_contact_screen.dart';
@@ -93,6 +94,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.inventory,
             name: AppRouteNames.inventory,
             builder: (context, state) => const InventoryScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.inventoryScanner,
+            name: AppRouteNames.inventoryScanner,
+            builder: (context, state) => const InventoryQrScannerScreen(),
           ),
           GoRoute(
             path: AppRoutes.buyInventory,
