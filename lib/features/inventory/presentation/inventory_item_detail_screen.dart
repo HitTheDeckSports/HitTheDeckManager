@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
@@ -23,6 +24,7 @@ import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
 import 'providers/inventory_providers.dart';
+import '../application/qr/inventory_qr_codec.dart';
 
 class InventoryItemDetailScreen extends ConsumerWidget {
   const InventoryItemDetailScreen({required this.itemId, super.key});
@@ -237,6 +239,10 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.id != null) ...[
+            const SizedBox(height: 24),
+            _InventoryQrSection(itemId: item.id!),
+          ],
           if (item.photoUrls.isNotEmpty) ...[
             const SizedBox(height: 24),
             _InventoryPhotosSection(photoUrls: item.photoUrls),
@@ -307,6 +313,38 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InventoryQrSection extends StatelessWidget {
+  const _InventoryQrSection({required this.itemId});
+
+  final String itemId;
+
+  @override
+  Widget build(BuildContext context) {
+    final qrValue = InventoryQrCodec.encodeInventoryItemId(itemId);
+
+    return _DetailSection(
+      title: 'Inventory QR Code',
+      children: [
+        Center(
+          child: QrImageView(
+            key: const Key('inventoryQrCode'),
+            data: qrValue,
+            version: QrVersions.auto,
+            size: 220,
+            semanticsLabel: 'Inventory QR code',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Scan this code to open this inventory item.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
     );
   }
 }
@@ -823,7 +861,7 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
         _DetailRow(
           label: 'Inventory Item',
           value:
-              '${relatedItem.inventoryNumber ?? 'Not assigned'} â€” $displayName',
+              '${relatedItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
         _DetailRow(label: 'Status', value: relatedItem.status.label),
         _DetailRow(

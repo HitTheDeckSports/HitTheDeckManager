@@ -125,6 +125,34 @@ void main() {
     expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
     expect(find.text('2 photos'), findsOneWidget);
   });
+
+  testWidgets('displays inventory QR code for a saved item', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-qr-123',
+      inventoryNumber: 'BAT-2608-0100',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'item-qr-123'),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inventory QR Code'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryQrCode')), findsOneWidget);
+    expect(
+      find.text('Scan this code to open this inventory item.'),
+      findsOneWidget,
+    );
+  });
   testWidgets('displays glove-specific inventory details', (
     WidgetTester tester,
   ) async {
