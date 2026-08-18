@@ -479,6 +479,9 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
         _isUploadingPhotos ||
         _isDeletingStoredPhoto;
 
+    final hasFailedPhotoUploads = _pendingPhotos.any(
+      (photo) => photo.status == PendingInventoryPhotoStatus.failed,
+    );
     return AppPage(
       title: widget.isEditing ? 'Edit Inventory' : 'Buy Inventory',
       subtitle: widget.isEditing
@@ -965,7 +968,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               onChanged: formController.setNotes,
             ),
             const SizedBox(height: 24),
-            if (_savedItemForPhotoRetry != null) ...[
+            if (_savedItemForPhotoRetry != null && hasFailedPhotoUploads) ...[
               Container(
                 key: const Key('inventoryPhotoRetryMessage'),
                 padding: const EdgeInsets.all(12),
@@ -1002,7 +1005,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                   : () => _saveInventoryWithPhotos(
                       formController: formController,
                     ),
-              icon: _savedItemForPhotoRetry != null
+              icon: _savedItemForPhotoRetry != null && hasFailedPhotoUploads
                   ? const Icon(Icons.refresh)
                   : isSaving
                   ? const SizedBox(
@@ -1012,7 +1015,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                     )
                   : const Icon(Icons.save_outlined),
               label: Text(
-                _savedItemForPhotoRetry != null
+                _savedItemForPhotoRetry != null && hasFailedPhotoUploads
                     ? isSaving
                           ? 'Retrying Photo Uploads...'
                           : 'Retry Photo Uploads'
