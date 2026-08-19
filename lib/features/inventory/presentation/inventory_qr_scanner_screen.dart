@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
-import '../application/qr/inventory_qr_codec.dart';
+import '../application/qr/inventory_qr_scan_resolver.dart';
+import 'providers/inventory_providers.dart';
 
-class InventoryQrScannerScreen extends StatefulWidget {
+class InventoryQrScannerScreen extends ConsumerStatefulWidget {
   const InventoryQrScannerScreen({super.key});
 
   @override
-  State<InventoryQrScannerScreen> createState() =>
+  ConsumerState<InventoryQrScannerScreen> createState() =>
       _InventoryQrScannerScreenState();
 }
 
-class _InventoryQrScannerScreenState extends State<InventoryQrScannerScreen> {
+class _InventoryQrScannerScreenState
+    extends ConsumerState<InventoryQrScannerScreen> {
   late final MobileScannerController _scannerController;
   bool _isHandlingScan = false;
   String? _errorMessage;
@@ -34,36 +37,92 @@ class _InventoryQrScannerScreenState extends State<InventoryQrScannerScreen> {
     super.dispose();
   }
 
-  void _handleDetection(BarcodeCapture capture) {
+  Future<void> _handleDetection(BarcodeCapture capture) async {
     if (_isHandlingScan) {
       return;
     }
 
+    String? rawValue;
+
     for (final barcode in capture.barcodes) {
-      final rawValue = barcode.rawValue;
+      final value = barcode.rawValue;
 
-      if (rawValue == null) {
-        continue;
+      if (value != null && value.trim().isNotEmpty) {
+        rawValue = value;
+        break;
       }
+    }
 
-      final itemId = InventoryQrCodec.tryParseInventoryItemId(rawValue);
+    if (rawValue == null) {
+      return;
+    }
 
-      if (itemId == null) {
-        setState(() {
-          _errorMessage =
-              'This QR code is not a valid Hit the Deck inventory code.';
-        });
-        continue;
-      }
-
+    setState(() {
       _isHandlingScan = true;
+      _errorMessage = null;
+    });
 
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': itemId},
+    try {
+      final resolver = InventoryQrScanResolver(
+        repository: ref.read(inventoryRepositoryProvider),
       );
 
-      return;
+      final result = await resolver.resolve(rawValue);
+
+      if (!mounted) {
+        return;
+      }
+
+      switch (result.type) {
+        case InventoryQrScanResultType.invalidCode:
+          setState(() {
+            _isHandlingScan = false;
+            _errorMessage =
+                'This QR code is not a valid Hit the Deck inventory code.';
+          });
+          return;
+
+        case InventoryQrScanResultType.itemNotFound:
+          setState(() {
+            _isHandlingScan = false;
+            _errorMessage =
+                'The inventory item for this QR code could not be found.';
+          });
+          return;
+
+        case InventoryQrScanResultType.valid:
+          final itemId = result.itemId;
+
+          if (itemId == null) {
+            setState(() {
+              _isHandlingScan = false;
+              _errorMessage = 'The scanned inventory code could not be opened.';
+            });
+            return;
+          }
+
+          await _scannerController.stop();
+
+          if (!mounted) {
+            return;
+          }
+
+          context.goNamed(
+            AppRouteNames.inventoryDetail,
+            pathParameters: {'itemId': itemId},
+          );
+          return;
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isHandlingScan = false;
+        _errorMessage =
+            'Unable to verify this inventory code. Please try again.';
+      });
     }
   }
 
@@ -86,6 +145,24 @@ class _InventoryQrScannerScreenState extends State<InventoryQrScannerScreen> {
               ),
             ),
           ),
+          if (_isHandlingScan) ...[
+            const SizedBox(height: 16),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Checking inventory...',
+                  key: Key('inventoryQrScannerChecking'),
+                ),
+              ],
+            ),
+          ],
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
             Text(
