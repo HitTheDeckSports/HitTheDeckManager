@@ -175,6 +175,22 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),
+        if (item.id != null)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemQrButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) {
+                        return _InventoryQrDialog(item: item);
+                      },
+                    );
+                  },
+            icon: const Icon(Icons.qr_code),
+            label: const Text('QR Code'),
+          ),
         if (item.id != null && item.status != InventoryStatus.disposed)
           OutlinedButton.icon(
             key: const Key('inventoryItemAddRepairButton'),
@@ -239,10 +255,6 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
-          if (item.id != null) ...[
-            const SizedBox(height: 24),
-            _InventoryQrSection(itemId: item.id!),
-          ],
           if (item.photoUrls.isNotEmpty) ...[
             const SizedBox(height: 24),
             _InventoryPhotosSection(photoUrls: item.photoUrls),
@@ -317,32 +329,71 @@ class _InventoryItemDetailContent extends ConsumerWidget {
   }
 }
 
-class _InventoryQrSection extends StatelessWidget {
-  const _InventoryQrSection({required this.itemId});
+class _InventoryQrDialog extends StatelessWidget {
+  const _InventoryQrDialog({required this.item});
 
-  final String itemId;
+  final InventoryItem item;
 
   @override
   Widget build(BuildContext context) {
+    final itemId = item.id;
+    final displayName = item.model == null || item.model!.trim().isEmpty
+        ? item.brand
+        : '${item.brand} ${item.model}';
+
+    if (itemId == null) {
+      return const SizedBox.shrink();
+    }
+
     final qrValue = InventoryQrCodec.encodeInventoryItemId(itemId);
 
-    return _DetailSection(
-      title: 'Inventory QR Code',
-      children: [
-        Center(
-          child: QrImageView(
-            key: const Key('inventoryQrCode'),
-            data: qrValue,
-            version: QrVersions.auto,
-            size: 220,
-            semanticsLabel: 'Inventory QR code',
-          ),
+    return AlertDialog(
+      key: const Key('inventoryQrDialog'),
+      title: const Text('Inventory QR Code'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              label: 'Inventory QR code',
+              image: true,
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: QrImageView(
+                    key: const Key('inventoryQrCode'),
+                    data: qrValue,
+                    version: QrVersions.auto,
+                    size: 220,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              item.inventoryNumber ?? 'Inventory number not assigned',
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(displayName, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Text(
+              'Scan this code to open this inventory item.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Scan this code to open this inventory item.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventoryQrCloseButton'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Close'),
         ),
       ],
     );

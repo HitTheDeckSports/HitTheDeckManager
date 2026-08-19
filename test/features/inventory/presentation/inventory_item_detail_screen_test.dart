@@ -126,7 +126,7 @@ void main() {
     expect(find.text('2 photos'), findsOneWidget);
   });
 
-  testWidgets('displays inventory QR code for a saved item', (
+  testWidgets('opens inventory QR code from the QR action', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -134,6 +134,7 @@ void main() {
       inventoryNumber: 'BAT-2608-0100',
       category: InventoryCategory.bat,
       brand: 'Combat',
+      model: 'Spec H1',
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 10000,
     );
@@ -146,8 +147,20 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Inventory QR Code'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemQrButton')), findsOneWidget);
+
+    expect(find.byKey(const Key('inventoryQrCode')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryQrDialog')), findsOneWidget);
     expect(find.byKey(const Key('inventoryQrCode')), findsOneWidget);
+
+    expect(find.text('Inventory QR Code'), findsOneWidget);
+    expect(find.text('BAT-2608-0100'), findsAtLeastNWidgets(1));
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
+
     expect(
       find.text('Scan this code to open this inventory item.'),
       findsOneWidget,
