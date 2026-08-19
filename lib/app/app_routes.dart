@@ -1,7 +1,6 @@
 abstract final class AppRoutes {
   static const String login = '/login';
-  static const String home = '/';
-  static const String dashboard = '/dashboard';
+  static const String dashboard = '/';
   static const String inventory = '/inventory';
   static const String inventoryScanner = '/inventory/scan';
   static const String contacts = '/contacts';
@@ -30,7 +29,6 @@ abstract final class AppRoutes {
 
 abstract final class AppRouteNames {
   static const String login = 'login';
-  static const String home = 'home';
   static const String dashboard = 'dashboard';
   static const String inventory = 'inventory';
   static const String inventoryScanner = 'inventoryScanner';

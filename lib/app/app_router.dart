@@ -8,7 +8,6 @@ import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/contacts/presentation/create_contact_screen.dart';
 import '../features/contacts/presentation/edit_contact_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
-import '../features/home/presentation/home_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
@@ -38,7 +37,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionState = ref.watch(authenticatedSessionProvider);
 
   return GoRouter(
-    initialLocation: AppRoutes.home,
+    initialLocation: AppRoutes.dashboard,
 
     redirect: (context, state) {
       final isLoginRoute = state.matchedLocation == AppRoutes.login;
@@ -64,7 +63,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Once an authorized session exists, the login page is no longer needed.
       if (isLoginRoute) {
-        return AppRoutes.home;
+        return AppRoutes.dashboard;
       }
 
       return null;
@@ -80,11 +79,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return AppShell(child: child);
         },
         routes: [
-          GoRoute(
-            path: AppRoutes.home,
-            name: AppRouteNames.home,
-            builder: (context, state) => const HomeScreen(),
-          ),
           GoRoute(
             path: AppRoutes.dashboard,
             name: AppRouteNames.dashboard,
