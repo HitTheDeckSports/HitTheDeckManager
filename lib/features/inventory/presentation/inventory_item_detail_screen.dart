@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:printing/printing.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
@@ -24,6 +25,9 @@ import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
 import 'providers/inventory_providers.dart';
+import '../application/labels/inventory_label_data.dart';
+import '../application/labels/inventory_label_pdf_generator.dart';
+import '../application/labels/inventory_label_template.dart';
 import '../application/qr/inventory_qr_codec.dart';
 
 class InventoryItemDetailScreen extends ConsumerWidget {
@@ -394,6 +398,115 @@ class _InventoryQrDialog extends StatelessWidget {
             Navigator.of(context).pop();
           },
           child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          key: const Key('inventoryPrintLabelButton'),
+          onPressed: () async {
+            final startingPosition = await showDialog<int>(
+              context: context,
+              builder: (context) {
+                return const _InventoryLabelPositionDialog();
+              },
+            );
+
+            if (startingPosition == null || !context.mounted) {
+              return;
+            }
+
+            final label = InventoryLabelData.fromInventoryItem(item);
+
+            await Printing.layoutPdf(
+              name: '${label.inventoryNumber}-label.pdf',
+              onLayout: (_) {
+                return InventoryLabelPdfGenerator.generateSingleLabelSheet(
+                  label: label,
+                  template: InventoryLabelTemplate.avery5366,
+                  startingPosition: startingPosition,
+                );
+              },
+            );
+          },
+          icon: const Icon(Icons.print_outlined),
+          label: const Text('Print Label'),
+        ),
+      ],
+    );
+  }
+}
+
+class _InventoryLabelPositionDialog extends StatefulWidget {
+  const _InventoryLabelPositionDialog();
+
+  @override
+  State<_InventoryLabelPositionDialog> createState() =>
+      _InventoryLabelPositionDialogState();
+}
+
+class _InventoryLabelPositionDialogState
+    extends State<_InventoryLabelPositionDialog> {
+  int _startingPosition = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    const template = InventoryLabelTemplate.avery5366;
+
+    return AlertDialog(
+      key: const Key('inventoryLabelPositionDialog'),
+      title: const Text('Choose Label Position'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Select the first unused label position on the Avery 5366 sheet.',
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<int>(
+            key: const Key('inventoryLabelPositionField'),
+            initialValue: _startingPosition,
+            decoration: const InputDecoration(
+              labelText: 'Starting Position',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (
+                var position = 1;
+                position <= template.labelsPerSheet;
+                position++
+              )
+                DropdownMenuItem<int>(
+                  value: position,
+                  child: Text('Position $position'),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) {
+                return;
+              }
+
+              setState(() {
+                _startingPosition = value;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          Text('Avery 5366 has ${template.labelsPerSheet} labels per sheet.'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventoryLabelPositionCancelButton'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('inventoryLabelPositionContinueButton'),
+          onPressed: () {
+            Navigator.of(context).pop(_startingPosition);
+          },
+          child: const Text('Continue'),
         ),
       ],
     );
