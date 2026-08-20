@@ -1,20 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../app/app_routes.dart';
+import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../application/search/inventory_search.dart';
 import '../domain/models/inventory_enums.dart';
 import 'providers/inventory_providers.dart';
-import '../../../core/formatting/currency_formatter.dart';
-import '../../../app/app_routes.dart';
 
-class InventoryScreen extends ConsumerWidget {
+class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends ConsumerState<InventoryScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _updateQuery(String value) {
+    setState(() {
+      _query = value;
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+
+    setState(() {
+      _query = '';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
 
     return AppPage(
@@ -48,57 +78,94 @@ class InventoryScreen extends ConsumerWidget {
             );
           }
 
+          final filteredItems = InventorySearch.filter(items, _query);
+          final hasQuery = _query.trim().isNotEmpty;
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextField(
+                key: const Key('inventorySearchField'),
+                controller: _searchController,
+                onChanged: _updateQuery,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: 'Search Inventory',
+                  hintText:
+                      'Inventory #, brand, model, status, certification...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: hasQuery
+                      ? IconButton(
+                          key: const Key('inventorySearchClearButton'),
+                          tooltip: 'Clear search',
+                          onPressed: _clearSearch,
+                          icon: const Icon(Icons.clear),
+                        )
+                      : null,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(
-                '${items.length} inventory item${items.length == 1 ? '' : 's'}',
+                hasQuery
+                    ? '${filteredItems.length} of ${items.length} inventory '
+                          'item${items.length == 1 ? '' : 's'}'
+                    : '${items.length} inventory '
+                          'item${items.length == 1 ? '' : 's'}',
+                key: const Key('inventoryResultCount'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
-              for (final item in items)
-                Card(
-                  child: ListTile(
-                    key: ValueKey('inventoryItemTile-${item.id}'),
-                    onTap: item.id == null
-                        ? null
-                        : () {
-                            context.goNamed(
-                              AppRouteNames.inventoryDetail,
-                              pathParameters: {'itemId': item.id!},
-                            );
-                          },
-                    leading: const Icon(Icons.sports_baseball),
-                    title: Text(
-                      item.model == null || item.model!.trim().isEmpty
-                          ? item.brand
-                          : '${item.brand} ${item.model}',
-                    ),
-                    subtitle: Text(
-                      '${item.category.label} • '
-                      '${item.inventoryNumber ?? 'Not assigned'}',
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          item.askingPriceCents == null
-                              ? 'No asking price'
-                              : CurrencyFormatter.formatCents(
-                                  item.askingPriceCents!,
-                                ),
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+              if (filteredItems.isEmpty)
+                const AppEmptyState(
+                  icon: Icons.search_off,
+                  title: 'No inventory items match your search.',
+                  message: 'Try a different inventory number, brand, or model.',
+                )
+              else
+                for (final item in filteredItems)
+                  Card(
+                    child: ListTile(
+                      key: ValueKey('inventoryItemTile-${item.id}'),
+                      onTap: item.id == null
+                          ? null
+                          : () {
+                              context.goNamed(
+                                AppRouteNames.inventoryDetail,
+                                pathParameters: {'itemId': item.id!},
+                              );
+                            },
+                      leading: const Icon(Icons.sports_baseball),
+                      title: Text(
+                        item.model == null || item.model!.trim().isEmpty
+                            ? item.brand
+                            : '${item.brand} ${item.model}',
+                      ),
+                      subtitle: Text(
+                        '${item.category.label} \u2022 '
+                        '${item.inventoryNumber ?? 'Not assigned'}',
+                      ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            item.askingPriceCents == null
+                                ? 'No asking price'
+                                : CurrencyFormatter.formatCents(
+                                    item.askingPriceCents!,
+                                  ),
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
             ],
           );
         },
