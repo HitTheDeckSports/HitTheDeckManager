@@ -19,6 +19,11 @@ void main() {
       expect(template.columns, 2);
       expect(template.rows, 15);
       expect(template.labelsPerSheet, 30);
+
+      expect(template.leftMarginInches, 0.53125);
+      expect(template.topMarginInches, 0.5);
+      expect(template.horizontalPitchInches, 4.0);
+      expect(template.verticalPitchInches, closeTo(2 / 3, 0.0001));
     });
 
     test('Avery 5366 accepts starting positions 1 through 30', () {
@@ -34,6 +39,50 @@ void main() {
 
       expect(template.isValidStartingPosition(0), isFalse);
       expect(template.isValidStartingPosition(31), isFalse);
+    });
+
+    test('position 1 is the upper-left label', () {
+      const template = InventoryLabelTemplate.avery5366;
+
+      final slot = template.slotForPosition(1);
+
+      expect(slot.leftInches, 0.53125);
+      expect(slot.topInches, 0.5);
+      expect(slot.widthInches, 3.4375);
+      expect(slot.heightInches, closeTo(2 / 3, 0.0001));
+    });
+
+    test('position 2 is the upper-right label', () {
+      const template = InventoryLabelTemplate.avery5366;
+
+      final slot = template.slotForPosition(2);
+
+      expect(slot.leftInches, 4.53125);
+      expect(slot.topInches, 0.5);
+    });
+
+    test('position 3 starts the second row', () {
+      const template = InventoryLabelTemplate.avery5366;
+
+      final slot = template.slotForPosition(3);
+
+      expect(slot.leftInches, 0.53125);
+      expect(slot.topInches, closeTo(0.5 + (2 / 3), 0.0001));
+    });
+
+    test('position 30 is the lower-right label', () {
+      const template = InventoryLabelTemplate.avery5366;
+
+      final slot = template.slotForPosition(30);
+
+      expect(slot.leftInches, 4.53125);
+      expect(slot.topInches, closeTo(0.5 + (14 * (2 / 3)), 0.0001));
+    });
+
+    test('slot lookup rejects an invalid position', () {
+      const template = InventoryLabelTemplate.avery5366;
+
+      expect(() => template.slotForPosition(31), throwsRangeError);
     });
   });
 }
