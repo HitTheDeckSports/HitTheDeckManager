@@ -34,10 +34,21 @@ class AppShell extends ConsumerWidget {
                   ),
                   trailing: Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: IconButton(
-                      tooltip: 'Sign out',
-                      icon: const Icon(Icons.logout),
-                      onPressed: () => _signOut(context, ref),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const Key('globalSearchRailButton'),
+                          tooltip: 'Search',
+                          icon: const Icon(Icons.search),
+                          onPressed: () => context.go(AppRoutes.search),
+                        ),
+                        IconButton(
+                          tooltip: 'Sign out',
+                          icon: const Icon(Icons.logout),
+                          onPressed: () => _signOut(context, ref),
+                        ),
+                      ],
                     ),
                   ),
                   destinations: const [
@@ -77,6 +88,12 @@ class AppShell extends ConsumerWidget {
 
         return Scaffold(
           body: child,
+          floatingActionButton: FloatingActionButton.small(
+            key: const Key('globalSearchFloatingButton'),
+            tooltip: 'Search',
+            onPressed: () => context.go(AppRoutes.search),
+            child: const Icon(Icons.search),
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex(currentLocation),
             onDestinationSelected: (index) {
@@ -143,7 +160,8 @@ class AppShell extends ConsumerWidget {
     }
 
     if (location.startsWith(AppRoutes.reports) ||
-        location.startsWith(AppRoutes.settings)) {
+        location.startsWith(AppRoutes.settings) ||
+        location.startsWith(AppRoutes.search)) {
       return 4;
     }
 
