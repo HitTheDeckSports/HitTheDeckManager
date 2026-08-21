@@ -8,9 +8,11 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../application/filters/inventory_filter.dart';
 import '../application/search/inventory_search.dart';
 import '../domain/models/inventory_enums.dart';
 import 'providers/inventory_providers.dart';
+import 'widgets/inventory_filter_dialog.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -22,6 +24,7 @@ class InventoryScreen extends ConsumerStatefulWidget {
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  InventoryFilterCriteria _filters = const InventoryFilterCriteria();
 
   @override
   void dispose() {
@@ -51,6 +54,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       title: 'Inventory',
       subtitle: 'Review and manage available, sold, and inactive equipment.',
       actions: [
+        OutlinedButton.icon(
+          key: const Key('inventoryFilterButton'),
+          onPressed: inventoryAsync.hasValue
+              ? () => _openFilters(context, inventoryAsync.requireValue)
+              : null,
+          icon: const Icon(Icons.filter_list),
+          label: Text(
+            _filters.isActive ? 'Filters (${_filters.activeCount})' : 'Filter',
+          ),
+        ),
         FilledButton.icon(
           key: const Key('inventoryScanQrButton'),
           onPressed: () {
@@ -78,8 +91,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             );
           }
 
-          final filteredItems = InventorySearch.filter(items, _query);
+          final searchedItems = InventorySearch.filter(items, _query);
+          final filteredItems = InventoryFilter.apply(searchedItems, _filters);
           final hasQuery = _query.trim().isNotEmpty;
+          final isFiltering = hasQuery || _filters.isActive;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,9 +120,34 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   border: const OutlineInputBorder(),
                 ),
               ),
+              if (_filters.isActive) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.filter_alt_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_filters.activeCount} active filter'
+                        '${_filters.activeCount == 1 ? '' : 's'}',
+                        key: const Key('inventoryActiveFilterSummary'),
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('inventoryClearFiltersButton'),
+                      onPressed: () {
+                        setState(() {
+                          _filters = const InventoryFilterCriteria();
+                        });
+                      },
+                      child: const Text('Clear Filters'),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
               Text(
-                hasQuery
+                isFiltering
                     ? '${filteredItems.length} of ${items.length} inventory '
                           'item${items.length == 1 ? '' : 's'}'
                     : '${items.length} inventory '
@@ -117,10 +157,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ),
               const SizedBox(height: 16),
               if (filteredItems.isEmpty)
-                const AppEmptyState(
+                AppEmptyState(
                   icon: Icons.search_off,
-                  title: 'No inventory items match your search.',
-                  message: 'Try a different inventory number, brand, or model.',
+                  title: _filters.isActive
+                      ? 'No inventory items match your filters.'
+                      : 'No inventory items match your search.',
+                  message: _filters.isActive
+                      ? 'Clear or adjust one or more filters and try again.'
+                      : 'Try a different inventory number, brand, or model.',
                 )
               else
                 for (final item in filteredItems)
@@ -171,5 +215,37 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _openFilters(
+    BuildContext context,
+    List<dynamic> rawItems,
+  ) async {
+    final brands =
+        rawItems
+            .map((item) => item.brand as String)
+            .map((brand) => brand.trim())
+            .where((brand) => brand.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    final selected = await showDialog<InventoryFilterCriteria>(
+      context: context,
+      builder: (context) {
+        return InventoryFilterDialog(
+          initialCriteria: _filters,
+          availableBrands: brands,
+        );
+      },
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _filters = selected;
+    });
   }
 }
