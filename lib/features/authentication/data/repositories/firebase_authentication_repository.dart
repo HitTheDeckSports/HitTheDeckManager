@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
+import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart'
+    as desktop_google;
 import '../../../../core/errors/app_exception.dart';
 import '../../domain/models/auth_user.dart';
 import '../../domain/repositories/authentication_repository.dart';
@@ -20,8 +21,14 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   final FirebaseAuth _firebaseAuth;
   final GoogleSignIn _googleSignIn;
 
+  static const String _windowsClientId = String.fromEnvironment(
+    'GOOGLE_WINDOWS_CLIENT_ID',
+  );
+  static const String _windowsClientSecret = String.fromEnvironment(
+    'GOOGLE_WINDOWS_CLIENT_SECRET',
+  );
   Future<void>? _googleInitialization;
-
+  desktop_google.GoogleSignIn? _windowsGoogleSignIn;
   @override
   Stream<AuthUser?> authStateChanges() {
     return _firebaseAuth.authStateChanges().map(_mapFirebaseUser);
@@ -37,6 +44,8 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
 
       if (kIsWeb) {
         credential = await _firebaseAuth.signInWithPopup(GoogleAuthProvider());
+      } else if (defaultTargetPlatform == TargetPlatform.windows) {
+        credential = await _signInWithGoogleOnWindows();
       } else {
         await _ensureGoogleSignInInitialized();
 
@@ -87,7 +96,9 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
     try {
       await _firebaseAuth.signOut();
 
-      if (!kIsWeb) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+        await _windowsGoogleSignIn?.signOut();
+      } else if (!kIsWeb) {
         await _ensureGoogleSignInInitialized();
         await _googleSignIn.signOut();
       }
@@ -98,6 +109,46 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
     } catch (error) {
       throw UnexpectedException('Unable to sign out.', cause: error);
     }
+  }
+
+  Future<UserCredential> _signInWithGoogleOnWindows() async {
+    if (_windowsClientId.isEmpty || _windowsClientSecret.isEmpty) {
+      throw const UnexpectedException(
+        'Windows Google sign-in credentials are not configured.',
+      );
+    }
+
+    final windowsGoogleSignIn = _windowsGoogleSignIn ??=
+        desktop_google.GoogleSignIn(
+          params: const desktop_google.GoogleSignInParams(
+            clientId: _windowsClientId,
+            clientSecret: _windowsClientSecret,
+            redirectPort: 8000,
+            scopes: ['openid', 'profile', 'email'],
+          ),
+        );
+
+    final googleCredentials = await windowsGoogleSignIn.signInOnline();
+
+    if (googleCredentials == null) {
+      throw const UnexpectedException('Google sign-in was canceled.');
+    }
+
+    final idToken = googleCredentials.idToken;
+    final accessToken = googleCredentials.accessToken;
+
+    if ((idToken == null || idToken.isEmpty) && accessToken.isEmpty) {
+      throw const UnexpectedException(
+        'Google sign-in did not return usable credentials.',
+      );
+    }
+
+    final firebaseCredential = GoogleAuthProvider.credential(
+      accessToken: accessToken,
+      idToken: idToken,
+    );
+
+    return _firebaseAuth.signInWithCredential(firebaseCredential);
   }
 
   /// Initializes the google_sign_in singleton exactly once.
