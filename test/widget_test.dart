@@ -32,7 +32,7 @@ Widget buildAuthorizedApp() {
 }
 
 void main() {
-  testWidgets('app loads home screen and navigates between sections', (
+  testWidgets('app loads dashboard and navigates between sections', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(1200, 800);
@@ -46,22 +46,22 @@ void main() {
     await tester.pumpWidget(buildAuthorizedApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Inventory Management'), findsOneWidget);
-    expect(find.text('Buy Inventory'), findsOneWidget);
-    expect(find.text('Sell Inventory'), findsOneWidget);
-
-    await tester.tap(find.text('Dashboard'));
-    await tester.pumpAndSettle();
-
     expect(find.text('Dashboard'), findsWidgets);
+    expect(find.text('Add Inventory'), findsOneWidget);
+    expect(find.text('Scan QR'), findsOneWidget);
 
     await tester.tap(find.text('Inventory'));
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory'), findsWidgets);
+
+    await tester.tap(find.text('Dashboard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dashboard'), findsWidgets);
   });
 
-  testWidgets('home action buttons open inventory workflows', (
+  testWidgets('dashboard Add Inventory opens buy workflow', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(1200, 800);
@@ -75,17 +75,9 @@ void main() {
     await tester.pumpWidget(buildAuthorizedApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Buy Inventory'));
+    await tester.tap(find.text('Add Inventory'));
     await tester.pumpAndSettle();
 
     expect(find.text('Buy Inventory'), findsOneWidget);
-
-    await tester.tap(find.text('Home'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Sell Inventory'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Sell Inventory'), findsOneWidget);
   });
 }

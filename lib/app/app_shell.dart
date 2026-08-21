@@ -34,18 +34,24 @@ class AppShell extends ConsumerWidget {
                   ),
                   trailing: Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: IconButton(
-                      tooltip: 'Sign out',
-                      icon: const Icon(Icons.logout),
-                      onPressed: () => _signOut(context, ref),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const Key('globalSearchRailButton'),
+                          tooltip: 'Search',
+                          icon: const Icon(Icons.search),
+                          onPressed: () => context.go(AppRoutes.search),
+                        ),
+                        IconButton(
+                          tooltip: 'Sign out',
+                          icon: const Icon(Icons.logout),
+                          onPressed: () => _signOut(context, ref),
+                        ),
+                      ],
                     ),
                   ),
                   destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: Text('Home'),
-                    ),
                     NavigationRailDestination(
                       icon: Icon(Icons.dashboard_outlined),
                       selectedIcon: Icon(Icons.dashboard),
@@ -57,24 +63,19 @@ class AppShell extends ConsumerWidget {
                       label: Text('Inventory'),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.people_outline),
-                      selectedIcon: Icon(Icons.people),
-                      label: Text('Contacts'),
-                    ),
-                    NavigationRailDestination(
                       icon: Icon(Icons.receipt_long_outlined),
                       selectedIcon: Icon(Icons.receipt_long),
                       label: Text('Transactions'),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.analytics_outlined),
-                      selectedIcon: Icon(Icons.analytics),
-                      label: Text('Reports'),
+                      icon: Icon(Icons.people_outline),
+                      selectedIcon: Icon(Icons.people),
+                      label: Text('Contacts'),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: Text('Settings'),
+                      icon: Icon(Icons.more_horiz),
+                      selectedIcon: Icon(Icons.more_horiz),
+                      label: Text('More'),
                     ),
                   ],
                 ),
@@ -86,68 +87,46 @@ class AppShell extends ConsumerWidget {
         }
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Hit the Deck Manager'),
-            actions: [
-              IconButton(
-                tooltip: 'Sign out',
-                icon: const Icon(Icons.logout),
-                onPressed: () => _signOut(context, ref),
-              ),
-            ],
+          body: child,
+          floatingActionButton: FloatingActionButton.small(
+            key: const Key('globalSearchFloatingButton'),
+            tooltip: 'Search',
+            onPressed: () => context.go(AppRoutes.search),
+            child: const Icon(Icons.search),
           ),
-          drawer: NavigationDrawer(
+          bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex(currentLocation),
             onDestinationSelected: (index) {
-              Navigator.of(context).pop();
               _navigateToIndex(context, index);
             },
-            children: const [
-              Padding(
-                padding: EdgeInsets.fromLTRB(28, 24, 16, 12),
-                child: Text(
-                  'Hit the Deck Manager',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-              NavigationDrawerDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: Text('Home'),
-              ),
-              NavigationDrawerDestination(
+            destinations: const [
+              NavigationDestination(
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
-                label: Text('Dashboard'),
+                label: 'Dashboard',
               ),
-              NavigationDrawerDestination(
+              NavigationDestination(
                 icon: Icon(Icons.inventory_2_outlined),
                 selectedIcon: Icon(Icons.inventory_2),
-                label: Text('Inventory'),
+                label: 'Inventory',
               ),
-              NavigationDrawerDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: Text('Contacts'),
-              ),
-              NavigationDrawerDestination(
+              NavigationDestination(
                 icon: Icon(Icons.receipt_long_outlined),
                 selectedIcon: Icon(Icons.receipt_long),
-                label: Text('Transactions'),
+                label: 'Transactions',
               ),
-              NavigationDrawerDestination(
-                icon: Icon(Icons.analytics_outlined),
-                selectedIcon: Icon(Icons.analytics),
-                label: Text('Reports'),
+              NavigationDestination(
+                icon: Icon(Icons.people_outline),
+                selectedIcon: Icon(Icons.people),
+                label: 'Contacts',
               ),
-              NavigationDrawerDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: Text('Settings'),
+              NavigationDestination(
+                icon: Icon(Icons.more_horiz),
+                selectedIcon: Icon(Icons.more_horiz),
+                label: 'More',
               ),
             ],
           ),
-          body: child,
         );
       },
     );
@@ -168,11 +147,11 @@ class AppShell extends ConsumerWidget {
   }
 
   int _selectedIndex(String location) {
-    if (location.startsWith(AppRoutes.dashboard)) {
+    if (location.startsWith(AppRoutes.inventory)) {
       return 1;
     }
 
-    if (location.startsWith(AppRoutes.inventory)) {
+    if (location.startsWith(AppRoutes.transactions)) {
       return 2;
     }
 
@@ -180,16 +159,10 @@ class AppShell extends ConsumerWidget {
       return 3;
     }
 
-    if (location.startsWith(AppRoutes.transactions)) {
+    if (location.startsWith(AppRoutes.reports) ||
+        location.startsWith(AppRoutes.settings) ||
+        location.startsWith(AppRoutes.search)) {
       return 4;
-    }
-
-    if (location.startsWith(AppRoutes.reports)) {
-      return 5;
-    }
-
-    if (location.startsWith(AppRoutes.settings)) {
-      return 6;
     }
 
     return 0;
@@ -197,14 +170,12 @@ class AppShell extends ConsumerWidget {
 
   void _navigateToIndex(BuildContext context, int index) {
     final route = switch (index) {
-      0 => AppRoutes.home,
-      1 => AppRoutes.dashboard,
-      2 => AppRoutes.inventory,
+      0 => AppRoutes.dashboard,
+      1 => AppRoutes.inventory,
+      2 => AppRoutes.transactions,
       3 => AppRoutes.contacts,
-      4 => AppRoutes.transactions,
-      5 => AppRoutes.reports,
-      6 => AppRoutes.settings,
-      _ => AppRoutes.home,
+      4 => AppRoutes.reports,
+      _ => AppRoutes.dashboard,
     };
 
     context.go(route);

@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Hit the Deck Manager uses the camera to take inventory and contact photos and scan inventory QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hit the Deck Manager uses your photo library to select inventory and contact photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

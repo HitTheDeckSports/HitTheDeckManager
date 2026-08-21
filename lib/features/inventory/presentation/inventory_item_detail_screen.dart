@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:printing/printing.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
@@ -23,6 +25,10 @@ import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
 import 'providers/inventory_providers.dart';
+import '../application/labels/inventory_label_data.dart';
+import '../application/labels/inventory_label_pdf_generator.dart';
+import '../application/labels/inventory_label_template.dart';
+import '../application/qr/inventory_qr_codec.dart';
 
 class InventoryItemDetailScreen extends ConsumerWidget {
   const InventoryItemDetailScreen({required this.itemId, super.key});
@@ -173,6 +179,22 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),
+        if (item.id != null)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemQrButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) {
+                        return _InventoryQrDialog(item: item);
+                      },
+                    );
+                  },
+            icon: const Icon(Icons.qr_code),
+            label: const Text('QR Code'),
+          ),
         if (item.id != null && item.status != InventoryStatus.disposed)
           OutlinedButton.icon(
             key: const Key('inventoryItemAddRepairButton'),
@@ -237,6 +259,10 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.photoUrls.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _InventoryPhotosSection(photoUrls: item.photoUrls),
+          ],
           const SizedBox(height: 24),
           _SellerInformationSection(sellerContactId: item.sellerContactId),
           if (item.acquisitionType == AcquisitionType.consignment &&
@@ -303,6 +329,261 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InventoryQrDialog extends StatelessWidget {
+  const _InventoryQrDialog({required this.item});
+
+  final InventoryItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final itemId = item.id;
+    final displayName = item.model == null || item.model!.trim().isEmpty
+        ? item.brand
+        : '${item.brand} ${item.model}';
+
+    if (itemId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final qrValue = InventoryQrCodec.encodeInventoryItemId(itemId);
+
+    return AlertDialog(
+      key: const Key('inventoryQrDialog'),
+      title: const Text('Inventory QR Code'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              label: 'Inventory QR code',
+              image: true,
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: QrImageView(
+                    key: const Key('inventoryQrCode'),
+                    data: qrValue,
+                    version: QrVersions.auto,
+                    size: 220,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              item.inventoryNumber ?? 'Inventory number not assigned',
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(displayName, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Text(
+              'Scan this code to open this inventory item.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventoryQrCloseButton'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          key: const Key('inventoryPrintLabelButton'),
+          onPressed: () async {
+            final startingPosition = await showDialog<int>(
+              context: context,
+              builder: (context) {
+                return const _InventoryLabelPositionDialog();
+              },
+            );
+
+            if (startingPosition == null || !context.mounted) {
+              return;
+            }
+
+            final label = InventoryLabelData.fromInventoryItem(item);
+
+            await Printing.layoutPdf(
+              name: '${label.inventoryNumber}-label.pdf',
+              onLayout: (_) {
+                return InventoryLabelPdfGenerator.generateSingleLabelSheet(
+                  label: label,
+                  template: InventoryLabelTemplate.avery5366,
+                  startingPosition: startingPosition,
+                );
+              },
+            );
+          },
+          icon: const Icon(Icons.print_outlined),
+          label: const Text('Print Label'),
+        ),
+      ],
+    );
+  }
+}
+
+class _InventoryLabelPositionDialog extends StatefulWidget {
+  const _InventoryLabelPositionDialog();
+
+  @override
+  State<_InventoryLabelPositionDialog> createState() =>
+      _InventoryLabelPositionDialogState();
+}
+
+class _InventoryLabelPositionDialogState
+    extends State<_InventoryLabelPositionDialog> {
+  int _startingPosition = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    const template = InventoryLabelTemplate.avery5366;
+
+    return AlertDialog(
+      key: const Key('inventoryLabelPositionDialog'),
+      title: const Text('Choose Label Position'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Select the first unused label position on the Avery 5366 sheet.',
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<int>(
+            key: const Key('inventoryLabelPositionField'),
+            initialValue: _startingPosition,
+            decoration: const InputDecoration(
+              labelText: 'Starting Position',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (
+                var position = 1;
+                position <= template.labelsPerSheet;
+                position++
+              )
+                DropdownMenuItem<int>(
+                  value: position,
+                  child: Text('Position $position'),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) {
+                return;
+              }
+
+              setState(() {
+                _startingPosition = value;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          Text('Avery 5366 has ${template.labelsPerSheet} labels per sheet.'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventoryLabelPositionCancelButton'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('inventoryLabelPositionContinueButton'),
+          onPressed: () {
+            Navigator.of(context).pop(_startingPosition);
+          },
+          child: const Text('Continue'),
+        ),
+      ],
+    );
+  }
+}
+
+class _InventoryPhotosSection extends StatelessWidget {
+  const _InventoryPhotosSection({required this.photoUrls});
+
+  final List<String> photoUrls;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailSection(
+      title: 'Photos',
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Image.network(
+              photoUrls.first,
+              key: const Key('inventoryPrimaryPhoto'),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const ColoredBox(
+                  color: Color(0xFFE0E0E0),
+                  child: Center(
+                    child: Icon(Icons.broken_image_outlined, size: 40),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (photoUrls.length > 1) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photoUrls.length - 1,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final photoIndex = index + 1;
+
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Image.network(
+                      photoUrls[photoIndex],
+                      key: Key('inventoryPhotoThumbnail-$photoIndex'),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const ColoredBox(
+                          color: Color(0xFFE0E0E0),
+                          child: Center(
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          '${photoUrls.length} ${photoUrls.length == 1 ? 'photo' : 'photos'}',
+          key: const Key('inventoryPhotoCountLabel'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }
@@ -744,7 +1025,7 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
         _DetailRow(
           label: 'Inventory Item',
           value:
-              '${relatedItem.inventoryNumber ?? 'Not assigned'} â€” $displayName',
+              '${relatedItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
         _DetailRow(label: 'Status', value: relatedItem.status.label),
         _DetailRow(

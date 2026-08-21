@@ -70,7 +70,7 @@ void main() {
 
       expect(find.text('Hit the Deck Manager'), findsWidgets);
       expect(find.text('Sign in with Google'), findsOneWidget);
-      expect(find.text('Inventory Management'), findsNothing);
+      expect(find.text('Dashboard'), findsNothing);
     });
 
     testWidgets('authorized user is allowed into protected home', (
@@ -87,8 +87,8 @@ void main() {
       await tester.pumpWidget(buildAppWithSession(regularSession));
       await tester.pumpAndSettle();
 
-      expect(find.text('Inventory Management'), findsOneWidget);
-      expect(find.text('Buy Inventory'), findsOneWidget);
+      expect(find.text('Dashboard'), findsWidgets);
+      expect(find.text('Add Inventory'), findsOneWidget);
       expect(find.text('Sign in with Google'), findsNothing);
     });
   });

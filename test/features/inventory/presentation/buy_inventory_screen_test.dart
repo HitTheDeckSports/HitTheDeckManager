@@ -65,6 +65,10 @@ void main() {
     expect(find.text('Bat Weight'), findsOneWidget);
     expect(find.text('Certification'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('0 of 10 photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryTakePhotoButton')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryChoosePhotoButton')), findsOneWidget);
     expect(find.text('Save Inventory'), findsOneWidget);
 
     expect(find.byKey(const Key('buyInventoryCategoryField')), findsOneWidget);
@@ -129,7 +133,7 @@ void main() {
     );
   });
 
-  testWidgets('shows catcher-specific field when Catcher’s Gear is selected', (
+  testWidgets("shows catcher-specific field when Catcher's Gear is selected", (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createTestApp());
@@ -617,7 +621,7 @@ void main() {
     expect(savedItem.handOrientation, 'Right Hand Throw');
   });
 
-  testWidgets('saves catcher’s gear size', (WidgetTester tester) async {
+  testWidgets("saves catcher's gear size", (WidgetTester tester) async {
     await tester.pumpWidget(createTestApp());
     await tester.pumpAndSettle();
 
@@ -967,5 +971,91 @@ void main() {
 
     expect(find.text('No Seller Selected'), findsOneWidget);
     expect(find.text('missing-contact'), findsNothing);
+  });
+
+  testWidgets('shows stored photo removal confirmation while editing', (
+    WidgetTester tester,
+  ) async {
+    const existingItem = InventoryItem(
+      id: 'item-photo-test',
+      inventoryNumber: 'BAT-2608-9999',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      photoUrls: ['https://example.invalid/stored-photo.jpg'],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: BuyInventoryScreen(existingItem: existingItem)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final removeButton = find.byKey(const Key('removeStoredInventoryPhoto-0'));
+
+    await tester.ensureVisible(removeButton);
+    await tester.tap(removeButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove Photo?'), findsOneWidget);
+    expect(
+      find.byKey(const Key('confirmRemoveStoredInventoryPhotoButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove Photo?'), findsNothing);
+  });
+
+  testWidgets('persists stored photo removal after confirmation', (
+    WidgetTester tester,
+  ) async {
+    const existingItem = InventoryItem(
+      id: 'item-photo-remove-test',
+      inventoryNumber: 'BAT-2608-9998',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      photoUrls: ['https://example.invalid/stored-photo.jpg'],
+    );
+
+    await inventoryRepository.createInventoryItem(existingItem);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: BuyInventoryScreen(existingItem: existingItem)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final removeButton = find.byKey(const Key('removeStoredInventoryPhoto-0'));
+
+    await tester.ensureVisible(removeButton);
+    await tester.tap(removeButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('confirmRemoveStoredInventoryPhotoButton')),
+    );
+    await tester.pumpAndSettle();
+
+    final updatedItem = await inventoryRepository.getInventoryItem(
+      'item-photo-remove-test',
+    );
+
+    expect(updatedItem, isNotNull);
+    expect(updatedItem!.photoUrls, isEmpty);
+    expect(find.byKey(const Key('removeStoredInventoryPhoto-0')), findsNothing);
   });
 }

@@ -95,6 +95,150 @@ void main() {
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
+  testWidgets('displays saved inventory photos on the detail screen', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-with-photos',
+      inventoryNumber: 'BAT-2608-0099',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      photoUrls: [
+        'https://example.invalid/primary.jpg',
+        'https://example.invalid/secondary.jpg',
+      ],
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'item-with-photos'),
+    );
+
+    await tester.pump();
+
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPrimaryPhoto')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
+    expect(find.text('2 photos'), findsOneWidget);
+  });
+
+  testWidgets('opens inventory QR code from the QR action', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-qr-123',
+      inventoryNumber: 'BAT-2608-0100',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'item-qr-123'),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryItemQrButton')), findsOneWidget);
+
+    expect(find.byKey(const Key('inventoryQrCode')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryQrDialog')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryQrCode')), findsOneWidget);
+
+    expect(find.text('Inventory QR Code'), findsOneWidget);
+    expect(find.text('BAT-2608-0100'), findsAtLeastNWidgets(1));
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
+
+    expect(
+      find.text('Scan this code to open this inventory item.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventoryPrintLabelButton')), findsOneWidget);
+    expect(find.text('Print Label'), findsOneWidget);
+  });
+  testWidgets('Print Label opens Avery starting position selection', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-label-123',
+      inventoryNumber: 'BAT-2608-0101',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'item-label-123'),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPrintLabelButton')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inventoryPrintLabelButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryLabelPositionDialog')),
+      findsOneWidget,
+    );
+
+    expect(find.text('Choose Label Position'), findsOneWidget);
+
+    expect(
+      find.text(
+        'Select the first unused label position on the Avery 5366 sheet.',
+      ),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const Key('inventoryLabelPositionField')),
+      findsOneWidget,
+    );
+
+    expect(find.text('Position 1'), findsOneWidget);
+
+    expect(find.text('Avery 5366 has 30 labels per sheet.'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('inventoryLabelPositionCancelButton')),
+      findsOneWidget,
+    );
+
+    expect(
+      find.byKey(const Key('inventoryLabelPositionContinueButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('inventoryLabelPositionCancelButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryLabelPositionDialog')), findsNothing);
+
+    expect(find.byKey(const Key('inventoryQrDialog')), findsOneWidget);
+  });
   testWidgets('displays glove-specific inventory details', (
     WidgetTester tester,
   ) async {

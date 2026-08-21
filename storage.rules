@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function hasVerifiedEmail() {
+      return request.auth != null
+          && request.auth.token.email != null
+          && request.auth.token.email_verified == true;
+    }
+
+    function userEmail() {
+      return request.auth.token.email;
+    }
+
+    function isRootOwner() {
+      return hasVerifiedEmail()
+          && userEmail() == 'sales.hitthedecksports@gmail.com';
+    }
+
+function isActiveAuthorizedUser() {
+  return hasVerifiedEmail()
+      && firestore.exists(
+        /databases/(default)/documents/authorized_users/$(userEmail())
+      )
+      && firestore.get(
+        /databases/(default)/documents/authorized_users/$(userEmail())
+      ).data.active == true;
+}
+
+    function isAuthorizedAppUser() {
+      return isRootOwner() || isActiveAuthorizedUser();
+    }
+
+    function isValidImageUpload() {
+      return request.resource != null
+          && request.resource.size <= 5 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+    }
+
+    match /inventory/{itemId}/{photoId} {
+      allow read: if isAuthorizedAppUser();
+
+      allow create, update: if isAuthorizedAppUser()
+          && isValidImageUpload();
+
+      allow delete: if isAuthorizedAppUser();
+    }
+
+    match /contacts/{contactId}/{photoId} {
+      allow read: if isAuthorizedAppUser();
+
+      allow create, update: if isAuthorizedAppUser()
+          && isValidImageUpload();
+
+      allow delete: if isAuthorizedAppUser();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

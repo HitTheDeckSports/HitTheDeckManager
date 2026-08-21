@@ -83,7 +83,7 @@ void main() {
 
     expect(find.text('Trade History'), findsOneWidget);
     expect(find.text('Sold item in a trade-in sale'), findsOneWidget);
-    expect(find.text('GLV-2608-0001 â€” Wilson A2000'), findsOneWidget);
+    expect(find.text('GLV-2608-0001 \u2014 Wilson A2000'), findsOneWidget);
     expect(find.text(r'$140.00'), findsOneWidget);
     expect(find.text('View Original Sale'), findsOneWidget);
   });
@@ -122,7 +122,7 @@ void main() {
 
     expect(find.text('Trade History'), findsOneWidget);
     expect(find.text('Inventory received as a trade-in'), findsOneWidget);
-    expect(find.text('BAT-2608-0001 â€” Combat Spec H1'), findsOneWidget);
+    expect(find.text('BAT-2608-0001 \u2014 Combat Spec H1'), findsOneWidget);
     expect(find.text('View Original Sale'), findsOneWidget);
   });
 }
