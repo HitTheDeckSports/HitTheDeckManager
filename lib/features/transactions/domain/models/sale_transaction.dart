@@ -10,6 +10,7 @@ class SaleTransaction {
     this.buyerContactId,
     this.notes,
     this.acquisitionValueCents,
+    this.repairCostCents = 0,
     this.tradeInCreditCents = 0,
   });
 
@@ -21,27 +22,40 @@ class SaleTransaction {
   final String? buyerContactId;
   final String? notes;
 
-  /// Snapshot of the cost basis used for this completed sale.
+  /// Snapshot of the acquisition-side cost basis used for this completed sale.
   ///
   /// Purchased/traded inventory uses the item's acquisition value. Consigned
-  /// inventory uses the consignor payout so historical profit equals the
-  /// agreed Hit the Deck commission.
+  /// inventory uses the consignor payout so historical profit reflects Hit the
+  /// Deck's commission before any repair costs.
   final int? acquisitionValueCents;
+
+  /// Snapshot of all repair costs recorded for the inventory item when the
+  /// sale is completed.
+  final int repairCostCents;
 
   /// Historical value credited for all trade-in items included in the sale.
   final int tradeInCreditCents;
 
-  /// Cash portion collected after applying trade-in credit.
   int get cashReceivedCents => salePriceCents - tradeInCreditCents;
 
-  int? get profitCents {
+  int? get totalCostBasisCents {
     final acquisitionValue = acquisitionValueCents;
 
     if (acquisitionValue == null) {
       return null;
     }
 
-    return salePriceCents - acquisitionValue;
+    return acquisitionValue + repairCostCents;
+  }
+
+  int? get profitCents {
+    final totalCostBasis = totalCostBasisCents;
+
+    if (totalCostBasis == null) {
+      return null;
+    }
+
+    return salePriceCents - totalCostBasis;
   }
 
   double? get grossMargin {
@@ -57,6 +71,7 @@ class SaleTransaction {
   bool get isValid {
     return inventoryItemId.trim().isNotEmpty &&
         salePriceCents >= 0 &&
+        repairCostCents >= 0 &&
         tradeInCreditCents >= 0 &&
         tradeInCreditCents <= salePriceCents &&
         acquisitionValueCents != null &&
@@ -72,6 +87,7 @@ class SaleTransaction {
     Object? buyerContactId = _unset,
     Object? notes = _unset,
     Object? acquisitionValueCents = _unset,
+    int? repairCostCents,
     int? tradeInCreditCents,
   }) {
     return SaleTransaction(
@@ -87,6 +103,7 @@ class SaleTransaction {
       acquisitionValueCents: identical(acquisitionValueCents, _unset)
           ? this.acquisitionValueCents
           : acquisitionValueCents as int?,
+      repairCostCents: repairCostCents ?? this.repairCostCents,
       tradeInCreditCents: tradeInCreditCents ?? this.tradeInCreditCents,
     );
   }
@@ -103,6 +120,7 @@ class SaleTransaction {
             other.buyerContactId == buyerContactId &&
             other.notes == notes &&
             other.acquisitionValueCents == acquisitionValueCents &&
+            other.repairCostCents == repairCostCents &&
             other.tradeInCreditCents == tradeInCreditCents;
   }
 
@@ -117,6 +135,7 @@ class SaleTransaction {
       buyerContactId,
       notes,
       acquisitionValueCents,
+      repairCostCents,
       tradeInCreditCents,
     );
   }

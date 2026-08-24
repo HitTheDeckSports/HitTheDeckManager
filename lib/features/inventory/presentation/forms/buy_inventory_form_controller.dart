@@ -13,7 +13,7 @@ final buyInventoryFormControllerProvider =
 class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
   @override
   BuyInventoryFormState build() {
-    return const BuyInventoryFormState();
+    return _newFormState();
   }
 
   void initializeFromItem(InventoryItem item) {
@@ -179,7 +179,7 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
         .createItem(item);
 
     if (resetAfterSave) {
-      state = const BuyInventoryFormState();
+      state = _newFormState();
     }
 
     return savedItem;
@@ -206,15 +206,22 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
         .updateItem(itemToUpdate);
 
     if (resetAfterSave) {
-      state = const BuyInventoryFormState();
+      state = _newFormState();
     }
 
     return updatedItem;
   }
 
   void reset() {
-    state = const BuyInventoryFormState();
+    state = _newFormState();
   }
+}
+
+BuyInventoryFormState _newFormState() {
+  final now = DateTime.now();
+  return BuyInventoryFormState(
+    purchaseDate: DateTime(now.year, now.month, now.day),
+  );
 }
 
 String _formatNumber(double value) {

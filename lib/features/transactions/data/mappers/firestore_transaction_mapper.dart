@@ -21,6 +21,7 @@ abstract final class FirestoreTransactionMapper {
       'buyerContactId': _emptyToNull(transaction.buyerContactId),
       'notes': _emptyToNull(transaction.notes),
       'acquisitionValueCents': transaction.acquisitionValueCents,
+      'repairCostCents': transaction.repairCostCents,
       'tradeInCreditCents': transaction.tradeInCreditCents,
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -48,6 +49,7 @@ abstract final class FirestoreTransactionMapper {
       buyerContactId: _stringOrNull(data['buyerContactId']),
       notes: _stringOrNull(data['notes']),
       acquisitionValueCents: _intOrNull(data['acquisitionValueCents']),
+      repairCostCents: _intOrNull(data['repairCostCents']) ?? 0,
       tradeInCreditCents: _intOrNull(data['tradeInCreditCents']) ?? 0,
     );
   }
