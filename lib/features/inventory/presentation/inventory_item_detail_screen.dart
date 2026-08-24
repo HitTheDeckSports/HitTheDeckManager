@@ -10,6 +10,7 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../transactions/domain/models/consignment_transaction.dart';
 import '../../transactions/domain/models/disposal_reason.dart';
@@ -84,6 +85,7 @@ class _InventoryItemDetailContent extends ConsumerWidget {
         ? item.brand
         : '${item.brand} ${item.model}';
     final inventoryControllerState = ref.watch(inventoryControllerProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     final isUpdatingStatus = inventoryControllerState.isLoading;
     return AppPage(
@@ -209,7 +211,8 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.build_outlined),
             label: const Text('Add Repair'),
           ),
-        if (item.id != null &&
+        if (permissions.canDisposeInventory &&
+            item.id != null &&
             item.status != InventoryStatus.sold &&
             item.status != InventoryStatus.disposed)
           OutlinedButton.icon(
@@ -274,12 +277,13 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           _DetailSection(
             title: 'Pricing',
             children: [
-              _DetailRow(
-                label: 'Acquisition Value',
-                value: CurrencyFormatter.formatCents(
-                  item.acquisitionValueCents,
+              if (permissions.canViewFinancialData)
+                _DetailRow(
+                  label: 'Acquisition Value',
+                  value: CurrencyFormatter.formatCents(
+                    item.acquisitionValueCents,
+                  ),
                 ),
-              ),
               _DetailRow(
                 label: 'New Value',
                 value: _formatOptionalMoney(item.newValueCents),
@@ -299,17 +303,24 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             _RepairHistorySection(
               inventoryItemId: item.id!,
               acquisitionValueCents: item.acquisitionValueCents,
+              canViewFinancialData: permissions.canViewFinancialData,
             ),
             const SizedBox(height: 24),
             _DisposalHistorySection(inventoryItemId: item.id!),
           ],
           if (item.status == InventoryStatus.sold && item.id != null) ...[
             const SizedBox(height: 24),
-            _SaleInformationSection(inventoryItemId: item.id!),
+            _SaleInformationSection(
+              inventoryItemId: item.id!,
+              canViewFinancialData: permissions.canViewFinancialData,
+            ),
           ],
           if (item.id != null) ...[
             const SizedBox(height: 24),
-            _TradeHistorySection(inventoryItemId: item.id!),
+            _TradeHistorySection(
+              inventoryItemId: item.id!,
+              canViewFinancialData: permissions.canViewFinancialData,
+            ),
             const SizedBox(height: 24),
             _InventoryDealSection(
               inventoryItemId: item.id!,
@@ -847,9 +858,13 @@ class _DealLinkSection extends StatelessWidget {
 }
 
 class _TradeHistorySection extends ConsumerWidget {
-  const _TradeHistorySection({required this.inventoryItemId});
+  const _TradeHistorySection({
+    required this.inventoryItemId,
+    required this.canViewFinancialData,
+  });
 
   final String inventoryItemId;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -917,6 +932,7 @@ class _TradeHistorySection extends ConsumerWidget {
                     inventoryItemId: inventoryItemId,
                     trade: trades[index],
                     inventoryById: inventoryById,
+                    canViewFinancialData: canViewFinancialData,
                   ),
                 ],
               ],
@@ -933,11 +949,13 @@ class _TradeHistoryEntry extends StatelessWidget {
     required this.inventoryItemId,
     required this.trade,
     required this.inventoryById,
+    required this.canViewFinancialData,
   });
 
   final String inventoryItemId;
   final TradeTransaction trade;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -968,6 +986,7 @@ class _TradeHistoryEntry extends StatelessWidget {
           _RelatedTradeInventoryItem(
             inventoryItemId: relatedIds[index],
             item: inventoryById[relatedIds[index]],
+            canViewFinancialData: canViewFinancialData,
           ),
         ],
         if (trade.saleTransactionId != null &&
@@ -997,10 +1016,12 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
   const _RelatedTradeInventoryItem({
     required this.inventoryItemId,
     required this.item,
+    required this.canViewFinancialData,
   });
 
   final String inventoryItemId;
   final InventoryItem? item;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -1028,12 +1049,13 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
               '${relatedItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
         _DetailRow(label: 'Status', value: relatedItem.status.label),
-        _DetailRow(
-          label: 'Acquisition Value',
-          value: CurrencyFormatter.formatCents(
-            relatedItem.acquisitionValueCents,
+        if (canViewFinancialData)
+          _DetailRow(
+            label: 'Acquisition Value',
+            value: CurrencyFormatter.formatCents(
+              relatedItem.acquisitionValueCents,
+            ),
           ),
-        ),
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
@@ -1211,10 +1233,12 @@ class _RepairHistorySection extends ConsumerWidget {
   const _RepairHistorySection({
     required this.inventoryItemId,
     required this.acquisitionValueCents,
+    required this.canViewFinancialData,
   });
 
   final String inventoryItemId;
   final int acquisitionValueCents;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1243,6 +1267,7 @@ class _RepairHistorySection extends ConsumerWidget {
         return _RepairHistoryContent(
           repairs: repairs,
           acquisitionValueCents: acquisitionValueCents,
+          canViewFinancialData: canViewFinancialData,
         );
       },
     );
@@ -1253,10 +1278,12 @@ class _RepairHistoryContent extends StatelessWidget {
   const _RepairHistoryContent({
     required this.repairs,
     required this.acquisitionValueCents,
+    required this.canViewFinancialData,
   });
 
   final List<RepairTransaction> repairs;
   final int acquisitionValueCents;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -1274,21 +1301,26 @@ class _RepairHistoryContent extends StatelessWidget {
           label: 'Number of Repairs',
           value: repairs.length.toString(),
         ),
-        _DetailRow(
-          label: 'Total Repair Cost',
-          value: CurrencyFormatter.formatCents(totalRepairCostCents),
-        ),
-        _DetailRow(
-          label: 'True Cost',
-          value: CurrencyFormatter.formatCents(trueCostCents),
-        ),
+        if (canViewFinancialData) ...[
+          _DetailRow(
+            label: 'Total Repair Cost',
+            value: CurrencyFormatter.formatCents(totalRepairCostCents),
+          ),
+          _DetailRow(
+            label: 'True Cost',
+            value: CurrencyFormatter.formatCents(trueCostCents),
+          ),
+        ],
         const SizedBox(height: 12),
         if (repairs.isEmpty)
           const Text('No repairs have been recorded for this item.')
         else
           for (var index = 0; index < repairs.length; index++) ...[
             if (index > 0) const Divider(height: 32),
-            _RepairHistoryEntry(repair: repairs[index]),
+            _RepairHistoryEntry(
+              repair: repairs[index],
+              canViewFinancialData: canViewFinancialData,
+            ),
           ],
       ],
     );
@@ -1296,9 +1328,13 @@ class _RepairHistoryContent extends StatelessWidget {
 }
 
 class _RepairHistoryEntry extends StatelessWidget {
-  const _RepairHistoryEntry({required this.repair});
+  const _RepairHistoryEntry({
+    required this.repair,
+    required this.canViewFinancialData,
+  });
 
   final RepairTransaction repair;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -1310,10 +1346,11 @@ class _RepairHistoryEntry extends StatelessWidget {
       children: [
         _DetailRow(label: 'Repair Date', value: _formatDate(repair.repairDate)),
         _DetailRow(label: 'Description', value: repair.description),
-        _DetailRow(
-          label: 'Repair Cost',
-          value: CurrencyFormatter.formatCents(repair.costCents),
-        ),
+        if (canViewFinancialData)
+          _DetailRow(
+            label: 'Repair Cost',
+            value: CurrencyFormatter.formatCents(repair.costCents),
+          ),
         if (repair.notes != null && repair.notes!.trim().isNotEmpty)
           _DetailRow(label: 'Notes', value: repair.notes!),
         if (repairId != null && repairId.trim().isNotEmpty) ...[
@@ -1438,9 +1475,13 @@ class _SellerInformationContent extends StatelessWidget {
 }
 
 class _SaleInformationSection extends ConsumerWidget {
-  const _SaleInformationSection({required this.inventoryItemId});
+  const _SaleInformationSection({
+    required this.inventoryItemId,
+    required this.canViewFinancialData,
+  });
 
   final String inventoryItemId;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1475,16 +1516,23 @@ class _SaleInformationSection extends ConsumerWidget {
           );
         }
 
-        return _SaleInformationCardContent(sale: sale);
+        return _SaleInformationCardContent(
+          sale: sale,
+          canViewFinancialData: canViewFinancialData,
+        );
       },
     );
   }
 }
 
 class _SaleInformationCardContent extends StatelessWidget {
-  const _SaleInformationCardContent({required this.sale});
+  const _SaleInformationCardContent({
+    required this.sale,
+    required this.canViewFinancialData,
+  });
 
   final SaleTransaction sale;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -1501,24 +1549,26 @@ class _SaleInformationCardContent extends StatelessWidget {
           label: 'Sale Price',
           value: CurrencyFormatter.formatCents(sale.salePriceCents),
         ),
-        _DetailRow(
-          label: 'Cost at Time of Sale',
-          value: acquisitionValue == null
-              ? 'Not available'
-              : CurrencyFormatter.formatCents(acquisitionValue),
-        ),
-        _DetailRow(
-          label: 'Profit',
-          value: profit == null
-              ? 'Not available'
-              : CurrencyFormatter.formatCents(profit),
-        ),
-        _DetailRow(
-          label: 'Gross Margin',
-          value: sale.grossMargin == null
-              ? 'Not available'
-              : '${(sale.grossMargin! * 100).toStringAsFixed(1)}%',
-        ),
+        if (canViewFinancialData) ...[
+          _DetailRow(
+            label: 'Cost at Time of Sale',
+            value: acquisitionValue == null
+                ? 'Not available'
+                : CurrencyFormatter.formatCents(acquisitionValue),
+          ),
+          _DetailRow(
+            label: 'Profit',
+            value: profit == null
+                ? 'Not available'
+                : CurrencyFormatter.formatCents(profit),
+          ),
+          _DetailRow(
+            label: 'Gross Margin',
+            value: sale.grossMargin == null
+                ? 'Not available'
+                : '${(sale.grossMargin! * 100).toStringAsFixed(1)}%',
+          ),
+        ],
         if (sale.notes != null && sale.notes!.trim().isNotEmpty)
           _DetailRow(label: 'Sale Notes', value: sale.notes!),
         const SizedBox(height: 12),
@@ -1701,7 +1751,7 @@ List<Widget> _categorySpecificRows(InventoryItem item) {
     ],
     InventoryCategory.catchersGear => [
       _DetailRow(
-        label: "Catcher’s Gear Size",
+        label: "Catcherâ€™s Gear Size",
         value: _displayOptionalText(item.catchersGearSize),
       ),
     ],

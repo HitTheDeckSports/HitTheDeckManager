@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/dashboard/application/dashboard_metrics.dart';
 import 'package:hit_the_deck_manager/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:hit_the_deck_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
@@ -179,6 +181,41 @@ void main() {
 
     expect(find.text('Last 7 Days'), findsOneWidget);
   });
+  testWidgets('ordinary User does not see Dashboard financial metrics', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(
+      tester,
+      router: router,
+      permissions: const AppPermissions.none(),
+    );
+
+    expect(find.byKey(const Key('dashboardRevenueCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardCostCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardProfitCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardMarginCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardPotentialProfitCard')), findsNothing);
+
+    expect(
+      find.byKey(const Key('dashboardAvailableItemsCard')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
+    expect(
+      find.byKey(const Key('dashboardInventoryValueCard')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('dashboardInventoryCountCard')),
+      findsOneWidget,
+    );
+  });
   testWidgets('Dashboard Add Inventory action navigates correctly', (
     WidgetTester tester,
   ) async {
@@ -237,10 +274,12 @@ GoRouter _createRouter() {
 Future<void> _pumpDashboard(
   WidgetTester tester, {
   required GoRouter router,
+  AppPermissions permissions = const AppPermissions.ownerOrAdmin(),
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        currentAppPermissionsProvider.overrideWithValue(permissions),
         dashboardMetricsProvider.overrideWithValue(
           const AsyncValue.data(_testMetrics),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formatting/currency_formatter.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
@@ -19,6 +20,18 @@ class ReportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(currentAppPermissionsProvider);
+
+    if (!permissions.canAccessReports) {
+      return const AppPage(
+        title: 'Reports',
+        subtitle: 'Financial reporting is restricted to Owners and Admins.',
+        child: Center(
+          child: Text('You do not have permission to view financial reports.'),
+        ),
+      );
+    }
+
     final reportsAsync = ref.watch(reportsSnapshotProvider);
     final selection = ref.watch(reportDateRangeSelectionProvider);
 

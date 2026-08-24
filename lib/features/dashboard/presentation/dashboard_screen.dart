@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
@@ -18,6 +19,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final metricsAsync = ref.watch(dashboardMetricsProvider);
     final rangeSelection = ref.watch(dashboardDateRangeSelectionProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     return AppPage(
       title: 'Dashboard',
@@ -62,7 +64,10 @@ class DashboardScreen extends ConsumerWidget {
                 ref.invalidate(dashboardMetricsProvider);
               },
             ),
-            data: (metrics) => _DashboardMetricsContent(metrics: metrics),
+            data: (metrics) => _DashboardMetricsContent(
+              metrics: metrics,
+              canViewFinancialData: permissions.canViewFinancialData,
+            ),
           ),
         ],
       ),
@@ -190,9 +195,13 @@ class _DateRangeSelector extends ConsumerWidget {
 }
 
 class _DashboardMetricsContent extends StatelessWidget {
-  const _DashboardMetricsContent({required this.metrics});
+  const _DashboardMetricsContent({
+    required this.metrics,
+    required this.canViewFinancialData,
+  });
 
   final DashboardMetrics metrics;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -205,31 +214,33 @@ class _DashboardMetricsContent extends StatelessWidget {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
-        _MetricGrid(
-          children: [
-            _MetricCard(
-              key: const Key('dashboardRevenueCard'),
-              label: 'Revenue',
-              value: CurrencyFormatter.formatCents(metrics.totalRevenueCents),
-            ),
-            _MetricCard(
-              key: const Key('dashboardCostCard'),
-              label: 'Cost',
-              value: CurrencyFormatter.formatCents(metrics.totalCostCents),
-            ),
-            _MetricCard(
-              key: const Key('dashboardProfitCard'),
-              label: 'Profit',
-              value: CurrencyFormatter.formatCents(metrics.totalProfitCents),
-            ),
-            _MetricCard(
-              key: const Key('dashboardMarginCard'),
-              label: 'Gross Margin',
-              value: '${(metrics.grossMargin * 100).toStringAsFixed(1)}%',
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
+        if (canViewFinancialData) ...[
+          _MetricGrid(
+            children: [
+              _MetricCard(
+                key: const Key('dashboardRevenueCard'),
+                label: 'Revenue',
+                value: CurrencyFormatter.formatCents(metrics.totalRevenueCents),
+              ),
+              _MetricCard(
+                key: const Key('dashboardCostCard'),
+                label: 'Cost',
+                value: CurrencyFormatter.formatCents(metrics.totalCostCents),
+              ),
+              _MetricCard(
+                key: const Key('dashboardProfitCard'),
+                label: 'Profit',
+                value: CurrencyFormatter.formatCents(metrics.totalProfitCents),
+              ),
+              _MetricCard(
+                key: const Key('dashboardMarginCard'),
+                label: 'Gross Margin',
+                value: '${(metrics.grossMargin * 100).toStringAsFixed(1)}%',
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+        ],
         Text('Quick Snapshot', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         _MetricGrid(
@@ -272,25 +283,27 @@ class _DashboardMetricsContent extends StatelessWidget {
                 metrics.openInventoryValueCents,
               ),
             ),
-            _MetricCard(
-              key: const Key('dashboardInventoryCostCard'),
-              label: 'Open Inventory Cost',
-              value: CurrencyFormatter.formatCents(
-                metrics.openInventoryCostCents,
+            if (canViewFinancialData)
+              _MetricCard(
+                key: const Key('dashboardInventoryCostCard'),
+                label: 'Open Inventory Cost',
+                value: CurrencyFormatter.formatCents(
+                  metrics.openInventoryCostCents,
+                ),
               ),
-            ),
             _MetricCard(
               key: const Key('dashboardInventoryCountCard'),
               label: 'Inventory Count',
               value: metrics.inventoryCount.toString(),
             ),
-            _MetricCard(
-              key: const Key('dashboardPotentialProfitCard'),
-              label: 'Current Inventory Potential Profit',
-              value: CurrencyFormatter.formatCents(
-                metrics.openPotentialProfitCents,
+            if (canViewFinancialData)
+              _MetricCard(
+                key: const Key('dashboardPotentialProfitCard'),
+                label: 'Current Inventory Potential Profit',
+                value: CurrencyFormatter.formatCents(
+                  metrics.openPotentialProfitCents,
+                ),
               ),
-            ),
           ],
         ),
       ],

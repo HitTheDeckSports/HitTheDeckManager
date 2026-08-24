@@ -8,6 +8,7 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/consignment_transaction.dart';
@@ -35,6 +36,7 @@ class TransactionsScreen extends ConsumerWidget {
     final consignmentsAsync = ref.watch(consignmentTransactionsProvider);
     final inventoryAsync = ref.watch(inventoryItemsProvider);
     final dealsAsync = ref.watch(dealsProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     final asyncValues = <AsyncValue<Object?>>[
       salesAsync,
@@ -134,13 +136,24 @@ class TransactionsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DealsSection(deals: deals),
+          _DealsSection(
+            deals: deals,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
           const SizedBox(height: 24),
-          _SalesSection(sales: sortedSales, inventoryById: inventoryById),
+          _SalesSection(
+            sales: sortedSales,
+            inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
           const SizedBox(height: 24),
           _TradesSection(trades: sortedTrades, inventoryById: inventoryById),
           const SizedBox(height: 24),
-          _RepairsSection(repairs: sortedRepairs, inventoryById: inventoryById),
+          _RepairsSection(
+            repairs: sortedRepairs,
+            inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
           const SizedBox(height: 24),
           _DisposalsSection(
             disposals: sortedDisposals,
@@ -150,6 +163,7 @@ class TransactionsScreen extends ConsumerWidget {
           _ConsignmentsSection(
             consignments: sortedConsignments,
             inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
           ),
         ],
       ),
@@ -158,9 +172,13 @@ class TransactionsScreen extends ConsumerWidget {
 }
 
 class _DealsSection extends StatelessWidget {
-  const _DealsSection({required this.deals});
+  const _DealsSection({
+    required this.deals,
+    required this.canViewFinancialData,
+  });
 
   final List<Deal> deals;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +194,10 @@ class _DealsSection extends StatelessWidget {
           )
         else
           for (final deal in deals) ...[
-            _DealTransactionCard(deal: deal),
+            _DealTransactionCard(
+              deal: deal,
+              canViewFinancialData: canViewFinancialData,
+            ),
             const SizedBox(height: 12),
           ],
       ],
@@ -185,10 +206,15 @@ class _DealsSection extends StatelessWidget {
 }
 
 class _SalesSection extends StatelessWidget {
-  const _SalesSection({required this.sales, required this.inventoryById});
+  const _SalesSection({
+    required this.sales,
+    required this.inventoryById,
+    required this.canViewFinancialData,
+  });
 
   final List<SaleTransaction> sales;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +231,7 @@ class _SalesSection extends StatelessWidget {
             _SaleTransactionCard(
               sale: sale,
               inventoryItem: inventoryById[sale.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -240,10 +267,15 @@ class _TradesSection extends StatelessWidget {
 }
 
 class _RepairsSection extends StatelessWidget {
-  const _RepairsSection({required this.repairs, required this.inventoryById});
+  const _RepairsSection({
+    required this.repairs,
+    required this.inventoryById,
+    required this.canViewFinancialData,
+  });
 
   final List<RepairTransaction> repairs;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +292,7 @@ class _RepairsSection extends StatelessWidget {
             _RepairTransactionCard(
               repair: repair,
               inventoryItem: inventoryById[repair.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -304,10 +337,12 @@ class _ConsignmentsSection extends StatelessWidget {
   const _ConsignmentsSection({
     required this.consignments,
     required this.inventoryById,
+    required this.canViewFinancialData,
   });
 
   final List<ConsignmentTransaction> consignments;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -324,6 +359,7 @@ class _ConsignmentsSection extends StatelessWidget {
             _ConsignmentTransactionCard(
               consignment: consignment,
               inventoryItem: inventoryById[consignment.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -344,9 +380,13 @@ class _SectionHeading extends StatelessWidget {
 }
 
 class _DealTransactionCard extends ConsumerWidget {
-  const _DealTransactionCard({required this.deal});
+  const _DealTransactionCard({
+    required this.deal,
+    required this.canViewFinancialData,
+  });
 
   final Deal deal;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -392,16 +432,23 @@ class _DealTransactionCard extends ConsumerWidget {
           );
         }
 
-        return _DealSummaryCard(summary: summary);
+        return _DealSummaryCard(
+          summary: summary,
+          canViewFinancialData: canViewFinancialData,
+        );
       },
     );
   }
 }
 
 class _DealSummaryCard extends StatelessWidget {
-  const _DealSummaryCard({required this.summary});
+  const _DealSummaryCard({
+    required this.summary,
+    required this.canViewFinancialData,
+  });
 
   final DealSummary summary;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -451,20 +498,22 @@ class _DealSummaryCard extends StatelessWidget {
                 label: 'Child Inventory',
                 value: summary.deal.childInventoryItemIds.length.toString(),
               ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Realized Deal Profit',
-                value: CurrencyFormatter.formatCents(
-                  summary.realizedDealProfitCents,
+              if (canViewFinancialData) ...[
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Realized Deal Profit',
+                  value: CurrencyFormatter.formatCents(
+                    summary.realizedDealProfitCents,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Projected Deal Profit',
-                value: CurrencyFormatter.formatCents(
-                  summary.projectedDealProfitCents,
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Projected Deal Profit',
+                  value: CurrencyFormatter.formatCents(
+                    summary.projectedDealProfitCents,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -488,10 +537,15 @@ class _DealStatusChip extends StatelessWidget {
 }
 
 class _SaleTransactionCard extends StatelessWidget {
-  const _SaleTransactionCard({required this.sale, required this.inventoryItem});
+  const _SaleTransactionCard({
+    required this.sale,
+    required this.inventoryItem,
+    required this.canViewFinancialData,
+  });
 
   final SaleTransaction sale;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -543,25 +597,27 @@ class _SaleTransactionCard extends StatelessWidget {
                 label: 'Revenue',
                 value: CurrencyFormatter.formatCents(sale.salePriceCents),
               ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Cost',
-                value: acquisitionValue == null
-                    ? 'Not available'
-                    : CurrencyFormatter.formatCents(acquisitionValue),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Profit',
-                value: profit == null
-                    ? 'Not available'
-                    : CurrencyFormatter.formatCents(profit),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Gross Margin',
-                value: _formatMargin(sale.grossMargin),
-              ),
+              if (canViewFinancialData) ...[
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Cost',
+                  value: acquisitionValue == null
+                      ? 'Not available'
+                      : CurrencyFormatter.formatCents(acquisitionValue),
+                ),
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Profit',
+                  value: profit == null
+                      ? 'Not available'
+                      : CurrencyFormatter.formatCents(profit),
+                ),
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Gross Margin',
+                  value: _formatMargin(sale.grossMargin),
+                ),
+              ],
               if (sale.notes != null && sale.notes!.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(sale.notes!),
@@ -629,10 +685,12 @@ class _RepairTransactionCard extends StatelessWidget {
   const _RepairTransactionCard({
     required this.repair,
     required this.inventoryItem,
+    required this.canViewFinancialData,
   });
 
   final RepairTransaction repair;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -657,7 +715,9 @@ class _RepairTransactionCard extends StatelessWidget {
                 icon: Icons.build_outlined,
                 title: 'Repair',
                 subtitle: _formatDate(repair.repairDate),
-                trailing: CurrencyFormatter.formatCents(repair.costCents),
+                trailing: canViewFinancialData
+                    ? CurrencyFormatter.formatCents(repair.costCents)
+                    : null,
               ),
               const SizedBox(height: 12),
               _TransactionDetailRow(
@@ -730,10 +790,12 @@ class _ConsignmentTransactionCard extends StatelessWidget {
   const _ConsignmentTransactionCard({
     required this.consignment,
     required this.inventoryItem,
+    required this.canViewFinancialData,
   });
 
   final ConsignmentTransaction consignment;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -750,20 +812,24 @@ class _ConsignmentTransactionCard extends StatelessWidget {
               icon: Icons.assignment_outlined,
               title: 'Consignment',
               subtitle: _formatDate(consignment.consignmentDate),
-              trailing: CurrencyFormatter.formatCents(
-                consignment.commissionCents,
-              ),
+              trailing: canViewFinancialData
+                  ? CurrencyFormatter.formatCents(consignment.commissionCents)
+                  : null,
             ),
             const SizedBox(height: 12),
             _TransactionDetailRow(
               label: 'Inventory Item',
               value: _inventoryDisplayName(inventoryItem),
             ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Hit the Deck Commission',
-              value: CurrencyFormatter.formatCents(consignment.commissionCents),
-            ),
+            if (canViewFinancialData) ...[
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Hit the Deck Commission',
+                value: CurrencyFormatter.formatCents(
+                  consignment.commissionCents,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             _TransactionDetailRow(
               label: 'Status',

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/reports/application/deal_rollup_report.dart';
 import 'package:hit_the_deck_manager/features/reports/application/financial_performance_report.dart';
 import 'package:hit_the_deck_manager/features/reports/application/inventory_aging_report.dart';
@@ -274,6 +276,20 @@ void main() {
     expect(find.byKey(const Key('reportDateRangeWideLayout')), findsNothing);
   });
 
+  testWidgets('ordinary User is denied financial Reports', (
+    WidgetTester tester,
+  ) async {
+    await _pumpReports(tester, permissions: const AppPermissions.none());
+
+    expect(
+      find.text('You do not have permission to view financial reports.'),
+      findsOneWidget,
+    );
+    expect(find.text('Financial Performance'), findsNothing);
+    expect(find.text('Sales Analysis'), findsNothing);
+    expect(find.text('Inventory Aging'), findsNothing);
+    expect(find.text('Deals'), findsNothing);
+  });
   testWidgets('Reports shows loading state', (WidgetTester tester) async {
     await _pumpReports(
       tester,
@@ -300,11 +316,13 @@ void main() {
 Future<void> _pumpReports(
   WidgetTester tester, {
   AsyncValue<ReportsSnapshot>? reportsValue,
+  AppPermissions permissions = const AppPermissions.ownerOrAdmin(),
   bool settle = true,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        currentAppPermissionsProvider.overrideWithValue(permissions),
         reportsSnapshotProvider.overrideWithValue(
           reportsValue ?? AsyncValue.data(_snapshot),
         ),
