@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
-import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -12,6 +11,7 @@ import '../../../shared/presentation/widgets/app_page.dart';
 import '../application/filters/inventory_filter.dart';
 import '../application/search/inventory_search.dart';
 import '../domain/models/inventory_enums.dart';
+import '../domain/models/inventory_item.dart';
 import 'providers/inventory_providers.dart';
 import 'widgets/inventory_filter_dialog.dart';
 
@@ -41,7 +41,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   void _clearSearch() {
     _searchController.clear();
-
     setState(() {
       _query = '';
     });
@@ -50,7 +49,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
-    final permissions = ref.watch(currentAppPermissionsProvider);
 
     return AppPage(
       title: 'Inventory',
@@ -170,49 +168,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 )
               else
                 for (final item in filteredItems)
-                  Card(
-                    child: ListTile(
-                      key: ValueKey('inventoryItemTile-${item.id}'),
-                      onTap: item.id == null
-                          ? null
-                          : () {
-                              context.goNamed(
-                                AppRouteNames.inventoryDetail,
-                                pathParameters: {'itemId': item.id!},
-                              );
-                            },
-                      leading: const Icon(Icons.sports_baseball),
-                      title: Text(
-                        item.model == null || item.model!.trim().isEmpty
-                            ? item.brand
-                            : '${item.brand} ${item.model}',
-                      ),
-                      subtitle: Text(
-                        '${item.category.label} \u2022 '
-                        '${item.inventoryNumber ?? 'Not assigned'}',
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            item.askingPriceCents == null
-                                ? 'No asking price'
-                                : CurrencyFormatter.formatCents(
-                                    item.askingPriceCents!,
-                                  ),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          if (permissions.canViewFinancialData) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                  _InventoryItemCard(
+                    key: ValueKey('inventoryItemTile-${item.id}'),
+                    item: item,
+                    onTap: item.id == null
+                        ? null
+                        : () {
+                            context.goNamed(
+                              AppRouteNames.inventoryDetail,
+                              pathParameters: {'itemId': item.id!},
+                            );
+                          },
                   ),
             ],
           );
@@ -252,4 +218,246 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       _filters = selected;
     });
   }
+}
+
+class _InventoryItemCard extends StatelessWidget {
+  const _InventoryItemCard({
+    required this.item,
+    required this.onTap,
+    super.key,
+  });
+
+  final InventoryItem item;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = item.model == null || item.model!.trim().isEmpty
+        ? item.brand
+        : '${item.brand} ${item.model}';
+    final sizeLabel = _inventorySizeLabel(item);
+    final price = item.askingPriceCents == null
+        ? 'No asking price'
+        : CurrencyFormatter.formatCents(item.askingPriceCents!);
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _InventoryThumbnail(item: item),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.inventoryNumber ?? 'Not assigned',
+                          key: ValueKey('inventoryItemNumber-${item.id}'),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          sizeLabel == null
+                              ? item.category.label
+                              : '${item.category.label} â€¢ $sizeLabel',
+                          key: ValueKey('inventoryItemSize-${item.id}'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        _InventoryStatusChip(status: item.status),
+                        if (compact) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            price,
+                            key: ValueKey('inventoryItemPrice-${item.id}'),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 16),
+                    Text(
+                      price,
+                      key: ValueKey('inventoryItemPrice-${item.id}'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InventoryThumbnail extends StatelessWidget {
+  const _InventoryThumbnail({required this.item});
+
+  final InventoryItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = item.photoUrls.isEmpty ? null : item.photoUrls.first;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        key: ValueKey('inventoryItemPhoto-${item.id}'),
+        width: 96,
+        height: 96,
+        child: photoUrl == null
+            ? _InventoryPhotoPlaceholder(category: item.category)
+            : Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _InventoryPhotoPlaceholder(category: item.category);
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _InventoryPhotoPlaceholder extends StatelessWidget {
+  const _InventoryPhotoPlaceholder({required this.category});
+
+  final InventoryCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (category) {
+      InventoryCategory.bat => Icons.sports_baseball,
+      InventoryCategory.glove => Icons.sports_baseball,
+      InventoryCategory.catchersGear => Icons.health_and_safety_outlined,
+      InventoryCategory.helmet => Icons.sports_football,
+      InventoryCategory.other => Icons.inventory_2_outlined,
+    };
+
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          icon,
+          size: 38,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _InventoryStatusChip extends StatelessWidget {
+  const _InventoryStatusChip({required this.status});
+
+  final InventoryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (background, foreground) = switch (status) {
+      InventoryStatus.available => (
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+      InventoryStatus.sold => (
+        colorScheme.secondaryContainer,
+        colorScheme.onSecondaryContainer,
+      ),
+      InventoryStatus.inactive => (
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+      ),
+      InventoryStatus.broken => (
+        colorScheme.errorContainer,
+        colorScheme.onErrorContainer,
+      ),
+      InventoryStatus.disposed => (
+        colorScheme.surfaceContainerHigh,
+        colorScheme.onSurface,
+      ),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          status.label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: foreground),
+        ),
+      ),
+    );
+  }
+}
+
+String? _inventorySizeLabel(InventoryItem item) {
+  final parts = <String>[];
+
+  switch (item.category) {
+    case InventoryCategory.bat:
+      if (item.lengthInches != null) {
+        parts.add('${_formatMeasurement(item.lengthInches!)} in');
+      }
+      if (item.weightOunces != null) {
+        parts.add('${_formatMeasurement(item.weightOunces!)} oz');
+      }
+      if (item.drop != null) {
+        parts.add(_formatMeasurement(item.drop!));
+      }
+    case InventoryCategory.glove:
+      if (item.gloveSizeInches != null) {
+        parts.add('${_formatMeasurement(item.gloveSizeInches!)} in');
+      }
+      if (item.handOrientation != null &&
+          item.handOrientation!.trim().isNotEmpty) {
+        parts.add(item.handOrientation!.trim());
+      }
+    case InventoryCategory.catchersGear:
+      if (item.catchersGearSize != null &&
+          item.catchersGearSize!.trim().isNotEmpty) {
+        parts.add(item.catchersGearSize!.trim());
+      }
+    case InventoryCategory.helmet:
+    case InventoryCategory.other:
+      break;
+  }
+
+  return parts.isEmpty ? null : parts.join(' â€¢ ');
+}
+
+String _formatMeasurement(double value) {
+  return value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toString();
 }

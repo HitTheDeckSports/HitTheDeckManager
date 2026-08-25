@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
-import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
-import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -77,7 +75,6 @@ void main() {
     await tester.pumpAndSettle();
 
     final scanButton = find.byKey(const Key('inventoryScanQrButton'));
-
     expect(scanButton, findsOneWidget);
 
     await tester.tap(scanButton);
@@ -86,7 +83,7 @@ void main() {
     expect(find.text('Inventory scanner destination'), findsOneWidget);
   });
 
-  testWidgets('InventoryScreen displays repository items', (
+  testWidgets('InventoryScreen displays photo-forward inventory cards', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -98,6 +95,9 @@ void main() {
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 20000,
       askingPriceCents: 32500,
+      lengthInches: 32,
+      weightOunces: 29,
+      drop: -3,
     );
 
     final repository = InMemoryInventoryRepository(initialItems: [item]);
@@ -114,42 +114,46 @@ void main() {
     expect(find.byKey(const Key('inventorySearchField')), findsOneWidget);
     expect(find.text('1 inventory item'), findsOneWidget);
     expect(find.text('Combat Spec H1'), findsOneWidget);
-    expect(find.text('Bat \u2022 BAT-2607-0001'), findsOneWidget);
+    expect(find.text('BAT-2607-0001'), findsOneWidget);
+    expect(find.text('Bat â€¢ 32 in â€¢ 29 oz â€¢ -3'), findsOneWidget);
+    expect(find.text('Available'), findsOneWidget);
     expect(find.text(r'$325.00'), findsOneWidget);
-    expect(find.text(r'Cost: $200.00'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryItemPhoto-item-1')),
+      findsOneWidget,
+    );
+    expect(find.text(r'Cost: $200.00'), findsNothing);
     expect(find.text('No inventory items yet.'), findsNothing);
   });
 
-  testWidgets(
-    'ordinary User does not see acquisition cost on Inventory cards',
-    (WidgetTester tester) async {
-      const item = InventoryItem(
-        id: 'item-1',
-        inventoryNumber: 'BAT-2607-0001',
-        category: InventoryCategory.bat,
-        brand: 'Combat',
-        model: 'Spec H1',
-        acquisitionType: AcquisitionType.purchased,
-        acquisitionValueCents: 20000,
-        askingPriceCents: 32500,
-      );
-      final repository = InMemoryInventoryRepository(initialItems: [item]);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            currentAppPermissionsProvider.overrideWithValue(
-              const AppPermissions.none(),
-            ),
-            inventoryRepositoryProvider.overrideWithValue(repository),
-          ],
-          child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(r'$325.00'), findsOneWidget);
-      expect(find.text(r'Cost: $200.00'), findsNothing);
-    },
-  );
+  testWidgets('Inventory cards never display acquisition cost', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-1',
+      inventoryNumber: 'BAT-2607-0001',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsNothing);
+    expect(find.textContaining('Cost:'), findsNothing);
+  });
+
   testWidgets('Inventory search filters displayed items', (
     WidgetTester tester,
   ) async {
@@ -303,7 +307,6 @@ void main() {
     await tester.pumpAndSettle();
 
     final itemTile = find.byKey(const ValueKey('inventoryItemTile-item-1'));
-
     expect(itemTile, findsOneWidget);
 
     await tester.tap(itemTile);
