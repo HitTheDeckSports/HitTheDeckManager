@@ -159,7 +159,8 @@ class AppShell extends ConsumerWidget {
       return 3;
     }
 
-    if (location.startsWith(AppRoutes.reports) ||
+    if (location.startsWith(AppRoutes.more) ||
+        location.startsWith(AppRoutes.reports) ||
         location.startsWith(AppRoutes.settings) ||
         location.startsWith(AppRoutes.search)) {
       return 4;
@@ -174,7 +175,7 @@ class AppShell extends ConsumerWidget {
       1 => AppRoutes.inventory,
       2 => AppRoutes.transactions,
       3 => AppRoutes.contacts,
-      4 => AppRoutes.reports,
+      4 => AppRoutes.more,
       _ => AppRoutes.dashboard,
     };
 

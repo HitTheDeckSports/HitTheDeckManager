@@ -226,7 +226,7 @@ void main() {
 
     expect(find.text('0-30 days'), findsOneWidget);
     expect(find.text('31-60 days'), findsOneWidget);
-    expect(find.text('180+ days'), findsOneWidget);
+    expect(find.text('181+ days'), findsOneWidget);
 
     expect(find.text('Uncompleted Deals'), findsOneWidget);
     expect(find.text('Completed Deals'), findsOneWidget);

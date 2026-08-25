@@ -12,16 +12,12 @@ import '../../authentication/presentation/providers/app_permissions_provider.dar
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/consignment_transaction.dart';
-import '../domain/models/deal.dart';
-import '../domain/models/deal_status.dart';
-import '../domain/models/deal_summary.dart';
 import '../domain/models/disposal_transaction.dart';
 import '../domain/models/repair_transaction.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/trade_transaction.dart';
 import '../domain/models/transaction_enums.dart';
 import '../domain/models/disposal_reason.dart';
-import 'providers/deal_providers.dart';
 import 'providers/transaction_providers.dart';
 
 class TransactionsScreen extends ConsumerWidget {
@@ -35,7 +31,6 @@ class TransactionsScreen extends ConsumerWidget {
     final disposalsAsync = ref.watch(disposalTransactionsProvider);
     final consignmentsAsync = ref.watch(consignmentTransactionsProvider);
     final inventoryAsync = ref.watch(inventoryItemsProvider);
-    final dealsAsync = ref.watch(dealsProvider);
     final permissions = ref.watch(currentAppPermissionsProvider);
 
     final asyncValues = <AsyncValue<Object?>>[
@@ -45,14 +40,13 @@ class TransactionsScreen extends ConsumerWidget {
       disposalsAsync,
       consignmentsAsync,
       inventoryAsync,
-      dealsAsync,
     ];
 
     if (asyncValues.any((value) => value.isLoading)) {
       return const AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppLoadingState(message: 'Loading transactions...'),
       );
     }
@@ -66,7 +60,7 @@ class TransactionsScreen extends ConsumerWidget {
       return AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppErrorState(
           message: 'Unable to load transaction history.',
           details: firstError.toString(),
@@ -77,7 +71,6 @@ class TransactionsScreen extends ConsumerWidget {
             ref.invalidate(disposalTransactionsProvider);
             ref.invalidate(consignmentTransactionsProvider);
             ref.invalidate(inventoryItemsProvider);
-            ref.invalidate(dealsProvider);
           },
         ),
       );
@@ -89,21 +82,19 @@ class TransactionsScreen extends ConsumerWidget {
     final disposals = disposalsAsync.requireValue;
     final consignments = consignmentsAsync.requireValue;
     final inventoryItems = inventoryAsync.requireValue;
-    final deals = dealsAsync.requireValue;
 
     final hasAnyTransaction =
         sales.isNotEmpty ||
         repairs.isNotEmpty ||
         trades.isNotEmpty ||
         disposals.isNotEmpty ||
-        consignments.isNotEmpty ||
-        deals.isNotEmpty;
+        consignments.isNotEmpty;
 
     if (!hasAnyTransaction) {
       return const AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppEmptyState(
           icon: Icons.receipt_long_outlined,
           title: 'No transactions yet.',
@@ -132,15 +123,10 @@ class TransactionsScreen extends ConsumerWidget {
     return AppPage(
       title: 'Transactions',
       subtitle:
-          'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+          'Review sales, trade-ins, repairs, disposals, and consignments.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DealsSection(
-            deals: deals,
-            canViewFinancialData: permissions.canViewFinancialData,
-          ),
-          const SizedBox(height: 24),
           _SalesSection(
             sales: sortedSales,
             inventoryById: inventoryById,
@@ -167,40 +153,6 @@ class TransactionsScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _DealsSection extends StatelessWidget {
-  const _DealsSection({
-    required this.deals,
-    required this.canViewFinancialData,
-  });
-
-  final List<Deal> deals;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsDealsSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Deals (${deals.length})'),
-        const SizedBox(height: 12),
-        if (deals.isEmpty)
-          const Text(
-            'No Deals yet. Deals are created automatically when a sale includes trade-in inventory.',
-          )
-        else
-          for (final deal in deals) ...[
-            _DealTransactionCard(
-              deal: deal,
-              canViewFinancialData: canViewFinancialData,
-            ),
-            const SizedBox(height: 12),
-          ],
-      ],
     );
   }
 }
@@ -376,163 +328,6 @@ class _SectionHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: Theme.of(context).textTheme.titleLarge);
-  }
-}
-
-class _DealTransactionCard extends ConsumerWidget {
-  const _DealTransactionCard({
-    required this.deal,
-    required this.canViewFinancialData,
-  });
-
-  final Deal deal;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dealId = deal.id;
-
-    if (dealId == null || dealId.trim().isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('A Deal record is missing its ID.'),
-        ),
-      );
-    }
-
-    final summaryAsync = ref.watch(dealSummaryProvider(dealId));
-
-    return summaryAsync.when(
-      loading: () => Card(
-        key: ValueKey('dealTransactionCard-$dealId'),
-        child: const Padding(
-          padding: EdgeInsets.all(16),
-          child: AppLoadingState(message: 'Loading Deal summary...'),
-        ),
-      ),
-      error: (error, stackTrace) => Card(
-        key: ValueKey('dealTransactionCard-$dealId'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: AppErrorState(
-            message: 'Unable to load Deal summary.',
-            details: error.toString(),
-          ),
-        ),
-      ),
-      data: (summary) {
-        if (summary == null) {
-          return Card(
-            key: ValueKey('dealTransactionCard-$dealId'),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Deal summary is unavailable.'),
-            ),
-          );
-        }
-
-        return _DealSummaryCard(
-          summary: summary,
-          canViewFinancialData: canViewFinancialData,
-        );
-      },
-    );
-  }
-}
-
-class _DealSummaryCard extends StatelessWidget {
-  const _DealSummaryCard({
-    required this.summary,
-    required this.canViewFinancialData,
-  });
-
-  final DealSummary summary;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    final dealId = summary.deal.id!;
-
-    return Card(
-      key: ValueKey('dealTransactionCard-$dealId'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: ValueKey('dealTransactionCardTap-$dealId'),
-        onTap: () {
-          context.goNamed(
-            AppRouteNames.dealDetail,
-            pathParameters: {'dealId': dealId},
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.handshake_outlined, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Deal',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(summary.status.label),
-                      ],
-                    ),
-                  ),
-                  _DealStatusChip(status: summary.status),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              _TransactionDetailRow(
-                label: 'Child Inventory',
-                value: summary.deal.childInventoryItemIds.length.toString(),
-              ),
-              if (canViewFinancialData) ...[
-                const SizedBox(height: 8),
-                _TransactionDetailRow(
-                  label: 'Realized Deal Profit',
-                  value: CurrencyFormatter.formatCents(
-                    summary.realizedDealProfitCents,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _TransactionDetailRow(
-                  label: 'Projected Deal Profit',
-                  value: CurrencyFormatter.formatCents(
-                    summary.projectedDealProfitCents,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DealStatusChip extends StatelessWidget {
-  const _DealStatusChip({required this.status});
-
-  final DealStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      key: ValueKey('dealStatus-${status.name}'),
-      label: Text(status.label),
-    );
   }
 }
 

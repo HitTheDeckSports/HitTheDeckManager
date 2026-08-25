@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -118,6 +120,36 @@ void main() {
     expect(find.text('No inventory items yet.'), findsNothing);
   });
 
+  testWidgets(
+    'ordinary User does not see acquisition cost on Inventory cards',
+    (WidgetTester tester) async {
+      const item = InventoryItem(
+        id: 'item-1',
+        inventoryNumber: 'BAT-2607-0001',
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        model: 'Spec H1',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 20000,
+        askingPriceCents: 32500,
+      );
+      final repository = InMemoryInventoryRepository(initialItems: [item]);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentAppPermissionsProvider.overrideWithValue(
+              const AppPermissions.none(),
+            ),
+            inventoryRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(r'$325.00'), findsOneWidget);
+      expect(find.text(r'Cost: $200.00'), findsNothing);
+    },
+  );
   testWidgets('Inventory search filters displayed items', (
     WidgetTester tester,
   ) async {

@@ -13,8 +13,11 @@ class Deal {
 
   /// Inventory received directly through the parent sale.
   ///
-  /// Version 1.0 supports exactly one Deal level. A child item may later be
-  /// sold, but that later sale does not create grandchildren under this Deal.
+  /// Stores the direct child inventory received through this Deal.
+  ///
+  /// Reporting may recursively follow a child's later sale into another Deal.
+  /// The stored relationship remains direct-child based so reporting depth can
+  /// evolve without changing existing Deal records.
   final List<String> childInventoryItemIds;
 
   final String? notes;

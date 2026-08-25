@@ -16,7 +16,7 @@ extension InventoryAgingBucketLabel on InventoryAgingBucket {
     InventoryAgingBucket.days31To60 => '31-60 days',
     InventoryAgingBucket.days61To90 => '61-90 days',
     InventoryAgingBucket.days91To180 => '91-180 days',
-    InventoryAgingBucket.days181Plus => '180+ days',
+    InventoryAgingBucket.days181Plus => '181+ days',
   };
 }
 

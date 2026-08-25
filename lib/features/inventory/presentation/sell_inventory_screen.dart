@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
@@ -74,6 +75,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
     final contactsAsync = ref.watch(contactsProvider);
     final formState = ref.watch(sellInventoryFormControllerProvider);
     final completionState = ref.watch(saleCompletionControllerProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     final formController = ref.read(
       sellInventoryFormControllerProvider.notifier,
@@ -183,11 +185,13 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                             'Inventory Number: '
                             '${selectedItem.inventoryNumber ?? 'Not assigned'}',
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Acquisition Value: '
-                            '${CurrencyFormatter.formatCents(selectedItem.acquisitionValueCents)}',
-                          ),
+                          if (permissions.canViewFinancialData) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Acquisition Value: '
+                              '${CurrencyFormatter.formatCents(selectedItem.acquisitionValueCents)}',
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             selectedItem.askingPriceCents == null
@@ -204,7 +208,10 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                     selectedItem.acquisitionType ==
                         AcquisitionType.consignment) ...[
                   const SizedBox(height: 16),
-                  _ConsignmentSaleAgreementCard(item: selectedItem),
+                  _ConsignmentSaleAgreementCard(
+                    item: selectedItem,
+                    canViewFinancialData: permissions.canViewFinancialData,
+                  ),
                 ],
                 const SizedBox(height: 16),
                 TextFormField(
@@ -385,6 +392,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                   standardProfitCents: formState.profitCents,
                   standardGrossMargin: formState.grossMargin,
                   formatMargin: _formatMargin,
+                  canViewFinancialData: permissions.canViewFinancialData,
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
@@ -478,9 +486,13 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
 }
 
 class _ConsignmentSaleAgreementCard extends ConsumerWidget {
-  const _ConsignmentSaleAgreementCard({required this.item});
+  const _ConsignmentSaleAgreementCard({
+    required this.item,
+    required this.canViewFinancialData,
+  });
 
   final InventoryItem item;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -537,16 +549,21 @@ class _ConsignmentSaleAgreementCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                _SummaryRow(
-                  label: 'Hit the Deck Commission',
-                  value: CurrencyFormatter.formatCents(
-                    consignment.commissionCents,
+                if (canViewFinancialData) ...[
+                  _SummaryRow(
+                    label: 'Hit the Deck Commission',
+                    value: CurrencyFormatter.formatCents(
+                      consignment.commissionCents,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'The consignor payout will be the final sale price minus this commission.',
-                ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'The consignor payout will be the final sale price minus this commission.',
+                  ),
+                ] else
+                  const Text(
+                    'A consignment agreement is on file for this item.',
+                  ),
               ],
             ),
           ),
@@ -563,6 +580,7 @@ class _LiveSaleSummary extends ConsumerWidget {
     required this.standardProfitCents,
     required this.standardGrossMargin,
     required this.formatMargin,
+    required this.canViewFinancialData,
   });
 
   final InventoryItem? selectedItem;
@@ -570,6 +588,7 @@ class _LiveSaleSummary extends ConsumerWidget {
   final int? standardProfitCents;
   final double? standardGrossMargin;
   final String Function(double) formatMargin;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -585,6 +604,7 @@ class _LiveSaleSummary extends ConsumerWidget {
         profitCents: standardProfitCents,
         grossMargin: standardGrossMargin,
         formatMargin: formatMargin,
+        canViewFinancialData: canViewFinancialData,
       );
     }
 
@@ -621,6 +641,7 @@ class _LiveSaleSummary extends ConsumerWidget {
             profitCents: null,
             grossMargin: null,
             formatMargin: formatMargin,
+            canViewFinancialData: canViewFinancialData,
           );
         }
 
@@ -644,6 +665,7 @@ class _LiveSaleSummary extends ConsumerWidget {
           profitCents: profit,
           grossMargin: margin,
           formatMargin: formatMargin,
+          canViewFinancialData: canViewFinancialData,
         );
       },
     );
@@ -658,6 +680,7 @@ class _SaleSummaryCard extends StatelessWidget {
     required this.profitCents,
     required this.grossMargin,
     required this.formatMargin,
+    required this.canViewFinancialData,
   });
 
   final int? salePriceCents;
@@ -666,6 +689,7 @@ class _SaleSummaryCard extends StatelessWidget {
   final int? profitCents;
   final double? grossMargin;
   final String Function(double) formatMargin;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -687,25 +711,27 @@ class _SaleSummaryCard extends StatelessWidget {
                   ? 'â€”'
                   : CurrencyFormatter.formatCents(salePriceCents!),
             ),
-            const SizedBox(height: 8),
-            _SummaryRow(
-              label: costLabel,
-              value: costCents == null
-                  ? 'â€”'
-                  : CurrencyFormatter.formatCents(costCents!),
-            ),
-            const SizedBox(height: 8),
-            _SummaryRow(
-              label: 'Profit',
-              value: profitCents == null
-                  ? 'â€”'
-                  : CurrencyFormatter.formatCents(profitCents!),
-            ),
-            const SizedBox(height: 8),
-            _SummaryRow(
-              label: 'Gross Margin',
-              value: grossMargin == null ? 'â€”' : formatMargin(grossMargin!),
-            ),
+            if (canViewFinancialData) ...[
+              const SizedBox(height: 8),
+              _SummaryRow(
+                label: costLabel,
+                value: costCents == null
+                    ? '-'
+                    : CurrencyFormatter.formatCents(costCents!),
+              ),
+              const SizedBox(height: 8),
+              _SummaryRow(
+                label: 'Profit',
+                value: profitCents == null
+                    ? '-'
+                    : CurrencyFormatter.formatCents(profitCents!),
+              ),
+              const SizedBox(height: 8),
+              _SummaryRow(
+                label: 'Gross Margin',
+                value: grossMargin == null ? '-' : formatMargin(grossMargin!),
+              ),
+            ],
           ],
         ),
       ),
