@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/authentication/domain/models/authorized_user.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
 import '../features/inventory/presentation/inventory_qr_scanner_screen.dart';
@@ -12,6 +13,7 @@ import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/inventory/presentation/inventory_item_detail_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/search/presentation/universal_search_screen.dart';
+import '../features/settings/presentation/more_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/transactions/presentation/add_repair_screen.dart';
 import '../features/transactions/presentation/deal_detail_screen.dart';
@@ -64,6 +66,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Once an authorized session exists, the login page is no longer needed.
       if (isLoginRoute) {
+        return AppRoutes.dashboard;
+      }
+
+      final isOrdinaryUser =
+          session.authorization.role == AuthorizedUserRole.user;
+      final isRestrictedRoute =
+          state.name == AppRouteNames.reports ||
+          state.name == AppRouteNames.disposeInventory ||
+          state.name == AppRouteNames.userAccess;
+
+      if (isOrdinaryUser && isRestrictedRoute) {
         return AppRoutes.dashboard;
       }
 
@@ -290,6 +303,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.reports,
             name: AppRouteNames.reports,
             builder: (context, state) => const ReportScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.more,
+            name: AppRouteNames.more,
+            builder: (context, state) => const MoreScreen(),
           ),
           GoRoute(
             path: AppRoutes.search,

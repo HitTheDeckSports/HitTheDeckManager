@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
@@ -49,6 +50,38 @@ void main() {
     );
   });
 
+  testWidgets('Deals do not appear as Transactions', (
+    WidgetTester tester,
+  ) async {
+    final repository = InMemoryTransactionRepository();
+    final inventoryRepository = InMemoryInventoryRepository();
+    addTearDown(repository.dispose);
+    addTearDown(inventoryRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(repository),
+          dealsProvider.overrideWith(
+            (ref) => Stream.value(const [
+              Deal(
+                id: 'deal-1',
+                parentSaleTransactionId: 'sale-1',
+                childInventoryItemIds: ['item-1'],
+              ),
+            ]),
+          ),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('No transactions yet.'), findsOneWidget);
+    expect(find.byKey(const Key('transactionsDealsSection')), findsNothing);
+    expect(find.textContaining('Deals ('), findsNothing);
+  });
   testWidgets('displays recorded sales with newest transaction first', (
     WidgetTester tester,
   ) async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -49,6 +50,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     return AppPage(
       title: 'Inventory',
@@ -201,11 +203,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   ),
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          if (permissions.canViewFinancialData) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Cost: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                     ),

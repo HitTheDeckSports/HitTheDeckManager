@@ -11,6 +11,7 @@ abstract final class AppRoutes {
   static const String transactionDetail = '/transactions/:transactionId';
   static const String dealDetail = '/deals/:dealId';
   static const String reports = '/reports';
+  static const String more = '/more';
   static const String search = '/search';
   static const String settings = '/settings';
   static const String userAccess = '/settings/user-access';
@@ -41,6 +42,7 @@ abstract final class AppRouteNames {
   static const String transactionDetail = 'transactionDetail';
   static const String dealDetail = 'dealDetail';
   static const String reports = 'reports';
+  static const String more = 'more';
   static const String search = 'search';
   static const String settings = 'settings';
   static const String userAccess = 'userAccess';

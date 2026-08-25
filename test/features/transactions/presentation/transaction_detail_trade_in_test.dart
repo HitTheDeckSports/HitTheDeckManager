@@ -87,7 +87,7 @@ void main() {
 
     expect(find.text('Trade-In Information'), findsOneWidget);
     expect(
-      find.text('GLV-2608-0001 â€” Rawlings Heart of the Hide'),
+      find.text('GLV-2608-0001 — Rawlings Heart of the Hide'),
       findsOneWidget,
     );
     expect(find.text('Good'), findsOneWidget);

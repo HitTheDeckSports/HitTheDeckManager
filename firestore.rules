@@ -80,8 +80,17 @@ service cloud.firestore {
       // All active Hit the Deck Manager users may read inventory.
       allow read: if isAuthorizedAppUser();
 
-      // Active application users may create and update inventory.
-      allow create, update: if isAuthorizedAppUser();
+      // Active application users may create inventory. Updates that mark
+      // an item disposed are restricted to Owner/Admin.
+      allow create: if isAuthorizedAppUser();
+      allow update: if isAuthorizedAppUser()
+          && (
+            isAdmin()
+            || (
+              resource.data.status != 'disposed'
+              && request.resource.data.status != 'disposed'
+            )
+          );
 
       // Business workflows change status rather than permanently deleting.
       allow delete: if false;
@@ -128,7 +137,7 @@ service cloud.firestore {
 
     match /disposals/{disposalId} {
       allow read: if isAuthorizedAppUser();
-      allow create, update: if isAuthorizedAppUser();
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 

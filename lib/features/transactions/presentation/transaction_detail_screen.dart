@@ -8,6 +8,7 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
 import '../../inventory/domain/models/inventory_enums.dart';
 import '../../inventory/domain/models/inventory_item.dart';
@@ -96,7 +97,7 @@ class _SaleTransactionDetailContent extends ConsumerWidget {
   }
 }
 
-class _TransactionDetailView extends StatelessWidget {
+class _TransactionDetailView extends ConsumerWidget {
   const _TransactionDetailView({
     required this.transaction,
     required this.inventoryItem,
@@ -140,7 +141,8 @@ class _TransactionDetailView extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(currentAppPermissionsProvider);
     final acquisitionValue = transaction.acquisitionValueCents;
     final profit = transaction.profitCents;
 
@@ -224,25 +226,27 @@ class _TransactionDetailView extends StatelessWidget {
                       transaction.cashReceivedCents,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _TransactionDetailRow(
-                    label: 'Cost',
-                    value: acquisitionValue == null
-                        ? 'Not available'
-                        : CurrencyFormatter.formatCents(acquisitionValue),
-                  ),
-                  const SizedBox(height: 8),
-                  _TransactionDetailRow(
-                    label: 'Profit',
-                    value: profit == null
-                        ? 'Not available'
-                        : CurrencyFormatter.formatCents(profit),
-                  ),
-                  const SizedBox(height: 8),
-                  _TransactionDetailRow(
-                    label: 'Gross Margin',
-                    value: _formatMargin(transaction.grossMargin),
-                  ),
+                  if (permissions.canViewFinancialData) ...[
+                    const SizedBox(height: 8),
+                    _TransactionDetailRow(
+                      label: 'Cost',
+                      value: acquisitionValue == null
+                          ? 'Not available'
+                          : CurrencyFormatter.formatCents(acquisitionValue),
+                    ),
+                    const SizedBox(height: 8),
+                    _TransactionDetailRow(
+                      label: 'Profit',
+                      value: profit == null
+                          ? 'Not available'
+                          : CurrencyFormatter.formatCents(profit),
+                    ),
+                    const SizedBox(height: 8),
+                    _TransactionDetailRow(
+                      label: 'Gross Margin',
+                      value: _formatMargin(transaction.grossMargin),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -441,7 +445,7 @@ class _TradeInInformationCard extends StatelessWidget {
   }
 }
 
-class _TradeInInventoryEntry extends StatelessWidget {
+class _TradeInInventoryEntry extends ConsumerWidget {
   const _TradeInInventoryEntry({
     required this.inventoryItemId,
     required this.item,
@@ -451,7 +455,8 @@ class _TradeInInventoryEntry extends StatelessWidget {
   final InventoryItem? item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(currentAppPermissionsProvider);
     final inventoryItem = item;
 
     if (inventoryItem == null) {
@@ -476,7 +481,7 @@ class _TradeInInventoryEntry extends StatelessWidget {
         _TransactionDetailRow(
           label: 'Inventory Item',
           value:
-              '${inventoryItem.inventoryNumber ?? 'Not assigned'} â€” $displayName',
+              '${inventoryItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
         const SizedBox(height: 8),
         _TransactionDetailRow(
@@ -484,12 +489,13 @@ class _TradeInInventoryEntry extends StatelessWidget {
           value: inventoryItem.condition?.label ?? 'Not specified',
         ),
         const SizedBox(height: 8),
-        _TransactionDetailRow(
-          label: 'Acquisition Value',
-          value: CurrencyFormatter.formatCents(
-            inventoryItem.acquisitionValueCents,
+        if (permissions.canViewFinancialData)
+          _TransactionDetailRow(
+            label: 'Acquisition Value',
+            value: CurrencyFormatter.formatCents(
+              inventoryItem.acquisitionValueCents,
+            ),
           ),
-        ),
         const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerLeft,

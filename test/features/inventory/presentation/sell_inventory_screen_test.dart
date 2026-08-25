@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -43,6 +45,9 @@ void main() {
 
     container = ProviderContainer(
       overrides: [
+        currentAppPermissionsProvider.overrideWithValue(
+          const AppPermissions.ownerOrAdmin(),
+        ),
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         contactRepositoryProvider.overrideWithValue(contactRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
@@ -145,6 +150,9 @@ void main() {
 
     container = ProviderContainer(
       overrides: [
+        currentAppPermissionsProvider.overrideWithValue(
+          const AppPermissions.ownerOrAdmin(),
+        ),
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         contactRepositoryProvider.overrideWithValue(contactRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
@@ -200,6 +208,34 @@ void main() {
     expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
     expect(find.text(r'$125.00'), findsOneWidget);
     expect(find.text('38.5%'), findsOneWidget);
+  });
+  testWidgets('ordinary User can sell without seeing financial metrics', (
+    WidgetTester tester,
+  ) async {
+    container.dispose();
+    container = ProviderContainer(
+      overrides: [
+        currentAppPermissionsProvider.overrideWithValue(
+          const AppPermissions.none(),
+        ),
+        inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        contactRepositoryProvider.overrideWithValue(contactRepository),
+        transactionRepositoryProvider.overrideWithValue(transactionRepository),
+        dealRepositoryProvider.overrideWithValue(dealRepository),
+      ],
+    );
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sellInventoryItemField')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Combat Spec H1').last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Asking Price:'), findsOneWidget);
+    expect(find.textContaining('Acquisition Value:'), findsNothing);
+    expect(find.text('Profit'), findsNothing);
+    expect(find.text('Gross Margin'), findsNothing);
+    expect(find.text('Complete Sale'), findsOneWidget);
   });
   testWidgets('buyer dropdown displays saved contacts', (
     WidgetTester tester,

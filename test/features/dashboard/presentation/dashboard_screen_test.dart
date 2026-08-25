@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/dashboard/application/dashboard_metrics.dart';
 import 'package:hit_the_deck_manager/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:hit_the_deck_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
@@ -17,6 +19,11 @@ const _testMetrics = DashboardMetrics(
   openInventoryCostCents: 18000,
   openPotentialProfitCents: 11000,
   inventoryCount: 3,
+  unitsSold: 7,
+  availableItems: 12,
+  averageDaysInInventory: 26,
+  brokenItems: 2,
+  dateRangeLabel: 'Month to Date',
 );
 
 void main() {
@@ -41,7 +48,7 @@ void main() {
     expect(find.text('Sell'), findsNothing);
   });
 
-  testWidgets('Dashboard displays approved metric cards in both sections', (
+  testWidgets('Dashboard displays approved eight primary cards', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -49,19 +56,16 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    expect(find.text('Month to Date'), findsOneWidget);
-    expect(find.text('Current Inventory'), findsOneWidget);
-
     expect(find.byKey(const Key('dashboardRevenueCard')), findsOneWidget);
-    expect(find.text('Total Revenue'), findsOneWidget);
+    expect(find.text('Revenue'), findsOneWidget);
     expect(find.text(r'$500.00'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardCostCard')), findsOneWidget);
-    expect(find.text('Total Cost'), findsOneWidget);
+    expect(find.text('Cost'), findsOneWidget);
     expect(find.text(r'$300.00'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardProfitCard')), findsOneWidget);
-    expect(find.text('Total Profit'), findsOneWidget);
+    expect(find.text('Profit'), findsOneWidget);
     expect(find.text(r'$200.00'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardMarginCard')), findsOneWidget);
@@ -80,20 +84,138 @@ void main() {
     expect(find.text(r'$180.00'), findsOneWidget);
 
     expect(
-      find.byKey(const Key('dashboardPotentialProfitCard')),
-      findsOneWidget,
-    );
-    expect(find.text('Open Potential Profit'), findsOneWidget);
-    expect(find.text(r'$110.00'), findsOneWidget);
-
-    expect(
       find.byKey(const Key('dashboardInventoryCountCard')),
       findsOneWidget,
     );
     expect(find.text('Inventory Count'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('dashboardPotentialProfitCard')),
+      findsOneWidget,
+    );
+    expect(find.text('Current Inventory Potential Profit'), findsOneWidget);
+    expect(find.text(r'$110.00'), findsOneWidget);
   });
 
+  testWidgets('Dashboard displays the approved Quick Snapshot', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    expect(find.text('Quick Snapshot'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('dashboardAvailableItemsCard')),
+      findsOneWidget,
+    );
+    expect(find.text('Available Items'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+
+    expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
+    expect(find.text('Units Sold'), findsOneWidget);
+    expect(find.text('7'), findsOneWidget);
+
+    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
+    expect(find.text('Average Days in Inventory'), findsOneWidget);
+    expect(find.text('26'), findsOneWidget);
+    expect(find.text('days'), findsOneWidget);
+
+    expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
+    expect(find.text('Broken Items'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('Dashboard date selector uses narrow layout on a phone width', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    expect(
+      find.byKey(const Key('dashboardDateRangeNarrowLayout')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboardDateRangeWideLayout')), findsNothing);
+    expect(find.byKey(const Key('dashboardDateRangeSelector')), findsOneWidget);
+    expect(find.text('Performance Period'), findsOneWidget);
+  });
+  testWidgets('Dashboard defaults date-range selector to Month to Date', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    expect(find.byKey(const Key('dashboardDateRangeSelector')), findsOneWidget);
+    expect(
+      find.byKey(const Key('dashboardPerformancePeriodLabel')),
+      findsOneWidget,
+    );
+    expect(find.text('Month to Date'), findsWidgets);
+  });
+
+  testWidgets('Dashboard date-range selector updates preset selection', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    final selector = find.byKey(const Key('dashboardDateRangeSelector'));
+    await tester.ensureVisible(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Last 7 Days').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Last 7 Days'), findsOneWidget);
+  });
+  testWidgets('ordinary User does not see Dashboard financial metrics', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(
+      tester,
+      router: router,
+      permissions: const AppPermissions.none(),
+    );
+
+    expect(find.byKey(const Key('dashboardRevenueCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardCostCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardProfitCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardMarginCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardPotentialProfitCard')), findsNothing);
+
+    expect(
+      find.byKey(const Key('dashboardAvailableItemsCard')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
+    expect(
+      find.byKey(const Key('dashboardInventoryValueCard')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('dashboardInventoryCountCard')),
+      findsOneWidget,
+    );
+  });
   testWidgets('Dashboard Add Inventory action navigates correctly', (
     WidgetTester tester,
   ) async {
@@ -129,7 +251,7 @@ GoRouter _createRouter() {
     routes: [
       GoRoute(
         path: AppRoutes.dashboard,
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) => const Scaffold(body: DashboardScreen()),
       ),
       GoRoute(
         path: AppRoutes.buyInventory,
@@ -152,10 +274,12 @@ GoRouter _createRouter() {
 Future<void> _pumpDashboard(
   WidgetTester tester, {
   required GoRouter router,
+  AppPermissions permissions = const AppPermissions.ownerOrAdmin(),
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        currentAppPermissionsProvider.overrideWithValue(permissions),
         dashboardMetricsProvider.overrideWithValue(
           const AsyncValue.data(_testMetrics),
         ),

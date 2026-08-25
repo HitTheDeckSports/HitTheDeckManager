@@ -8,19 +8,16 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/consignment_transaction.dart';
-import '../domain/models/deal.dart';
-import '../domain/models/deal_status.dart';
-import '../domain/models/deal_summary.dart';
 import '../domain/models/disposal_transaction.dart';
 import '../domain/models/repair_transaction.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/trade_transaction.dart';
 import '../domain/models/transaction_enums.dart';
 import '../domain/models/disposal_reason.dart';
-import 'providers/deal_providers.dart';
 import 'providers/transaction_providers.dart';
 
 class TransactionsScreen extends ConsumerWidget {
@@ -34,7 +31,7 @@ class TransactionsScreen extends ConsumerWidget {
     final disposalsAsync = ref.watch(disposalTransactionsProvider);
     final consignmentsAsync = ref.watch(consignmentTransactionsProvider);
     final inventoryAsync = ref.watch(inventoryItemsProvider);
-    final dealsAsync = ref.watch(dealsProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     final asyncValues = <AsyncValue<Object?>>[
       salesAsync,
@@ -43,14 +40,13 @@ class TransactionsScreen extends ConsumerWidget {
       disposalsAsync,
       consignmentsAsync,
       inventoryAsync,
-      dealsAsync,
     ];
 
     if (asyncValues.any((value) => value.isLoading)) {
       return const AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppLoadingState(message: 'Loading transactions...'),
       );
     }
@@ -64,7 +60,7 @@ class TransactionsScreen extends ConsumerWidget {
       return AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppErrorState(
           message: 'Unable to load transaction history.',
           details: firstError.toString(),
@@ -75,7 +71,6 @@ class TransactionsScreen extends ConsumerWidget {
             ref.invalidate(disposalTransactionsProvider);
             ref.invalidate(consignmentTransactionsProvider);
             ref.invalidate(inventoryItemsProvider);
-            ref.invalidate(dealsProvider);
           },
         ),
       );
@@ -87,21 +82,19 @@ class TransactionsScreen extends ConsumerWidget {
     final disposals = disposalsAsync.requireValue;
     final consignments = consignmentsAsync.requireValue;
     final inventoryItems = inventoryAsync.requireValue;
-    final deals = dealsAsync.requireValue;
 
     final hasAnyTransaction =
         sales.isNotEmpty ||
         repairs.isNotEmpty ||
         trades.isNotEmpty ||
         disposals.isNotEmpty ||
-        consignments.isNotEmpty ||
-        deals.isNotEmpty;
+        consignments.isNotEmpty;
 
     if (!hasAnyTransaction) {
       return const AppPage(
         title: 'Transactions',
         subtitle:
-            'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+            'Review sales, trade-ins, repairs, disposals, and consignments.',
         child: AppEmptyState(
           icon: Icons.receipt_long_outlined,
           title: 'No transactions yet.',
@@ -130,17 +123,23 @@ class TransactionsScreen extends ConsumerWidget {
     return AppPage(
       title: 'Transactions',
       subtitle:
-          'Review sales, trade-ins, repairs, disposals, consignments, and Deals.',
+          'Review sales, trade-ins, repairs, disposals, and consignments.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DealsSection(deals: deals),
-          const SizedBox(height: 24),
-          _SalesSection(sales: sortedSales, inventoryById: inventoryById),
+          _SalesSection(
+            sales: sortedSales,
+            inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
           const SizedBox(height: 24),
           _TradesSection(trades: sortedTrades, inventoryById: inventoryById),
           const SizedBox(height: 24),
-          _RepairsSection(repairs: sortedRepairs, inventoryById: inventoryById),
+          _RepairsSection(
+            repairs: sortedRepairs,
+            inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
           const SizedBox(height: 24),
           _DisposalsSection(
             disposals: sortedDisposals,
@@ -150,6 +149,7 @@ class TransactionsScreen extends ConsumerWidget {
           _ConsignmentsSection(
             consignments: sortedConsignments,
             inventoryById: inventoryById,
+            canViewFinancialData: permissions.canViewFinancialData,
           ),
         ],
       ),
@@ -157,38 +157,16 @@ class TransactionsScreen extends ConsumerWidget {
   }
 }
 
-class _DealsSection extends StatelessWidget {
-  const _DealsSection({required this.deals});
-
-  final List<Deal> deals;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsDealsSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Deals (${deals.length})'),
-        const SizedBox(height: 12),
-        if (deals.isEmpty)
-          const Text(
-            'No Deals yet. Deals are created automatically when a sale includes trade-in inventory.',
-          )
-        else
-          for (final deal in deals) ...[
-            _DealTransactionCard(deal: deal),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
 class _SalesSection extends StatelessWidget {
-  const _SalesSection({required this.sales, required this.inventoryById});
+  const _SalesSection({
+    required this.sales,
+    required this.inventoryById,
+    required this.canViewFinancialData,
+  });
 
   final List<SaleTransaction> sales;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +183,7 @@ class _SalesSection extends StatelessWidget {
             _SaleTransactionCard(
               sale: sale,
               inventoryItem: inventoryById[sale.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -240,10 +219,15 @@ class _TradesSection extends StatelessWidget {
 }
 
 class _RepairsSection extends StatelessWidget {
-  const _RepairsSection({required this.repairs, required this.inventoryById});
+  const _RepairsSection({
+    required this.repairs,
+    required this.inventoryById,
+    required this.canViewFinancialData,
+  });
 
   final List<RepairTransaction> repairs;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +244,7 @@ class _RepairsSection extends StatelessWidget {
             _RepairTransactionCard(
               repair: repair,
               inventoryItem: inventoryById[repair.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -304,10 +289,12 @@ class _ConsignmentsSection extends StatelessWidget {
   const _ConsignmentsSection({
     required this.consignments,
     required this.inventoryById,
+    required this.canViewFinancialData,
   });
 
   final List<ConsignmentTransaction> consignments;
   final Map<String, InventoryItem> inventoryById;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -324,6 +311,7 @@ class _ConsignmentsSection extends StatelessWidget {
             _ConsignmentTransactionCard(
               consignment: consignment,
               inventoryItem: inventoryById[consignment.inventoryItemId],
+              canViewFinancialData: canViewFinancialData,
             ),
             const SizedBox(height: 12),
           ],
@@ -343,155 +331,16 @@ class _SectionHeading extends StatelessWidget {
   }
 }
 
-class _DealTransactionCard extends ConsumerWidget {
-  const _DealTransactionCard({required this.deal});
-
-  final Deal deal;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dealId = deal.id;
-
-    if (dealId == null || dealId.trim().isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('A Deal record is missing its ID.'),
-        ),
-      );
-    }
-
-    final summaryAsync = ref.watch(dealSummaryProvider(dealId));
-
-    return summaryAsync.when(
-      loading: () => Card(
-        key: ValueKey('dealTransactionCard-$dealId'),
-        child: const Padding(
-          padding: EdgeInsets.all(16),
-          child: AppLoadingState(message: 'Loading Deal summary...'),
-        ),
-      ),
-      error: (error, stackTrace) => Card(
-        key: ValueKey('dealTransactionCard-$dealId'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: AppErrorState(
-            message: 'Unable to load Deal summary.',
-            details: error.toString(),
-          ),
-        ),
-      ),
-      data: (summary) {
-        if (summary == null) {
-          return Card(
-            key: ValueKey('dealTransactionCard-$dealId'),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Deal summary is unavailable.'),
-            ),
-          );
-        }
-
-        return _DealSummaryCard(summary: summary);
-      },
-    );
-  }
-}
-
-class _DealSummaryCard extends StatelessWidget {
-  const _DealSummaryCard({required this.summary});
-
-  final DealSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final dealId = summary.deal.id!;
-
-    return Card(
-      key: ValueKey('dealTransactionCard-$dealId'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: ValueKey('dealTransactionCardTap-$dealId'),
-        onTap: () {
-          context.goNamed(
-            AppRouteNames.dealDetail,
-            pathParameters: {'dealId': dealId},
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.handshake_outlined, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Deal',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(summary.status.label),
-                      ],
-                    ),
-                  ),
-                  _DealStatusChip(status: summary.status),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              _TransactionDetailRow(
-                label: 'Child Inventory',
-                value: summary.deal.childInventoryItemIds.length.toString(),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Realized Deal Profit',
-                value: CurrencyFormatter.formatCents(
-                  summary.realizedDealProfitCents,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Projected Deal Profit',
-                value: CurrencyFormatter.formatCents(
-                  summary.projectedDealProfitCents,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DealStatusChip extends StatelessWidget {
-  const _DealStatusChip({required this.status});
-
-  final DealStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      key: ValueKey('dealStatus-${status.name}'),
-      label: Text(status.label),
-    );
-  }
-}
-
 class _SaleTransactionCard extends StatelessWidget {
-  const _SaleTransactionCard({required this.sale, required this.inventoryItem});
+  const _SaleTransactionCard({
+    required this.sale,
+    required this.inventoryItem,
+    required this.canViewFinancialData,
+  });
 
   final SaleTransaction sale;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -543,25 +392,27 @@ class _SaleTransactionCard extends StatelessWidget {
                 label: 'Revenue',
                 value: CurrencyFormatter.formatCents(sale.salePriceCents),
               ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Cost',
-                value: acquisitionValue == null
-                    ? 'Not available'
-                    : CurrencyFormatter.formatCents(acquisitionValue),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Profit',
-                value: profit == null
-                    ? 'Not available'
-                    : CurrencyFormatter.formatCents(profit),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Gross Margin',
-                value: _formatMargin(sale.grossMargin),
-              ),
+              if (canViewFinancialData) ...[
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Cost',
+                  value: acquisitionValue == null
+                      ? 'Not available'
+                      : CurrencyFormatter.formatCents(acquisitionValue),
+                ),
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Profit',
+                  value: profit == null
+                      ? 'Not available'
+                      : CurrencyFormatter.formatCents(profit),
+                ),
+                const SizedBox(height: 8),
+                _TransactionDetailRow(
+                  label: 'Gross Margin',
+                  value: _formatMargin(sale.grossMargin),
+                ),
+              ],
               if (sale.notes != null && sale.notes!.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(sale.notes!),
@@ -629,10 +480,12 @@ class _RepairTransactionCard extends StatelessWidget {
   const _RepairTransactionCard({
     required this.repair,
     required this.inventoryItem,
+    required this.canViewFinancialData,
   });
 
   final RepairTransaction repair;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -657,7 +510,9 @@ class _RepairTransactionCard extends StatelessWidget {
                 icon: Icons.build_outlined,
                 title: 'Repair',
                 subtitle: _formatDate(repair.repairDate),
-                trailing: CurrencyFormatter.formatCents(repair.costCents),
+                trailing: canViewFinancialData
+                    ? CurrencyFormatter.formatCents(repair.costCents)
+                    : null,
               ),
               const SizedBox(height: 12),
               _TransactionDetailRow(
@@ -730,10 +585,12 @@ class _ConsignmentTransactionCard extends StatelessWidget {
   const _ConsignmentTransactionCard({
     required this.consignment,
     required this.inventoryItem,
+    required this.canViewFinancialData,
   });
 
   final ConsignmentTransaction consignment;
   final InventoryItem? inventoryItem;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -750,20 +607,24 @@ class _ConsignmentTransactionCard extends StatelessWidget {
               icon: Icons.assignment_outlined,
               title: 'Consignment',
               subtitle: _formatDate(consignment.consignmentDate),
-              trailing: CurrencyFormatter.formatCents(
-                consignment.commissionCents,
-              ),
+              trailing: canViewFinancialData
+                  ? CurrencyFormatter.formatCents(consignment.commissionCents)
+                  : null,
             ),
             const SizedBox(height: 12),
             _TransactionDetailRow(
               label: 'Inventory Item',
               value: _inventoryDisplayName(inventoryItem),
             ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Hit the Deck Commission',
-              value: CurrencyFormatter.formatCents(consignment.commissionCents),
-            ),
+            if (canViewFinancialData) ...[
+              const SizedBox(height: 8),
+              _TransactionDetailRow(
+                label: 'Hit the Deck Commission',
+                value: CurrencyFormatter.formatCents(
+                  consignment.commissionCents,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             _TransactionDetailRow(
               label: 'Status',

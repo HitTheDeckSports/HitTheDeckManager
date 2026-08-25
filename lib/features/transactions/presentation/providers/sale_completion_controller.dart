@@ -102,6 +102,14 @@ class SaleCompletionController extends AsyncNotifier<void> {
       }
     }
 
+    final repairs = await transactionRepository.getRepairsForInventoryItem(
+      itemId,
+    );
+    final repairCostCents = repairs.fold<int>(
+      0,
+      (total, repair) => total + repair.costCents,
+    );
+
     final soldItem = item.copyWith(status: InventoryStatus.sold);
     final updatedItem = await inventoryRepository.updateInventoryItem(soldItem);
 
@@ -121,7 +129,10 @@ class SaleCompletionController extends AsyncNotifier<void> {
         throw StateError('Trade-in credit cannot exceed the total sale price.');
       }
 
-      var saleToSave = sale.copyWith(tradeInCreditCents: tradeInCreditCents);
+      var saleToSave = sale.copyWith(
+        repairCostCents: repairCostCents,
+        tradeInCreditCents: tradeInCreditCents,
+      );
 
       if (originalConsignment != null) {
         final consignorPayoutCents = originalConsignment
