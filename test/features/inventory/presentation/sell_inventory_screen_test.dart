@@ -64,12 +64,29 @@ void main() {
     await dealRepository.dispose();
   });
 
-  Widget createTestApp() {
+  Widget createTestApp({InventoryItem? initialItem}) {
     return UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: Scaffold(body: SellInventoryScreen())),
+      child: MaterialApp(
+        home: Scaffold(body: SellInventoryScreen(initialItem: initialItem)),
+      ),
     );
   }
+
+  testWidgets('preselects an inventory item supplied by the detail screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp(initialItem: availableItem));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.text('Inventory Number: BAT-2608-0001'), findsOneWidget);
+
+    final priceField = tester.widget<TextFormField>(
+      find.byKey(const Key('sellInventorySalePriceField')),
+    );
+    expect(priceField.initialValue, '325.00');
+  });
 
   testWidgets('displays the initial Sell Inventory fields', (
     WidgetTester tester,

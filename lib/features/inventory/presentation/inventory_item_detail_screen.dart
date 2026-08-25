@@ -93,82 +93,7 @@ class _InventoryItemDetailContent extends ConsumerWidget {
       subtitle: item.inventoryNumber ?? 'Inventory number not assigned',
       actions: [
         if (item.id != null)
-          PopupMenuButton<InventoryStatus>(
-            key: const Key('inventoryItemStatusButton'),
-            enabled: !isUpdatingStatus,
-            tooltip: 'Change inventory status',
-            onSelected: (status) async {
-              try {
-                final updatedItem = await ref
-                    .read(inventoryControllerProvider.notifier)
-                    .updateStatus(item: item, status: status);
-
-                ref.invalidate(inventoryItemProvider(updatedItem.id!));
-
-                if (!context.mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Inventory status changed to ${updatedItem.status.label}.',
-                    ),
-                  ),
-                );
-              } catch (error) {
-                if (!context.mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Unable to change inventory status: $error'),
-                  ),
-                );
-              }
-            },
-            itemBuilder: (context) {
-              return [
-                for (final status in const [
-                  InventoryStatus.available,
-                  InventoryStatus.inactive,
-                  InventoryStatus.broken,
-                ])
-                  PopupMenuItem<InventoryStatus>(
-                    value: status,
-                    enabled: status != item.status,
-                    child: Row(
-                      children: [
-                        Icon(
-                          status == item.status
-                              ? Icons.check
-                              : Icons.circle_outlined,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(status.label),
-                      ],
-                    ),
-                  ),
-              ];
-            },
-            child: OutlinedButton.icon(
-              onPressed: null,
-              icon: isUpdatingStatus
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.swap_horiz),
-              label: Text(
-                isUpdatingStatus ? 'Updating Status...' : 'Change Status',
-              ),
-            ),
-          ),
-        if (item.id != null)
-          FilledButton.icon(
+          OutlinedButton.icon(
             key: const Key('inventoryItemEditButton'),
             onPressed: isUpdatingStatus
                 ? null
@@ -181,57 +106,16 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Edit'),
           ),
-        if (item.id != null)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemQrButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    showDialog<void>(
-                      context: context,
-                      builder: (context) {
-                        return _InventoryQrDialog(item: item);
-                      },
-                    );
-                  },
-            icon: const Icon(Icons.qr_code),
-            label: const Text('QR Code'),
-          ),
-        if (item.id != null && item.status != InventoryStatus.disposed)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemAddRepairButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    context.goNamed(
-                      AppRouteNames.addRepair,
-                      pathParameters: {'itemId': item.id!},
-                    );
-                  },
-            icon: const Icon(Icons.build_outlined),
-            label: const Text('Add Repair'),
-          ),
-        if (permissions.canDisposeInventory &&
-            item.id != null &&
-            item.status != InventoryStatus.sold &&
-            item.status != InventoryStatus.disposed)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemDisposeButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    context.goNamed(
-                      AppRouteNames.disposeInventory,
-                      pathParameters: {'itemId': item.id!},
-                    );
-                  },
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Dispose'),
-          ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _InventoryPrimaryActions(
+            item: item,
+            canDisposeInventory: permissions.canDisposeInventory,
+            isUpdatingStatus: isUpdatingStatus,
+          ),
+          const SizedBox(height: 24),
           _DetailSection(
             title: 'Basic Information',
             children: [
@@ -340,6 +224,162 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InventoryPrimaryActions extends ConsumerWidget {
+  const _InventoryPrimaryActions({
+    required this.item,
+    required this.canDisposeInventory,
+    required this.isUpdatingStatus,
+  });
+
+  final InventoryItem item;
+  final bool canDisposeInventory;
+  final bool isUpdatingStatus;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Wrap(
+      key: const Key('inventoryItemPrimaryActions'),
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        if (item.id != null && item.status == InventoryStatus.available)
+          FilledButton.icon(
+            key: const Key('inventoryItemSellButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(AppRouteNames.sellInventory, extra: item);
+                  },
+            icon: const Icon(Icons.sell_outlined),
+            label: const Text('Sell Item'),
+          ),
+        if (item.id != null && item.status != InventoryStatus.disposed)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemAddRepairButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.addRepair,
+                      pathParameters: {'itemId': item.id!},
+                    );
+                  },
+            icon: const Icon(Icons.build_outlined),
+            label: const Text('Add Repair'),
+          ),
+        if (item.id != null)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemQrButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) {
+                        return _InventoryQrDialog(item: item);
+                      },
+                    );
+                  },
+            icon: const Icon(Icons.qr_code),
+            label: const Text('View / Print QR'),
+          ),
+        if (item.id != null)
+          PopupMenuButton<InventoryStatus>(
+            key: const Key('inventoryItemStatusButton'),
+            enabled: !isUpdatingStatus,
+            tooltip: 'Change inventory status',
+            onSelected: (status) async {
+              try {
+                final updatedItem = await ref
+                    .read(inventoryControllerProvider.notifier)
+                    .updateStatus(item: item, status: status);
+
+                ref.invalidate(inventoryItemProvider(updatedItem.id!));
+
+                if (!context.mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Inventory status changed to ${updatedItem.status.label}.',
+                    ),
+                  ),
+                );
+              } catch (error) {
+                if (!context.mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Unable to change inventory status: $error'),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (context) {
+              return [
+                for (final status in const [
+                  InventoryStatus.available,
+                  InventoryStatus.inactive,
+                  InventoryStatus.broken,
+                ])
+                  PopupMenuItem<InventoryStatus>(
+                    value: status,
+                    enabled: status != item.status,
+                    child: Row(
+                      children: [
+                        Icon(
+                          status == item.status
+                              ? Icons.check
+                              : Icons.circle_outlined,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(status.label),
+                      ],
+                    ),
+                  ),
+              ];
+            },
+            child: OutlinedButton.icon(
+              onPressed: null,
+              icon: isUpdatingStatus
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.swap_horiz),
+              label: Text(
+                isUpdatingStatus ? 'Updating Status...' : 'Change Status',
+              ),
+            ),
+          ),
+        if (canDisposeInventory &&
+            item.id != null &&
+            item.status != InventoryStatus.sold &&
+            item.status != InventoryStatus.disposed)
+          OutlinedButton.icon(
+            key: const Key('inventoryItemDisposeButton'),
+            onPressed: isUpdatingStatus
+                ? null
+                : () {
+                    context.goNamed(
+                      AppRouteNames.disposeInventory,
+                      pathParameters: {'itemId': item.id!},
+                    );
+                  },
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Dispose'),
+          ),
+      ],
     );
   }
 }

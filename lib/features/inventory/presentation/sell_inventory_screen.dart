@@ -20,7 +20,9 @@ import '../domain/models/inventory_item.dart';
 import 'providers/inventory_providers.dart';
 
 class SellInventoryScreen extends ConsumerStatefulWidget {
-  const SellInventoryScreen({super.key});
+  const SellInventoryScreen({this.initialItem, super.key});
+
+  final InventoryItem? initialItem;
 
   @override
   ConsumerState<SellInventoryScreen> createState() =>
@@ -29,6 +31,29 @@ class SellInventoryScreen extends ConsumerStatefulWidget {
 
 class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
   GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late bool _isApplyingInitialItem;
+
+  @override
+  void initState() {
+    super.initState();
+    _isApplyingInitialItem = widget.initialItem != null;
+
+    if (_isApplyingInitialItem) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        ref
+            .read(sellInventoryFormControllerProvider.notifier)
+            .setSelectedItem(widget.initialItem);
+
+        setState(() {
+          _isApplyingInitialItem = false;
+        });
+      });
+    }
+  }
 
   String _formatDate(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
@@ -101,7 +126,15 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
               .where((item) => item.status == InventoryStatus.available)
               .toList();
 
-          final selectedItem = formState.selectedItem;
+          final selectedItem = _isApplyingInitialItem
+              ? widget.initialItem
+              : formState.selectedItem;
+          final initialAskingPrice = widget.initialItem?.askingPriceCents;
+          final salePrice = _isApplyingInitialItem
+              ? initialAskingPrice == null
+                    ? ''
+                    : (initialAskingPrice / 100).toStringAsFixed(2)
+              : formState.salePrice;
 
           final selectableItems = [...availableItems];
 
@@ -216,7 +249,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   key: const Key('sellInventorySalePriceField'),
-                  initialValue: formState.salePrice,
+                  initialValue: salePrice,
                   decoration: const InputDecoration(
                     labelText: 'Sale Price',
                     hintText: r'Example: $325.00',

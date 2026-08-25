@@ -126,6 +126,99 @@ void main() {
     expect(find.text('2 photos'), findsOneWidget);
   });
 
+  testWidgets('Sell Item opens a sale for the selected inventory item', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-sell-action',
+      inventoryNumber: 'BAT-2608-0101',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
+      status: InventoryStatus.available,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+    final transactionRepository = InMemoryTransactionRepository();
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-sell-action',
+      routes: [
+        GoRoute(
+          path: AppRoutes.sellInventory,
+          name: AppRouteNames.sellInventory,
+          builder: (context, state) {
+            final selectedItem = state.extra as InventoryItem?;
+            return Scaffold(
+              body: Text('Selling ${selectedItem?.inventoryNumber}'),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryItemPrimaryActions')),
+      findsOneWidget,
+    );
+    final sellButton = find.byKey(const Key('inventoryItemSellButton'));
+    expect(sellButton, findsOneWidget);
+
+    await tester.tap(sellButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selling BAT-2608-0101'), findsOneWidget);
+  });
+
+  testWidgets('sold inventory does not display the Sell Item action', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'sold-item-actions',
+      inventoryNumber: 'BAT-2608-0102',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'sold-item-actions'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryItemSellButton')), findsNothing);
+  });
+
   testWidgets('opens inventory QR code from the QR action', (
     WidgetTester tester,
   ) async {

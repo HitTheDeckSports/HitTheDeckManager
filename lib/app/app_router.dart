@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/authentication/domain/models/authorized_user.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
+import '../features/inventory/domain/models/inventory_item.dart';
 import '../features/inventory/presentation/inventory_qr_scanner_screen.dart';
 import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/contacts/presentation/create_contact_screen.dart';
@@ -116,7 +117,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.sellInventory,
             name: AppRouteNames.sellInventory,
-            builder: (context, state) => const SellInventoryScreen(),
+            builder: (context, state) {
+              final extra = state.extra;
+
+              return SellInventoryScreen(
+                initialItem: extra is InventoryItem ? extra : null,
+              );
+            },
           ),
           GoRoute(
             path: AppRoutes.inventoryEdit,
