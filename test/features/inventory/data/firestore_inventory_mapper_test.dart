@@ -56,6 +56,20 @@ void main() {
       expect(data['updatedAt'], isA<FieldValue>());
     });
 
+    test('serializes helmet size', () {
+      const item = InventoryItem(
+        category: InventoryCategory.helmet,
+        brand: 'Easton',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 8000,
+        helmetSize: 'L/XL',
+      );
+
+      final data = FirestoreInventoryMapper.toFirestore(item);
+
+      expect(data['helmetSize'], 'L/XL');
+    });
+
     test('trims brand before writing', () {
       const item = InventoryItem(
         category: InventoryCategory.glove,

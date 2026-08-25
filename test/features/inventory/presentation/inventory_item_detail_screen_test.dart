@@ -112,6 +112,27 @@ void main() {
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
+  testWidgets('displays saved helmet size', (WidgetTester tester) async {
+    const item = InventoryItem(
+      id: 'helmet-1',
+      inventoryNumber: 'HLM-2608-0001',
+      category: InventoryCategory.helmet,
+      brand: 'Easton',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 8000,
+      helmetSize: 'L/XL',
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'helmet-1'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Helmet Size'), findsOneWidget);
+    expect(find.text('L/XL'), findsAtLeastNWidgets(1));
+  });
+
   testWidgets('ordinary User does not see inventory cost or profit', (
     WidgetTester tester,
   ) async {

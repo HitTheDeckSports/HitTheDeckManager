@@ -2058,7 +2058,13 @@ List<Widget> _categorySpecificRows(InventoryItem item) {
         value: _displayOptionalText(item.catchersGearSize),
       ),
     ],
-    InventoryCategory.helmet || InventoryCategory.other => const [],
+    InventoryCategory.helmet => [
+      _DetailRow(
+        label: 'Helmet Size',
+        value: _displayOptionalText(item.helmetSize),
+      ),
+    ],
+    InventoryCategory.other => const [],
   };
 }
 
@@ -2090,6 +2096,9 @@ String? _compactItemSpecifications(InventoryItem item) {
         values.add(item.catchersGearSize!.trim());
       }
     case InventoryCategory.helmet:
+      if (item.helmetSize != null && item.helmetSize!.trim().isNotEmpty) {
+        values.add(item.helmetSize!.trim());
+      }
     case InventoryCategory.other:
       break;
   }

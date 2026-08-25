@@ -61,6 +61,24 @@ void main() {
       expect(item?.catchersGearSize, isNull);
     });
 
+    test('converts helmet size only for Helmet inventory', () {
+      const helmetState = BuyInventoryFormState(
+        category: InventoryCategory.helmet,
+        brand: 'Easton',
+        acquisitionValue: '80.00',
+        helmetSize: ' L/XL ',
+      );
+      const batState = BuyInventoryFormState(
+        category: InventoryCategory.bat,
+        brand: 'Easton',
+        acquisitionValue: '80.00',
+        helmetSize: 'L/XL',
+      );
+
+      expect(helmetState.toInventoryItem()?.helmetSize, 'L/XL');
+      expect(batState.toInventoryItem()?.helmetSize, isNull);
+    });
+
     test('returns null when acquisition value is invalid', () {
       const state = BuyInventoryFormState(
         brand: 'Combat',

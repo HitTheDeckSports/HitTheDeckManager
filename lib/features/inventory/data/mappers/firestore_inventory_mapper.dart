@@ -32,6 +32,7 @@ abstract final class FirestoreInventoryMapper {
       'gloveSizeInches': item.gloveSizeInches,
       'handOrientation': item.handOrientation,
       'catchersGearSize': item.catchersGearSize,
+      'helmetSize': item.helmetSize,
       'photoUrls': item.photoUrls,
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -87,6 +88,7 @@ abstract final class FirestoreInventoryMapper {
       gloveSizeInches: _doubleValue(data['gloveSizeInches']),
       handOrientation: _stringOrNull(data['handOrientation']),
       catchersGearSize: _stringOrNull(data['catchersGearSize']),
+      helmetSize: _stringOrNull(data['helmetSize']),
       photoUrls: _stringList(data['photoUrls']),
     );
   }

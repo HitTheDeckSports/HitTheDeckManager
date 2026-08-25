@@ -449,6 +449,9 @@ String? _inventorySizeLabel(InventoryItem item) {
         parts.add(item.catchersGearSize!.trim());
       }
     case InventoryCategory.helmet:
+      if (item.helmetSize != null && item.helmetSize!.trim().isNotEmpty) {
+        parts.add(item.helmetSize!.trim());
+      }
     case InventoryCategory.other:
       break;
   }

@@ -952,6 +952,21 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               const SizedBox(height: 16),
             ],
 
+            if (formState.category == InventoryCategory.helmet) ...[
+              TextFormField(
+                key: const Key('buyInventoryHelmetSizeField'),
+                initialValue: formState.helmetSize,
+                decoration: const InputDecoration(
+                  labelText: 'Helmet Size',
+                  hintText: 'Example: L/XL, Adult, or Youth',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+                onChanged: formController.setHelmetSize,
+              ),
+              const SizedBox(height: 16),
+            ],
+
             TextFormField(
               key: const Key('buyInventoryNotesField'),
               initialValue: formState.notes,

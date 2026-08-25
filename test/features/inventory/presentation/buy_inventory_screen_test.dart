@@ -156,7 +156,7 @@ void main() {
     expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
   });
 
-  testWidgets('shows only common details for Helmet', (
+  testWidgets('shows helmet-specific field when Helmet is selected', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createTestApp());
@@ -171,6 +171,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
+    expect(
+      find.byKey(const Key('buyInventoryHelmetSizeField')),
+      findsOneWidget,
+    );
 
     expect(find.byKey(const Key('buyInventoryLengthField')), findsNothing);
     expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
@@ -664,6 +668,44 @@ void main() {
     expect(savedItem.category, InventoryCategory.catchersGear);
     expect(savedItem.catchersGearSize, 'Adult');
   });
+  testWidgets('saves helmet size', (WidgetTester tester) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setCategory(InventoryCategory.helmet);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Easton',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '80.00',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryHelmetSizeField')),
+      'L/XL',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    expect(items.single.category, InventoryCategory.helmet);
+    expect(items.single.helmetSize, 'L/XL');
+  });
+
   testWidgets('calculates drop from bat length and weight', (
     WidgetTester tester,
   ) async {

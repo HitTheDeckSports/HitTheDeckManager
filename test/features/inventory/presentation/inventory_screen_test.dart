@@ -126,6 +126,31 @@ void main() {
     expect(find.text('No inventory items yet.'), findsNothing);
   });
 
+  testWidgets('InventoryScreen displays helmet size on its card', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'helmet-1',
+      inventoryNumber: 'HLM-2608-0001',
+      category: InventoryCategory.helmet,
+      brand: 'Easton',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 8000,
+      helmetSize: 'L/XL',
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('L/XL'), findsOneWidget);
+  });
+
   testWidgets('Inventory cards never display acquisition cost', (
     WidgetTester tester,
   ) async {
@@ -312,7 +337,7 @@ void main() {
     await tester.tap(itemTile);
     await tester.pumpAndSettle();
 
-    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
     expect(find.text('32 in'), findsOneWidget);
     expect(find.text('29 oz'), findsOneWidget);

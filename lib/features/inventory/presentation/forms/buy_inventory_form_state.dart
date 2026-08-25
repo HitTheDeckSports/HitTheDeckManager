@@ -23,6 +23,7 @@ class BuyInventoryFormState {
     this.gloveSizeInches = '',
     this.handOrientation = '',
     this.catchersGearSize = '',
+    this.helmetSize = '',
     this.photoUrls = const [],
   });
   factory BuyInventoryFormState.fromInventoryItem(InventoryItem item) {
@@ -46,6 +47,7 @@ class BuyInventoryFormState {
       gloveSizeInches: _formatOptionalNumber(item.gloveSizeInches),
       handOrientation: item.handOrientation ?? '',
       catchersGearSize: item.catchersGearSize ?? '',
+      helmetSize: item.helmetSize ?? '',
       photoUrls: item.photoUrls,
     );
   }
@@ -71,6 +73,8 @@ class BuyInventoryFormState {
   final String handOrientation;
 
   final String catchersGearSize;
+
+  final String helmetSize;
 
   final List<String> photoUrls;
 
@@ -117,6 +121,9 @@ class BuyInventoryFormState {
       catchersGearSize: category == InventoryCategory.catchersGear
           ? _emptyToNull(catchersGearSize)
           : null,
+      helmetSize: category == InventoryCategory.helmet
+          ? _emptyToNull(helmetSize)
+          : null,
       photoUrls: photoUrls,
     );
 
@@ -143,6 +150,7 @@ class BuyInventoryFormState {
     String? gloveSizeInches,
     String? handOrientation,
     String? catchersGearSize,
+    String? helmetSize,
     List<String>? photoUrls,
   }) {
     return BuyInventoryFormState(
@@ -171,6 +179,7 @@ class BuyInventoryFormState {
       gloveSizeInches: gloveSizeInches ?? this.gloveSizeInches,
       handOrientation: handOrientation ?? this.handOrientation,
       catchersGearSize: catchersGearSize ?? this.catchersGearSize,
+      helmetSize: helmetSize ?? this.helmetSize,
       photoUrls: photoUrls ?? this.photoUrls,
     );
   }

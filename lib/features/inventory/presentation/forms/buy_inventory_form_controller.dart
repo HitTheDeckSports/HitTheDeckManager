@@ -163,6 +163,10 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     state = state.copyWith(catchersGearSize: catchersGearSize);
   }
 
+  void setHelmetSize(String helmetSize) {
+    state = state.copyWith(helmetSize: helmetSize);
+  }
+
   void setPhotoUrls(List<String> photoUrls) {
     state = state.copyWith(photoUrls: photoUrls);
   }

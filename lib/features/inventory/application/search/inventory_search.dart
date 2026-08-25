@@ -44,6 +44,7 @@ final class InventorySearch {
       item.gloveSizeInches?.toString(),
       item.handOrientation,
       item.catchersGearSize,
+      item.helmetSize,
     ].whereType<Object>().join(' ').toLowerCase();
   }
 }

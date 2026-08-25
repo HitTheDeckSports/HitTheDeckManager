@@ -26,6 +26,7 @@ class InventoryItem {
     this.gloveSizeInches,
     this.handOrientation,
     this.catchersGearSize,
+    this.helmetSize,
     this.photoUrls = const [],
   });
 
@@ -74,6 +75,9 @@ class InventoryItem {
 
   // Catcher's gear-specific fields.
   final String? catchersGearSize;
+
+  // Helmet-specific fields.
+  final String? helmetSize;
 
   /// References to item photos. The application supports up to 10 photos.
   final List<String> photoUrls;
@@ -155,6 +159,7 @@ class InventoryItem {
     Object? gloveSizeInches = _unset,
     Object? handOrientation = _unset,
     Object? catchersGearSize = _unset,
+    Object? helmetSize = _unset,
     List<String>? photoUrls,
   }) {
     return InventoryItem(
@@ -207,6 +212,9 @@ class InventoryItem {
       catchersGearSize: identical(catchersGearSize, _unset)
           ? this.catchersGearSize
           : catchersGearSize as String?,
+      helmetSize: identical(helmetSize, _unset)
+          ? this.helmetSize
+          : helmetSize as String?,
       photoUrls: photoUrls ?? this.photoUrls,
     );
   }
