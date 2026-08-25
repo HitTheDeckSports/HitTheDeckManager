@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
@@ -71,21 +73,36 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
 
     expect(find.text('Basic Information'), findsOneWidget);
     expect(find.text('Bat'), findsOneWidget);
     expect(find.text('Purchased'), findsOneWidget);
     expect(find.text('Like New'), findsOneWidget);
-    expect(find.text('Available'), findsOneWidget);
+    expect(find.text('Available'), findsAtLeastNWidgets(1));
     expect(find.text('08/02/2026'), findsOneWidget);
 
     expect(find.text('Pricing'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsNWidgets(2));
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
     expect(find.text(r'$499.99'), findsOneWidget);
-    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$325.00'), findsAtLeastNWidgets(2));
     expect(find.text(r'$275.00'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryItemTotalCostMetric')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryItemEstimatedProfitMetric')),
+      findsOneWidget,
+    );
+    expect(find.text('Est. Profit'), findsOneWidget);
+    expect(find.text(r'$125.00'), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryPrimaryPhotoPlaceholder')),
+      findsOneWidget,
+    );
 
     expect(find.text('Item Details'), findsOneWidget);
     expect(find.text('32 in'), findsOneWidget);
@@ -93,6 +110,55 @@ void main() {
     expect(find.text('-3'), findsOneWidget);
     expect(find.text('BBCOR'), findsOneWidget);
     expect(find.text('Limited-edition bat.'), findsOneWidget);
+  });
+
+  testWidgets('ordinary User does not see inventory cost or profit', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'ordinary-user-item',
+      inventoryNumber: 'BAT-2608-0200',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+    final transactionRepository = InMemoryTransactionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentAppPermissionsProvider.overrideWithValue(
+            const AppPermissions.none(),
+          ),
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: InventoryItemDetailScreen(itemId: 'ordinary-user-item'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Asking Price'), findsAtLeastNWidgets(1));
+    expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
+    expect(find.text('Acquisition Value'), findsNothing);
+    expect(find.text('Total Cost'), findsNothing);
+    expect(find.text('Est. Profit'), findsNothing);
+    expect(find.text('True Cost'), findsNothing);
+    expect(find.byKey(const Key('inventoryItemTotalCostMetric')), findsNothing);
+    expect(
+      find.byKey(const Key('inventoryItemEstimatedProfitMetric')),
+      findsNothing,
+    );
   });
 
   testWidgets('displays saved inventory photos on the detail screen', (
@@ -123,7 +189,9 @@ void main() {
     expect(find.text('Photos'), findsOneWidget);
     expect(find.byKey(const Key('inventoryPrimaryPhoto')), findsOneWidget);
     expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
-    expect(find.text('2 photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoCountLabel')), findsOneWidget);
+    expect(find.text('2'), findsAtLeastNWidgets(1));
+    expect(find.byKey(const Key('inventoryItemStatusBadge')), findsOneWidget);
   });
 
   testWidgets('Sell Item opens a sale for the selected inventory item', (
@@ -191,6 +259,8 @@ void main() {
     final sellButton = find.byKey(const Key('inventoryItemSellButton'));
     expect(sellButton, findsOneWidget);
 
+    await tester.ensureVisible(sellButton);
+    await tester.pumpAndSettle();
     await tester.tap(sellButton);
     await tester.pumpAndSettle();
 
@@ -244,7 +314,10 @@ void main() {
 
     expect(find.byKey(const Key('inventoryQrCode')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    final qrButton = find.byKey(const Key('inventoryItemQrButton'));
+    await tester.ensureVisible(qrButton);
+    await tester.pumpAndSettle();
+    await tester.tap(qrButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inventoryQrDialog')), findsOneWidget);
@@ -282,7 +355,10 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    final qrButton = find.byKey(const Key('inventoryItemQrButton'));
+    await tester.ensureVisible(qrButton);
+    await tester.pumpAndSettle();
+    await tester.tap(qrButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inventoryPrintLabelButton')), findsOneWidget);
@@ -355,7 +431,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Rawlings Heart of the Hide'), findsOneWidget);
+    expect(find.text('Rawlings Heart of the Hide'), findsAtLeastNWidgets(1));
     expect(find.text('Glove'), findsOneWidget);
     expect(find.text('Traded'), findsOneWidget);
     expect(find.text('11.5 in'), findsOneWidget);
@@ -511,8 +587,10 @@ void main() {
     final statusButton = find.byKey(const Key('inventoryItemStatusButton'));
 
     expect(statusButton, findsOneWidget);
-    expect(find.text('Available'), findsOneWidget);
+    expect(find.text('Available'), findsAtLeastNWidgets(1));
 
+    await tester.ensureVisible(statusButton);
+    await tester.pumpAndSettle();
     await tester.tap(statusButton);
     await tester.pumpAndSettle();
 
@@ -1499,7 +1577,7 @@ void main() {
     );
 
     expect(find.text(r'$0.00'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsNWidgets(2));
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
   });
   testWidgets('displays repair history newest first with total and true cost', (
     WidgetTester tester,
@@ -1570,7 +1648,7 @@ void main() {
     expect(find.text('Repair History'), findsOneWidget);
     expect(find.text('2'), findsAtLeastNWidgets(1));
     expect(find.text(r'$70.00'), findsOneWidget);
-    expect(find.text(r'$270.00'), findsOneWidget);
+    expect(find.text(r'$270.00'), findsAtLeastNWidgets(1));
 
     expect(
       find.byKey(const ValueKey('repairHistoryEntry-repair-1')),

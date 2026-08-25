@@ -110,6 +110,13 @@ class _InventoryItemDetailContent extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _InventoryPhotosSection(item: item),
+          const SizedBox(height: 16),
+          _InventorySummarySection(
+            item: item,
+            canViewFinancialData: permissions.canViewFinancialData,
+          ),
+          const SizedBox(height: 16),
           _InventoryPrimaryActions(
             item: item,
             canDisposeInventory: permissions.canDisposeInventory,
@@ -146,17 +153,17 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
-          if (item.photoUrls.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _InventoryPhotosSection(photoUrls: item.photoUrls),
-          ],
           const SizedBox(height: 24),
-          _SellerInformationSection(sellerContactId: item.sellerContactId),
-          if (item.acquisitionType == AcquisitionType.consignment &&
-              item.id != null) ...[
-            const SizedBox(height: 24),
-            _ConsignmentSection(item: item),
-          ],
+          _DetailSection(
+            title: 'Item Details',
+            children: [
+              ..._categorySpecificRows(item),
+              _DetailRow(
+                label: 'Notes',
+                value: _displayOptionalText(item.notes),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           _DetailSection(
             title: 'Pricing',
@@ -182,6 +189,13 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          _SellerInformationSection(sellerContactId: item.sellerContactId),
+          if (item.acquisitionType == AcquisitionType.consignment &&
+              item.id != null) ...[
+            const SizedBox(height: 24),
+            _ConsignmentSection(item: item),
+          ],
           if (item.id != null) ...[
             const SizedBox(height: 24),
             _RepairHistorySection(
@@ -211,18 +225,157 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               status: item.status,
             ),
           ],
-          const SizedBox(height: 24),
-          _DetailSection(
-            title: 'Item Details',
-            children: [
-              ..._categorySpecificRows(item),
-              _DetailRow(
-                label: 'Notes',
-                value: _displayOptionalText(item.notes),
-              ),
-            ],
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _InventorySummarySection extends ConsumerWidget {
+  const _InventorySummarySection({
+    required this.item,
+    required this.canViewFinancialData,
+  });
+
+  final InventoryItem item;
+  final bool canViewFinancialData;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayName = item.model == null || item.model!.trim().isEmpty
+        ? item.brand
+        : '${item.brand} ${item.model}';
+    final itemId = item.id;
+    final repairsAsync = itemId == null
+        ? const AsyncValue<List<RepairTransaction>>.data([])
+        : ref.watch(repairsForInventoryItemProvider(itemId));
+    final totalRepairCostCents = repairsAsync.maybeWhen<int?>(
+      data: (repairs) =>
+          repairs.fold<int>(0, (total, repair) => total + repair.costCents),
+      orElse: () => null,
+    );
+    final totalCostCents = totalRepairCostCents == null
+        ? null
+        : item.acquisitionValueCents + totalRepairCostCents;
+    final estimatedProfitCents =
+        totalCostCents == null || item.askingPriceCents == null
+        ? null
+        : item.askingPriceCents! - totalCostCents;
+    final specifications = _compactItemSpecifications(item);
+
+    return Card(
+      key: const Key('inventoryItemSummaryCard'),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.inventoryNumber ?? 'Not assigned',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              displayName,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              [
+                item.category.label,
+                ?specifications,
+                item.condition?.label ?? 'Condition not specified',
+              ].join(' â€¢ '),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 720 ? 3 : 2;
+                const spacing = 12.0;
+                final width =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: _SummaryMetric(
+                        label: 'Asking Price',
+                        value: _formatOptionalMoney(item.askingPriceCents),
+                      ),
+                    ),
+                    if (canViewFinancialData)
+                      SizedBox(
+                        width: width,
+                        child: _SummaryMetric(
+                          key: const Key('inventoryItemTotalCostMetric'),
+                          label: 'Total Cost',
+                          value: totalCostCents == null
+                              ? 'Calculating...'
+                              : CurrencyFormatter.formatCents(totalCostCents),
+                        ),
+                      ),
+                    if (canViewFinancialData)
+                      SizedBox(
+                        width: width,
+                        child: _SummaryMetric(
+                          key: const Key('inventoryItemEstimatedProfitMetric'),
+                          label: 'Est. Profit',
+                          value: estimatedProfitCents == null
+                              ? item.askingPriceCents == null
+                                    ? 'Not specified'
+                                    : 'Calculating...'
+                              : CurrencyFormatter.formatCents(
+                                  estimatedProfitCents,
+                                ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryMetric extends StatelessWidget {
+  const _SummaryMetric({required this.label, required this.value, super.key});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -565,33 +718,95 @@ class _InventoryLabelPositionDialogState
 }
 
 class _InventoryPhotosSection extends StatelessWidget {
-  const _InventoryPhotosSection({required this.photoUrls});
+  const _InventoryPhotosSection({required this.item});
 
-  final List<String> photoUrls;
+  final InventoryItem item;
 
   @override
   Widget build(BuildContext context) {
+    final photoUrls = item.photoUrls;
+
     return _DetailSection(
       title: 'Photos',
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: Image.network(
-              photoUrls.first,
-              key: const Key('inventoryPrimaryPhoto'),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const ColoredBox(
-                  color: Color(0xFFE0E0E0),
-                  child: Center(
-                    child: Icon(Icons.broken_image_outlined, size: 40),
-                  ),
-                );
-              },
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: photoUrls.isEmpty
+                    ? ColoredBox(
+                        key: const Key('inventoryPrimaryPhotoPlaceholder'),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        child: Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 52,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : Image.network(
+                        photoUrls.first,
+                        key: const Key('inventoryPrimaryPhoto'),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const ColoredBox(
+                            color: Color(0xFFE0E0E0),
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                size: 40,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
             ),
-          ),
+            Positioned(
+              top: 12,
+              left: 12,
+              child: _InventoryStatusBadge(status: item.status),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 17,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        photoUrls.length.toString(),
+                        key: const Key('inventoryPhotoCountLabel'),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         if (photoUrls.length > 1) ...[
           const SizedBox(height: 12),
@@ -628,13 +843,61 @@ class _InventoryPhotosSection extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 8),
-        Text(
-          '${photoUrls.length} ${photoUrls.length == 1 ? 'photo' : 'photos'}',
-          key: const Key('inventoryPhotoCountLabel'),
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
       ],
+    );
+  }
+}
+
+class _InventoryStatusBadge extends StatelessWidget {
+  const _InventoryStatusBadge({required this.status});
+
+  final InventoryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (background, foreground) = switch (status) {
+      InventoryStatus.available => (
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+      InventoryStatus.sold => (
+        colorScheme.secondaryContainer,
+        colorScheme.onSecondaryContainer,
+      ),
+      InventoryStatus.inactive => (
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+      ),
+      InventoryStatus.broken => (
+        colorScheme.errorContainer,
+        colorScheme.onErrorContainer,
+      ),
+      InventoryStatus.disposed => (
+        colorScheme.surfaceContainerHigh,
+        colorScheme.onSurface,
+      ),
+    };
+
+    return DecoratedBox(
+      key: const Key('inventoryItemStatusBadge'),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 5, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        child: Text(
+          status.label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1797,6 +2060,41 @@ List<Widget> _categorySpecificRows(InventoryItem item) {
     ],
     InventoryCategory.helmet || InventoryCategory.other => const [],
   };
+}
+
+String? _compactItemSpecifications(InventoryItem item) {
+  final values = <String>[];
+
+  switch (item.category) {
+    case InventoryCategory.bat:
+      if (item.lengthInches != null) {
+        values.add('${_formatNumber(item.lengthInches!)} in');
+      }
+      if (item.weightOunces != null) {
+        values.add('${_formatNumber(item.weightOunces!)} oz');
+      }
+      if (item.certification != null && item.certification!.trim().isNotEmpty) {
+        values.add(item.certification!.trim());
+      }
+    case InventoryCategory.glove:
+      if (item.gloveSizeInches != null) {
+        values.add('${_formatNumber(item.gloveSizeInches!)} in');
+      }
+      if (item.handOrientation != null &&
+          item.handOrientation!.trim().isNotEmpty) {
+        values.add(item.handOrientation!.trim());
+      }
+    case InventoryCategory.catchersGear:
+      if (item.catchersGearSize != null &&
+          item.catchersGearSize!.trim().isNotEmpty) {
+        values.add(item.catchersGearSize!.trim());
+      }
+    case InventoryCategory.helmet:
+    case InventoryCategory.other:
+      break;
+  }
+
+  return values.isEmpty ? null : values.join(' â€¢ ');
 }
 
 String _displayOptionalText(String? value) {
