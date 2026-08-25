@@ -151,32 +151,45 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Sales (2)'), findsOneWidget);
-    expect(find.text('Sale'), findsNWidgets(2));
+    expect(find.text('2 transactions', skipOffstage: false), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Card),
+        matching: find.text('Sale', skipOffstage: false),
+        skipOffstage: false,
+      ),
+      findsNWidgets(2),
+    );
 
-    expect(find.text('08/03/2026'), findsOneWidget);
-    expect(find.text('08/04/2026'), findsOneWidget);
+    expect(find.text('08/03/2026', skipOffstage: false), findsOneWidget);
+    expect(find.text('08/04/2026', skipOffstage: false), findsOneWidget);
 
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
+    expect(
+      find.text('BAT-2608-0001 — Combat Spec H1', skipOffstage: false),
+      findsOneWidget,
+    );
 
-    expect(find.text('GLV-2608-0001 — Wilson A2000'), findsOneWidget);
+    expect(
+      find.text('GLV-2608-0001 — Wilson A2000', skipOffstage: false),
+      findsOneWidget,
+    );
 
-    expect(find.text('item-1'), findsNothing);
-    expect(find.text('item-2'), findsNothing);
+    expect(find.text('item-1', skipOffstage: false), findsNothing);
+    expect(find.text('item-2', skipOffstage: false), findsNothing);
 
-    expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('PayPal'), findsOneWidget);
+    expect(find.text('Cash', skipOffstage: false), findsOneWidget);
+    expect(find.text('PayPal', skipOffstage: false), findsOneWidget);
 
-    expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$350.00'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$125.00'), findsOneWidget);
-    expect(find.text(r'$150.00'), findsOneWidget);
+    expect(find.text(r'$325.00', skipOffstage: false), findsAtLeastNWidgets(1));
+    expect(find.text(r'$350.00', skipOffstage: false), findsAtLeastNWidgets(1));
+    expect(find.text(r'$125.00', skipOffstage: false), findsOneWidget);
+    expect(find.text(r'$150.00', skipOffstage: false), findsOneWidget);
 
-    expect(find.text('38.5%'), findsOneWidget);
-    expect(find.text('42.9%'), findsOneWidget);
+    expect(find.text('38.5%', skipOffstage: false), findsOneWidget);
+    expect(find.text('42.9%', skipOffstage: false), findsOneWidget);
 
-    expect(find.text('Older sale.'), findsOneWidget);
-    expect(find.text('Newest sale.'), findsOneWidget);
+    expect(find.text('Older sale.', skipOffstage: false), findsOneWidget);
+    expect(find.text('Newest sale.', skipOffstage: false), findsOneWidget);
 
     final newerCard = find.byKey(const ValueKey('sale-2'));
 

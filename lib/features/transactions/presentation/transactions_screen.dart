@@ -12,19 +12,49 @@ import '../../authentication/presentation/providers/app_permissions_provider.dar
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/consignment_transaction.dart';
+import '../domain/models/disposal_reason.dart';
 import '../domain/models/disposal_transaction.dart';
 import '../domain/models/repair_transaction.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/trade_transaction.dart';
 import '../domain/models/transaction_enums.dart';
-import '../domain/models/disposal_reason.dart';
 import 'providers/transaction_providers.dart';
 
-class TransactionsScreen extends ConsumerWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+  _LedgerType _typeFilter = _LedgerType.all;
+  _LedgerDateFilter _dateFilter = _LedgerDateFilter.all;
+
+  bool get _hasActiveFilters =>
+      _query.trim().isNotEmpty ||
+      _typeFilter != _LedgerType.all ||
+      _dateFilter != _LedgerDateFilter.all;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() {
+      _query = '';
+      _typeFilter = _LedgerType.all;
+      _dateFilter = _LedgerDateFilter.all;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final salesAsync = ref.watch(saleTransactionsProvider);
     final repairsAsync = ref.watch(repairTransactionsProvider);
     final tradesAsync = ref.watch(tradeTransactionsProvider);
@@ -45,8 +75,7 @@ class TransactionsScreen extends ConsumerWidget {
     if (asyncValues.any((value) => value.isLoading)) {
       return const AppPage(
         title: 'Transactions',
-        subtitle:
-            'Review sales, trade-ins, repairs, disposals, and consignments.',
+        subtitle: 'Review the complete business-event ledger.',
         child: AppLoadingState(message: 'Loading transactions...'),
       );
     }
@@ -59,8 +88,7 @@ class TransactionsScreen extends ConsumerWidget {
     if (firstError != null) {
       return AppPage(
         title: 'Transactions',
-        subtitle:
-            'Review sales, trade-ins, repairs, disposals, and consignments.',
+        subtitle: 'Review the complete business-event ledger.',
         child: AppErrorState(
           message: 'Unable to load transaction history.',
           details: firstError.toString(),
@@ -76,25 +104,24 @@ class TransactionsScreen extends ConsumerWidget {
       );
     }
 
-    final sales = salesAsync.requireValue;
-    final repairs = repairsAsync.requireValue;
-    final trades = tradesAsync.requireValue;
-    final disposals = disposalsAsync.requireValue;
-    final consignments = consignmentsAsync.requireValue;
-    final inventoryItems = inventoryAsync.requireValue;
+    final inventoryById = <String, InventoryItem>{
+      for (final item in inventoryAsync.requireValue)
+        if (item.id != null) item.id!: item,
+    };
 
-    final hasAnyTransaction =
-        sales.isNotEmpty ||
-        repairs.isNotEmpty ||
-        trades.isNotEmpty ||
-        disposals.isNotEmpty ||
-        consignments.isNotEmpty;
+    final entries = _buildLedgerEntries(
+      sales: salesAsync.requireValue,
+      repairs: repairsAsync.requireValue,
+      trades: tradesAsync.requireValue,
+      disposals: disposalsAsync.requireValue,
+      consignments: consignmentsAsync.requireValue,
+      inventoryById: inventoryById,
+    );
 
-    if (!hasAnyTransaction) {
+    if (entries.isEmpty) {
       return const AppPage(
         title: 'Transactions',
-        subtitle:
-            'Review sales, trade-ins, repairs, disposals, and consignments.',
+        subtitle: 'Review the complete business-event ledger.',
         child: AppEmptyState(
           icon: Icons.receipt_long_outlined,
           title: 'No transactions yet.',
@@ -104,231 +131,329 @@ class TransactionsScreen extends ConsumerWidget {
       );
     }
 
-    final inventoryById = <String, InventoryItem>{
-      for (final item in inventoryItems)
-        if (item.id != null) item.id!: item,
-    };
-
-    final sortedSales = [...sales]
-      ..sort((a, b) => b.saleDate.compareTo(a.saleDate));
-    final sortedRepairs = [...repairs]
-      ..sort((a, b) => b.repairDate.compareTo(a.repairDate));
-    final sortedTrades = [...trades]
-      ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
-    final sortedDisposals = [...disposals]
-      ..sort((a, b) => b.disposalDate.compareTo(a.disposalDate));
-    final sortedConsignments = [...consignments]
-      ..sort((a, b) => b.consignmentDate.compareTo(a.consignmentDate));
+    final filteredEntries = entries.where(_matchesFilters).toList();
 
     return AppPage(
       title: 'Transactions',
-      subtitle:
-          'Review sales, trade-ins, repairs, disposals, and consignments.',
+      subtitle: 'Review the complete business-event ledger.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SalesSection(
-            sales: sortedSales,
-            inventoryById: inventoryById,
-            canViewFinancialData: permissions.canViewFinancialData,
+          TextField(
+            key: const Key('transactionsSearchField'),
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _query = value;
+              });
+            },
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              labelText: 'Search Transactions',
+              hintText: 'Inventory number, item, type, description, reason...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.trim().isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('transactionsSearchClearButton'),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _query = '';
+                        });
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
+              border: const OutlineInputBorder(),
+            ),
           ),
-          const SizedBox(height: 24),
-          _TradesSection(trades: sortedTrades, inventoryById: inventoryById),
-          const SizedBox(height: 24),
-          _RepairsSection(
-            repairs: sortedRepairs,
-            inventoryById: inventoryById,
-            canViewFinancialData: permissions.canViewFinancialData,
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                key: const Key('transactionsTypeFilter'),
+                width: 220,
+                child: DropdownButtonFormField<_LedgerType>(
+                  key: ValueKey(_typeFilter),
+                  isExpanded: true,
+                  initialValue: _typeFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Transaction Type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final type in _LedgerType.values)
+                      DropdownMenuItem(value: type, child: Text(type.label)),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _typeFilter = value;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(
+                key: const Key('transactionsDateFilter'),
+                width: 220,
+                child: DropdownButtonFormField<_LedgerDateFilter>(
+                  key: ValueKey(_dateFilter),
+                  isExpanded: true,
+                  initialValue: _dateFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Date',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final filter in _LedgerDateFilter.values)
+                      DropdownMenuItem(
+                        value: filter,
+                        child: Text(filter.label),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _dateFilter = value;
+                    });
+                  },
+                ),
+              ),
+              if (_hasActiveFilters)
+                TextButton.icon(
+                  key: const Key('transactionsClearFiltersButton'),
+                  onPressed: _clearFilters,
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('Clear Filters'),
+                ),
+            ],
           ),
-          const SizedBox(height: 24),
-          _DisposalsSection(
-            disposals: sortedDisposals,
-            inventoryById: inventoryById,
+          const SizedBox(height: 16),
+          Text(
+            _hasActiveFilters
+                ? '${filteredEntries.length} of ${entries.length} transactions'
+                : '${entries.length} transaction${entries.length == 1 ? '' : 's'}',
+            key: const Key('transactionsResultCount'),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 24),
-          _ConsignmentsSection(
-            consignments: sortedConsignments,
-            inventoryById: inventoryById,
-            canViewFinancialData: permissions.canViewFinancialData,
-          ),
+          const SizedBox(height: 16),
+          if (filteredEntries.isEmpty)
+            const AppEmptyState(
+              icon: Icons.search_off,
+              title: 'No transactions match your filters.',
+              message: 'Clear or adjust the search, type, or date filter.',
+            )
+          else
+            for (final entry in filteredEntries) ...[
+              _buildLedgerCard(
+                entry,
+                inventoryById,
+                permissions.canViewFinancialData,
+              ),
+              const SizedBox(height: 12),
+            ],
         ],
       ),
     );
   }
+
+  bool _matchesFilters(_LedgerEntry entry) {
+    if (_typeFilter != _LedgerType.all && entry.type != _typeFilter) {
+      return false;
+    }
+
+    final cutoff = _dateFilter.cutoff(DateTime.now());
+    if (cutoff != null && entry.date.isBefore(cutoff)) {
+      return false;
+    }
+
+    final query = _query.trim().toLowerCase();
+    return query.isEmpty || entry.searchableText.contains(query);
+  }
 }
 
-class _SalesSection extends StatelessWidget {
-  const _SalesSection({
-    required this.sales,
-    required this.inventoryById,
-    required this.canViewFinancialData,
+List<_LedgerEntry> _buildLedgerEntries({
+  required List<SaleTransaction> sales,
+  required List<RepairTransaction> repairs,
+  required List<TradeTransaction> trades,
+  required List<DisposalTransaction> disposals,
+  required List<ConsignmentTransaction> consignments,
+  required Map<String, InventoryItem> inventoryById,
+}) {
+  final entries = <_LedgerEntry>[
+    for (final sale in sales)
+      _LedgerEntry(
+        type: _LedgerType.sale,
+        date: sale.saleDate,
+        transaction: sale,
+        searchableText: _searchableText([
+          'sale',
+          _formatDate(sale.saleDate),
+          _inventoryDisplayName(inventoryById[sale.inventoryItemId]),
+          sale.paymentMethod.label,
+          sale.notes,
+        ]),
+      ),
+    for (final trade in trades)
+      _LedgerEntry(
+        type: _LedgerType.trade,
+        date: trade.tradeDate,
+        transaction: trade,
+        searchableText: _searchableText([
+          'trade trade-in',
+          _formatDate(trade.tradeDate),
+          ...trade.outgoingInventoryItemIds.map(
+            (id) => _inventoryDisplayName(inventoryById[id]),
+          ),
+          ...trade.incomingInventoryItemIds.map(
+            (id) => _inventoryDisplayName(inventoryById[id]),
+          ),
+          trade.paymentMethod?.label,
+          trade.notes,
+        ]),
+      ),
+    for (final repair in repairs)
+      _LedgerEntry(
+        type: _LedgerType.repair,
+        date: repair.repairDate,
+        transaction: repair,
+        searchableText: _searchableText([
+          'repair',
+          _formatDate(repair.repairDate),
+          _inventoryDisplayName(inventoryById[repair.inventoryItemId]),
+          repair.description,
+          repair.notes,
+        ]),
+      ),
+    for (final disposal in disposals)
+      _LedgerEntry(
+        type: _LedgerType.disposal,
+        date: disposal.disposalDate,
+        transaction: disposal,
+        searchableText: _searchableText([
+          'disposal',
+          _formatDate(disposal.disposalDate),
+          _inventoryDisplayName(inventoryById[disposal.inventoryItemId]),
+          disposal.reason.label,
+          disposal.notes,
+          if (disposal.replacementInventoryItemId != null)
+            'warranty replacement',
+        ]),
+      ),
+    for (final consignment in consignments)
+      _LedgerEntry(
+        type: _LedgerType.consignment,
+        date: consignment.consignmentDate,
+        transaction: consignment,
+        searchableText: _searchableText([
+          'consignment',
+          _formatDate(consignment.consignmentDate),
+          _inventoryDisplayName(inventoryById[consignment.inventoryItemId]),
+          consignment.isCompleted ? 'sold completed' : 'awaiting sale',
+          consignment.notes,
+        ]),
+      ),
+  ]..sort((a, b) => b.date.compareTo(a.date));
+
+  return entries;
+}
+
+Widget _buildLedgerCard(
+  _LedgerEntry entry,
+  Map<String, InventoryItem> inventoryById,
+  bool canViewFinancialData,
+) {
+  final transaction = entry.transaction;
+
+  if (transaction is SaleTransaction) {
+    return _SaleTransactionCard(
+      sale: transaction,
+      inventoryItem: inventoryById[transaction.inventoryItemId],
+      canViewFinancialData: canViewFinancialData,
+    );
+  }
+  if (transaction is TradeTransaction) {
+    return _TradeTransactionCard(
+      trade: transaction,
+      inventoryById: inventoryById,
+    );
+  }
+  if (transaction is RepairTransaction) {
+    return _RepairTransactionCard(
+      repair: transaction,
+      inventoryItem: inventoryById[transaction.inventoryItemId],
+      canViewFinancialData: canViewFinancialData,
+    );
+  }
+  if (transaction is DisposalTransaction) {
+    return _DisposalTransactionCard(
+      disposal: transaction,
+      inventoryItem: inventoryById[transaction.inventoryItemId],
+    );
+  }
+  if (transaction is ConsignmentTransaction) {
+    return _ConsignmentTransactionCard(
+      consignment: transaction,
+      inventoryItem: inventoryById[transaction.inventoryItemId],
+      canViewFinancialData: canViewFinancialData,
+    );
+  }
+
+  throw StateError('Unsupported transaction ledger entry.');
+}
+
+enum _LedgerType {
+  all('All types'),
+  sale('Sale'),
+  trade('Trade-In'),
+  repair('Repair'),
+  disposal('Disposal'),
+  consignment('Consignment');
+
+  const _LedgerType(this.label);
+  final String label;
+}
+
+enum _LedgerDateFilter {
+  all('All dates', null),
+  last7Days('Last 7 days', 7),
+  last30Days('Last 30 days', 30),
+  last90Days('Last 90 days', 90);
+
+  const _LedgerDateFilter(this.label, this.days);
+  final String label;
+  final int? days;
+
+  DateTime? cutoff(DateTime now) {
+    if (days == null) {
+      return null;
+    }
+
+    final today = DateTime(now.year, now.month, now.day);
+    return today.subtract(Duration(days: days! - 1));
+  }
+}
+
+class _LedgerEntry {
+  const _LedgerEntry({
+    required this.type,
+    required this.date,
+    required this.transaction,
+    required this.searchableText,
   });
 
-  final List<SaleTransaction> sales;
-  final Map<String, InventoryItem> inventoryById;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsSalesSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Sales (${sales.length})'),
-        const SizedBox(height: 12),
-        if (sales.isEmpty)
-          const Text('No sales recorded.')
-        else
-          for (final sale in sales) ...[
-            _SaleTransactionCard(
-              sale: sale,
-              inventoryItem: inventoryById[sale.inventoryItemId],
-              canViewFinancialData: canViewFinancialData,
-            ),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
-class _TradesSection extends StatelessWidget {
-  const _TradesSection({required this.trades, required this.inventoryById});
-
-  final List<TradeTransaction> trades;
-  final Map<String, InventoryItem> inventoryById;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsTradesSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Trade-Ins (${trades.length})'),
-        const SizedBox(height: 12),
-        if (trades.isEmpty)
-          const Text('No trade-ins recorded.')
-        else
-          for (final trade in trades) ...[
-            _TradeTransactionCard(trade: trade, inventoryById: inventoryById),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
-class _RepairsSection extends StatelessWidget {
-  const _RepairsSection({
-    required this.repairs,
-    required this.inventoryById,
-    required this.canViewFinancialData,
-  });
-
-  final List<RepairTransaction> repairs;
-  final Map<String, InventoryItem> inventoryById;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsRepairsSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Repairs (${repairs.length})'),
-        const SizedBox(height: 12),
-        if (repairs.isEmpty)
-          const Text('No repairs recorded.')
-        else
-          for (final repair in repairs) ...[
-            _RepairTransactionCard(
-              repair: repair,
-              inventoryItem: inventoryById[repair.inventoryItemId],
-              canViewFinancialData: canViewFinancialData,
-            ),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
-class _DisposalsSection extends StatelessWidget {
-  const _DisposalsSection({
-    required this.disposals,
-    required this.inventoryById,
-  });
-
-  final List<DisposalTransaction> disposals;
-  final Map<String, InventoryItem> inventoryById;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsDisposalsSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Disposals (${disposals.length})'),
-        const SizedBox(height: 12),
-        if (disposals.isEmpty)
-          const Text('No disposals recorded.')
-        else
-          for (final disposal in disposals) ...[
-            _DisposalTransactionCard(
-              disposal: disposal,
-              inventoryItem: inventoryById[disposal.inventoryItemId],
-            ),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
-class _ConsignmentsSection extends StatelessWidget {
-  const _ConsignmentsSection({
-    required this.consignments,
-    required this.inventoryById,
-    required this.canViewFinancialData,
-  });
-
-  final List<ConsignmentTransaction> consignments;
-  final Map<String, InventoryItem> inventoryById;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('transactionsConsignmentsSection'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeading(title: 'Consignments (${consignments.length})'),
-        const SizedBox(height: 12),
-        if (consignments.isEmpty)
-          const Text('No consignment agreements recorded.')
-        else
-          for (final consignment in consignments) ...[
-            _ConsignmentTransactionCard(
-              consignment: consignment,
-              inventoryItem: inventoryById[consignment.inventoryItemId],
-              canViewFinancialData: canViewFinancialData,
-            ),
-            const SizedBox(height: 12),
-          ],
-      ],
-    );
-  }
-}
-
-class _SectionHeading extends StatelessWidget {
-  const _SectionHeading({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title, style: Theme.of(context).textTheme.titleLarge);
-  }
+  final _LedgerType type;
+  final DateTime date;
+  final Object transaction;
+  final String searchableText;
 }
 
 class _SaleTransactionCard extends StatelessWidget {
@@ -701,6 +826,15 @@ class _TransactionDetailRow extends StatelessWidget {
   }
 }
 
+String _searchableText(Iterable<String?> values) {
+  return values
+      .whereType<String>()
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .join(' ')
+      .toLowerCase();
+}
+
 String _formatDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
@@ -728,5 +862,5 @@ String _inventoryDisplayName(InventoryItem? item) {
   final inventoryNumber =
       item.inventoryNumber ?? 'Inventory number not assigned';
 
-  return '$inventoryNumber \u2014 $equipmentName';
+  return '$inventoryNumber — $equipmentName';
 }

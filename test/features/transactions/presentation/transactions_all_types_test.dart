@@ -90,14 +90,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No transactions yet.'), findsNothing);
-    expect(find.text('Sales (0)'), findsOneWidget);
-    expect(find.text('Trade-Ins (1)'), findsOneWidget);
-    expect(find.text('Repairs (1)'), findsOneWidget);
-    expect(find.text('Disposals (1)'), findsOneWidget);
-    expect(find.text('Consignments (1)'), findsOneWidget);
+    expect(find.text('4 transactions'), findsOneWidget);
+    expect(find.byKey(const Key('transactionsSalesSection')), findsNothing);
+    expect(find.byKey(const Key('transactionsTradesSection')), findsNothing);
+    expect(find.byKey(const Key('transactionsRepairsSection')), findsNothing);
+    expect(find.byKey(const Key('transactionsDisposalsSection')), findsNothing);
+    expect(
+      find.byKey(const Key('transactionsConsignmentsSection')),
+      findsNothing,
+    );
     expect(find.text('Grip replacement'), findsOneWidget);
     expect(find.text('Other'), findsOneWidget);
     expect(find.text(r'$50.00'), findsWidgets);
+
+    final repairCard = find.byKey(
+      const ValueKey('repairTransactionCard-repair-a'),
+    );
+    final tradeCard = find.byKey(
+      const ValueKey('tradeTransactionCard-trade-a'),
+    );
+    final disposalCard = find.byKey(
+      const ValueKey('disposalTransactionCard-disposal-a'),
+    );
+    final consignmentCard = find.byKey(
+      const ValueKey('consignmentTransactionCard-consignment-a'),
+    );
+
+    expect(
+      tester.getTopLeft(repairCard).dy,
+      lessThan(tester.getTopLeft(tradeCard).dy),
+    );
+    expect(
+      tester.getTopLeft(tradeCard).dy,
+      lessThan(tester.getTopLeft(disposalCard).dy),
+    );
+    expect(
+      tester.getTopLeft(disposalCard).dy,
+      lessThan(tester.getTopLeft(consignmentCard).dy),
+    );
   });
 
   testWidgets('empty transaction history requires every category to be empty', (
