@@ -39,9 +39,9 @@ void main() {
                     const Center(child: Text('Contacts destination')),
               ),
               GoRoute(
-                path: AppRoutes.reports,
+                path: AppRoutes.more,
                 builder: (context, state) =>
-                    const Center(child: Text('Reports destination')),
+                    const Center(child: Text('More destination')),
               ),
             ],
           ),
@@ -101,9 +101,9 @@ void main() {
                   const Center(child: Text('Contacts destination')),
             ),
             GoRoute(
-              path: AppRoutes.reports,
+              path: AppRoutes.more,
               builder: (context, state) =>
-                  const Center(child: Text('Reports destination')),
+                  const Center(child: Text('More destination')),
             ),
           ],
         ),
@@ -134,7 +134,7 @@ void main() {
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
-    expect(find.text('Reports destination'), findsOneWidget);
+    expect(find.text('More destination'), findsOneWidget);
   });
 
   testWidgets('wide shell uses navigation rail without Home destination', (
@@ -177,9 +177,9 @@ void main() {
                   const Center(child: Text('Contacts destination')),
             ),
             GoRoute(
-              path: AppRoutes.reports,
+              path: AppRoutes.more,
               builder: (context, state) =>
-                  const Center(child: Text('Reports destination')),
+                  const Center(child: Text('More destination')),
             ),
           ],
         ),
