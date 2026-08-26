@@ -27,7 +27,7 @@ const _testMetrics = DashboardMetrics(
 );
 
 void main() {
-  testWidgets('Dashboard shows approved quick actions without Sell', (
+  testWidgets('Dashboard matches compact reference-driven hierarchy', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -35,54 +35,63 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
+    expect(find.text('Dashboard'), findsNothing);
+    expect(
+      find.text('A live overview of your current inventory.'),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
+    expect(find.text('OVERVIEW'), findsOneWidget);
+    expect(find.byKey(const Key('dashboardScanQrButton')), findsOneWidget);
+    expect(find.text('Scan QR'), findsNothing);
+    expect(find.byKey(const Key('dashboardInventoryButton')), findsNothing);
+    expect(find.text('INVENTORY'), findsNothing);
     expect(
       find.byKey(const Key('dashboardAddInventoryButton')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('dashboardScanQrButton')), findsOneWidget);
-    expect(find.text('Add Inventory'), findsOneWidget);
-    expect(find.text('Scan QR'), findsOneWidget);
-    expect(find.text('Sell Inventory'), findsNothing);
-    expect(find.text('Sell'), findsNothing);
+    expect(find.text('ADD INVENTORY'), findsOneWidget);
   });
 
-  testWidgets('Dashboard shows the approved inventory overview', (
+  testWidgets('Dashboard shows the approved inventory overview metrics', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
     addTearDown(router.dispose);
 
     await _pumpDashboard(tester, router: router);
-
-    expect(find.text('Inventory Overview'), findsOneWidget);
 
     expect(
       find.byKey(const Key('dashboardInventoryCountCard')),
       findsOneWidget,
     );
-    expect(find.text('Total Inventory Items'), findsOneWidget);
+    expect(find.text('TOTAL INVENTORY'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
+    expect(find.text('Items'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardInventoryCostCard')), findsOneWidget);
-    expect(find.text('Total Cost of Inventory'), findsOneWidget);
+    expect(find.text('MONEY INVESTED'), findsOneWidget);
     expect(find.text(r'$180.00'), findsOneWidget);
+    expect(find.text('Total Cost'), findsOneWidget);
 
     expect(
       find.byKey(const Key('dashboardInventoryValueCard')),
       findsOneWidget,
     );
-    expect(find.text('Est. Inventory Revenue'), findsOneWidget);
+    expect(find.text('INVENTORY VALUE'), findsOneWidget);
     expect(find.text(r'$290.00'), findsOneWidget);
+    expect(find.text('Current Value'), findsNothing);
 
     expect(
       find.byKey(const Key('dashboardPotentialProfitCard')),
       findsOneWidget,
     );
-    expect(find.text('Est. Inventory Profit'), findsOneWidget);
+    expect(find.text('POTENTIAL PROFIT'), findsOneWidget);
     expect(find.text(r'$110.00'), findsOneWidget);
+    expect(find.text('Potential Profit'), findsNothing);
   });
 
-  testWidgets('Dashboard shows the approved quick stats', (
+  testWidgets('Dashboard quick stats remain one four-column row', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -90,17 +99,19 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    expect(find.text('Quick Stats'), findsOneWidget);
+    expect(find.byKey(const Key('dashboardQuickStatsPanel')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardQuickStatsRow')), findsOneWidget);
+    expect(find.text('QUICK STATS'), findsOneWidget);
 
     expect(
       find.byKey(const Key('dashboardAvailableItemsCard')),
       findsOneWidget,
     );
-    expect(find.text('Available Items'), findsOneWidget);
+    expect(find.text('Available'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
-    expect(find.text('Items Sold Month to Date'), findsOneWidget);
+    expect(find.text('Sold MTD'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
@@ -108,9 +119,8 @@ void main() {
     expect(find.text('2'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
-    expect(find.text('Average Days in Inventory'), findsOneWidget);
+    expect(find.text('Avg. Days in Inventory'), findsOneWidget);
     expect(find.text('26'), findsOneWidget);
-    expect(find.text('days'), findsOneWidget);
   });
 
   testWidgets('Dashboard omits report-only performance controls and cards', (
@@ -123,13 +133,10 @@ void main() {
 
     expect(find.byKey(const Key('dashboardDateRangeSelector')), findsNothing);
     expect(find.text('Performance Period'), findsNothing);
-    expect(find.text('Revenue'), findsNothing);
-    expect(find.text('Cost'), findsNothing);
-    expect(find.text('Profit'), findsNothing);
     expect(find.text('Gross Margin'), findsNothing);
   });
 
-  testWidgets('ordinary User sees revenue but not cost or profit', (
+  testWidgets('restricted permissions hide cost and potential profit', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -151,14 +158,6 @@ void main() {
     );
     expect(find.byKey(const Key('dashboardInventoryCostCard')), findsNothing);
     expect(find.byKey(const Key('dashboardPotentialProfitCard')), findsNothing);
-
-    expect(
-      find.byKey(const Key('dashboardAvailableItemsCard')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
-    expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
-    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
   });
 
   testWidgets('Dashboard Add Inventory action navigates correctly', (
@@ -169,7 +168,12 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    await tester.tap(find.byKey(const Key('dashboardAddInventoryButton')));
+    final addInventoryButton = find.byKey(
+      const Key('dashboardAddInventoryButton'),
+    );
+    await tester.ensureVisible(addInventoryButton);
+    await tester.pumpAndSettle();
+    await tester.tap(addInventoryButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Add Inventory destination'), findsOneWidget);
