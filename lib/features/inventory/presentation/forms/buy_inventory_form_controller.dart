@@ -191,6 +191,7 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
 
   Future<InventoryItem?> submitUpdate(
     InventoryItem existingItem, {
+    bool preserveAcquisitionValue = false,
     bool resetAfterSave = true,
   }) async {
     final editedItem = state.toInventoryItem();
@@ -203,6 +204,9 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
       id: existingItem.id,
       inventoryNumber: existingItem.inventoryNumber,
       status: existingItem.status,
+      acquisitionValueCents: preserveAcquisitionValue
+          ? existingItem.acquisitionValueCents
+          : editedItem.acquisitionValueCents,
     );
 
     final updatedItem = await ref

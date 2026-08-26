@@ -7,6 +7,7 @@ import '../../../core/validation/app_validators.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../../shared/media/photo_source.dart';
 import '../../contacts/presentation/providers/contact_providers.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import '../application/photos/inventory_photo_workflow.dart';
@@ -275,9 +276,12 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
       InventoryItem? savedItem = retryItem;
 
       if (savedItem == null) {
+        final permissions = ref.read(currentAppPermissionsProvider);
+
         savedItem = widget.isEditing
             ? await formController.submitUpdate(
                 widget.existingItem!,
+                preserveAcquisitionValue: !permissions.canViewFinancialData,
                 resetAfterSave: false,
               )
             : await formController.submit(resetAfterSave: false);
@@ -473,6 +477,9 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     final inventoryControllerState = ref.watch(inventoryControllerProvider);
 
     final contactsAsync = ref.watch(contactsProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
+    final showAcquisitionValue =
+        !widget.isEditing || permissions.canViewFinancialData;
 
     final isSaving =
         inventoryControllerState.isLoading ||
@@ -570,28 +577,30 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                 }
               },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              key: const Key('buyInventoryAcquisitionValueField'),
-              initialValue: formState.acquisitionValue,
-              decoration: const InputDecoration(
-                labelText: 'Acquisition Value',
-                hintText: r'Example: $200.00',
-                prefixText: r'$ ',
-                border: OutlineInputBorder(),
+            if (showAcquisitionValue) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('buyInventoryAcquisitionValueField'),
+                initialValue: formState.acquisitionValue,
+                decoration: const InputDecoration(
+                  labelText: 'Acquisition Value',
+                  hintText: r'Example: $200.00',
+                  prefixText: r'$ ',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  return AppValidators.nonNegativeMoney(
+                    value,
+                    fieldName: 'Acquisition value',
+                    required: true,
+                  );
+                },
+                onChanged: formController.setAcquisitionValue,
               ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (value) {
-                return AppValidators.nonNegativeMoney(
-                  value,
-                  fieldName: 'Acquisition value',
-                  required: true,
-                );
-              },
-              onChanged: formController.setAcquisitionValue,
-            ),
+            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<InventoryCondition?>(
               key: const Key('buyInventoryConditionField'),

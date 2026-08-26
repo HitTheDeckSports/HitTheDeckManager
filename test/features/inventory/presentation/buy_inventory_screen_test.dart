@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -24,6 +26,9 @@ void main() {
       overrides: [
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         contactRepositoryProvider.overrideWithValue(contactRepository),
+        currentAppPermissionsProvider.overrideWithValue(
+          const AppPermissions.ownerOrAdmin(),
+        ),
       ],
     );
   });
@@ -1014,6 +1019,84 @@ void main() {
     expect(find.text('No Seller Selected'), findsOneWidget);
     expect(find.text('missing-contact'), findsNothing);
   });
+
+  testWidgets(
+    'ordinary user does not see historical acquisition value while editing',
+    (WidgetTester tester) async {
+      const item = InventoryItem(
+        id: 'item-secure-edit',
+        inventoryNumber: 'BAT-2608-0100',
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 20000,
+      );
+
+      final inventoryRepository = InMemoryInventoryRepository(
+        initialItems: const [item],
+      );
+      final contactRepository = InMemoryContactRepository();
+
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(contactRepository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            contactRepositoryProvider.overrideWithValue(contactRepository),
+            currentAppPermissionsProvider.overrideWithValue(
+              const AppPermissions.none(),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('buyInventoryAcquisitionValueField')),
+        findsNothing,
+      );
+      expect(find.text('Acquisition Value'), findsNothing);
+      expect(find.text('200.00'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'ordinary user still sees acquisition value for new inventory entry',
+    (WidgetTester tester) async {
+      final inventoryRepository = InMemoryInventoryRepository();
+      final contactRepository = InMemoryContactRepository();
+
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(contactRepository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            contactRepositoryProvider.overrideWithValue(contactRepository),
+            currentAppPermissionsProvider.overrideWithValue(
+              const AppPermissions.none(),
+            ),
+          ],
+          child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('buyInventoryAcquisitionValueField')),
+        findsOneWidget,
+      );
+      expect(find.text('Acquisition Value'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows stored photo removal confirmation while editing', (
     WidgetTester tester,

@@ -174,6 +174,57 @@ void main() {
       expect(resetState.category, InventoryCategory.bat);
     });
     test(
+      'preserves acquisition value when protected edit requests preservation',
+      () async {
+        const existingItem = InventoryItem(
+          id: 'item-protected',
+          inventoryNumber: 'BAT-2608-0999',
+          category: InventoryCategory.bat,
+          brand: 'Combat',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 20000,
+          askingPriceCents: 32500,
+        );
+
+        final repository = InMemoryInventoryRepository(
+          initialItems: [existingItem],
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+
+        addTearDown(container.dispose);
+        addTearDown(repository.dispose);
+
+        final controller = container.read(
+          buyInventoryFormControllerProvider.notifier,
+        );
+
+        controller.initializeFromItem(existingItem);
+        controller.setBrand('Combat Updated');
+        controller.setAcquisitionValue('1.00');
+
+        final updatedItem = await controller.submitUpdate(
+          existingItem,
+          preserveAcquisitionValue: true,
+        );
+
+        expect(updatedItem, isNotNull);
+        expect(updatedItem?.brand, 'Combat Updated');
+        expect(updatedItem?.acquisitionValueCents, 20000);
+
+        final repositoryItem = await repository.getInventoryItem(
+          'item-protected',
+        );
+
+        expect(repositoryItem?.acquisitionValueCents, 20000);
+      },
+    );
+
+    test(
       'updates an existing item and preserves its identity and status',
       () async {
         const existingItem = InventoryItem(
