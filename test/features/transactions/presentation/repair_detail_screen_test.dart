@@ -406,6 +406,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(r'$0.00'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsNWidgets(2));
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
   });
 }

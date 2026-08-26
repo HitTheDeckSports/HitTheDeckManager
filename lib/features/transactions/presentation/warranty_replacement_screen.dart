@@ -10,6 +10,7 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../domain/models/disposal_reason.dart';
 import 'providers/transaction_providers.dart';
 import 'providers/warranty_replacement_controller.dart';
@@ -218,6 +219,7 @@ class _WarrantyReplacementFormState
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(warrantyReplacementControllerProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
     final existingDealAsync = ref.watch(
       warrantyReplacementDealForDisposalProvider(widget.disposalId),
     );
@@ -277,8 +279,10 @@ class _WarrantyReplacementFormState
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'The replacement will copy the original item details and carry forward its acquisition value of '
-                        '${CurrencyFormatter.formatCents(widget.disposedItem.acquisitionValueCents)}.',
+                        permissions.canViewFinancialData
+                            ? 'The replacement will copy the original item details and carry forward its acquisition value of '
+                                  '${CurrencyFormatter.formatCents(widget.disposedItem.acquisitionValueCents)}.'
+                            : 'The replacement will copy the original item details and preserve its existing cost basis.',
                       ),
                       const SizedBox(height: 8),
                       const Text(

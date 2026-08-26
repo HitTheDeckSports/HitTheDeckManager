@@ -72,10 +72,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isOrdinaryUser =
           session.authorization.role == AuthorizedUserRole.user;
+      final path = state.uri.path;
       final isRestrictedRoute =
-          state.name == AppRouteNames.reports ||
-          state.name == AppRouteNames.disposeInventory ||
-          state.name == AppRouteNames.userAccess;
+          path == AppRoutes.reports ||
+          path == AppRoutes.userAccess ||
+          (path.startsWith('/inventory/') && path.endsWith('/dispose')) ||
+          (path.startsWith('/repairs/') && path.endsWith('/edit')) ||
+          (path.startsWith('/disposals/') &&
+              path.endsWith('/warranty-replacement'));
 
       if (isOrdinaryUser && isRestrictedRoute) {
         return AppRoutes.dashboard;

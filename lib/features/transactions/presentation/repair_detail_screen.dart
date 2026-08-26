@@ -10,6 +10,7 @@ import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../domain/models/repair_transaction.dart';
 import 'providers/repair_transaction_controller.dart';
 import 'providers/transaction_providers.dart';
@@ -130,43 +131,48 @@ class _RepairDetailContent extends ConsumerWidget {
     );
 
     final controllerState = ref.watch(repairTransactionControllerProvider);
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     final isDeleting = controllerState.isLoading;
 
     return AppPage(
       title: 'Repair Details',
       subtitle: _formatDate(repair.repairDate),
-      actions: [
-        OutlinedButton.icon(
-          key: const Key('repairEditButton'),
-          onPressed: isDeleting
-              ? null
-              : () {
-                  context.goNamed(
-                    AppRouteNames.editRepair,
-                    pathParameters: {'repairId': repair.id!},
-                  );
-                },
-          icon: const Icon(Icons.edit_outlined),
-          label: const Text('Edit Repair'),
-        ),
-        FilledButton.icon(
-          key: const Key('repairDeleteButton'),
-          onPressed: isDeleting
-              ? null
-              : () {
-                  _deleteRepair(context, ref);
-                },
-          icon: isDeleting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.delete_outline),
-          label: Text(isDeleting ? 'Deleting Repair...' : 'Delete Repair'),
-        ),
-      ],
+      actions: permissions.canViewFinancialData
+          ? [
+              OutlinedButton.icon(
+                key: const Key('repairEditButton'),
+                onPressed: isDeleting
+                    ? null
+                    : () {
+                        context.goNamed(
+                          AppRouteNames.editRepair,
+                          pathParameters: {'repairId': repair.id!},
+                        );
+                      },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Edit Repair'),
+              ),
+              FilledButton.icon(
+                key: const Key('repairDeleteButton'),
+                onPressed: isDeleting
+                    ? null
+                    : () {
+                        _deleteRepair(context, ref);
+                      },
+                icon: isDeleting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline),
+                label: Text(
+                  isDeleting ? 'Deleting Repair...' : 'Delete Repair',
+                ),
+              ),
+            ]
+          : const [],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -177,10 +183,11 @@ class _RepairDetailContent extends ConsumerWidget {
                 label: 'Repair Date',
                 value: _formatDate(repair.repairDate),
               ),
-              _RepairDetailRow(
-                label: 'Repair Cost',
-                value: CurrencyFormatter.formatCents(repair.costCents),
-              ),
+              if (permissions.canViewFinancialData)
+                _RepairDetailRow(
+                  label: 'Repair Cost',
+                  value: CurrencyFormatter.formatCents(repair.costCents),
+                ),
               _RepairDetailRow(label: 'Description', value: repair.description),
               _RepairDetailRow(
                 label: 'Notes',

@@ -12,6 +12,7 @@ import '../../inventory/domain/models/inventory_enums.dart';
 import '../domain/models/deal_status.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import 'providers/deal_providers.dart';
 
 class DealDetailScreen extends ConsumerWidget {
@@ -22,6 +23,7 @@ class DealDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(dealSummaryProvider(dealId));
+    final permissions = ref.watch(currentAppPermissionsProvider);
 
     return summaryAsync.when(
       loading: () => const AppPage(
@@ -56,42 +58,44 @@ class DealDetailScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Section(
-                title: 'Profit Summary',
-                children: [
-                  _Row(
-                    label: 'Parent Transaction Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.parentTransactionProfitCents,
+              if (permissions.canViewFinancialData) ...[
+                _Section(
+                  title: 'Profit Summary',
+                  children: [
+                    _Row(
+                      label: 'Parent Transaction Profit',
+                      value: CurrencyFormatter.formatCents(
+                        summary.parentTransactionProfitCents,
+                      ),
                     ),
-                  ),
-                  _Row(
-                    label: 'Realized Child Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.realizedChildProfitCents,
+                    _Row(
+                      label: 'Realized Child Profit',
+                      value: CurrencyFormatter.formatCents(
+                        summary.realizedChildProfitCents,
+                      ),
                     ),
-                  ),
-                  _Row(
-                    label: 'Projected Child Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.projectedChildProfitCents,
+                    _Row(
+                      label: 'Projected Child Profit',
+                      value: CurrencyFormatter.formatCents(
+                        summary.projectedChildProfitCents,
+                      ),
                     ),
-                  ),
-                  _Row(
-                    label: 'Realized Deal Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.realizedDealProfitCents,
+                    _Row(
+                      label: 'Realized Deal Profit',
+                      value: CurrencyFormatter.formatCents(
+                        summary.realizedDealProfitCents,
+                      ),
                     ),
-                  ),
-                  _Row(
-                    label: 'Projected Deal Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.projectedDealProfitCents,
+                    _Row(
+                      label: 'Projected Deal Profit',
+                      value: CurrencyFormatter.formatCents(
+                        summary.projectedDealProfitCents,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
               _Section(
                 title: 'Deal Progress',
                 children: [
@@ -127,6 +131,7 @@ class DealDetailScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               _DealChildrenSection(
                 childInventoryItemIds: summary.deal.childInventoryItemIds,
+                canViewFinancialData: permissions.canViewFinancialData,
               ),
             ],
           ),
@@ -137,9 +142,13 @@ class DealDetailScreen extends ConsumerWidget {
 }
 
 class _DealChildrenSection extends ConsumerWidget {
-  const _DealChildrenSection({required this.childInventoryItemIds});
+  const _DealChildrenSection({
+    required this.childInventoryItemIds,
+    required this.canViewFinancialData,
+  });
 
   final List<String> childInventoryItemIds;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -180,6 +189,7 @@ class _DealChildrenSection extends ConsumerWidget {
               _ChildItem(
                 itemId: childInventoryItemIds[index],
                 item: byId[childInventoryItemIds[index]],
+                canViewFinancialData: canViewFinancialData,
               ),
             ],
           ],
@@ -190,10 +200,15 @@ class _DealChildrenSection extends ConsumerWidget {
 }
 
 class _ChildItem extends StatelessWidget {
-  const _ChildItem({required this.itemId, required this.item});
+  const _ChildItem({
+    required this.itemId,
+    required this.item,
+    required this.canViewFinancialData,
+  });
 
   final String itemId;
   final InventoryItem? item;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
@@ -216,10 +231,11 @@ class _ChildItem extends StatelessWidget {
           value: '${child.inventoryNumber ?? 'Not assigned'} â€” $name',
         ),
         _Row(label: 'Status', value: child.status.label),
-        _Row(
-          label: 'Acquisition Value',
-          value: CurrencyFormatter.formatCents(child.acquisitionValueCents),
-        ),
+        if (canViewFinancialData)
+          _Row(
+            label: 'Acquisition Value',
+            value: CurrencyFormatter.formatCents(child.acquisitionValueCents),
+          ),
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
