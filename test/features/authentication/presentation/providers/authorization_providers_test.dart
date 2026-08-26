@@ -61,7 +61,6 @@ class FakeAuthorizationRepository implements AuthorizationRepository {
 }
 
 Future<AuthenticatedSession?> readSession(ProviderContainer container) async {
-  // Keep the StreamProvider alive while waiting for its first emitted value.
   final subscription = container.listen<AsyncValue<AuthenticatedSession?>>(
     authenticatedSessionProvider,
     (previous, next) {},
@@ -94,7 +93,7 @@ ProviderContainer createContainer({
 }
 
 void main() {
-  const authUser = AuthUser(id: 'user-1', email: 'user@example.com');
+  const authUser = AuthUser(id: 'admin-1', email: 'admin@example.com');
 
   group('authenticatedSessionProvider', () {
     test('returns null when no Firebase user is signed in', () async {
@@ -112,12 +111,12 @@ void main() {
       expect(authenticationRepository.signOutCount, 0);
     });
 
-    test('returns session for active authorized user', () async {
+    test('returns session for active authorized Admin', () async {
       final authenticationRepository = FakeAuthenticationRepository(authUser);
       final authorizationRepository = FakeAuthorizationRepository(
         const AuthorizedUser(
-          email: 'user@example.com',
-          role: AuthorizedUserRole.user,
+          email: 'admin@example.com',
+          role: AuthorizedUserRole.admin,
           active: true,
         ),
       );
@@ -132,6 +131,7 @@ void main() {
       expect(session, isNotNull);
       expect(session!.user, authUser);
       expect(session.authorization.active, isTrue);
+      expect(session.authorization.isAdmin, isTrue);
       expect(authenticationRepository.signOutCount, 0);
     });
 
@@ -150,12 +150,12 @@ void main() {
       expect(authenticationRepository.signOutCount, 1);
     });
 
-    test('signs out when authorization record is disabled', () async {
+    test('signs out when Admin authorization record is disabled', () async {
       final authenticationRepository = FakeAuthenticationRepository(authUser);
       final authorizationRepository = FakeAuthorizationRepository(
         const AuthorizedUser(
-          email: 'user@example.com',
-          role: AuthorizedUserRole.user,
+          email: 'admin@example.com',
+          role: AuthorizedUserRole.admin,
           active: false,
         ),
       );
@@ -171,11 +171,11 @@ void main() {
       expect(authenticationRepository.signOutCount, 1);
     });
 
-    test('preserves admin role in authenticated session', () async {
+    test('preserves Admin role in authenticated session', () async {
       final authenticationRepository = FakeAuthenticationRepository(authUser);
       final authorizationRepository = FakeAuthorizationRepository(
         const AuthorizedUser(
-          email: 'user@example.com',
+          email: 'admin@example.com',
           role: AuthorizedUserRole.admin,
           active: true,
         ),

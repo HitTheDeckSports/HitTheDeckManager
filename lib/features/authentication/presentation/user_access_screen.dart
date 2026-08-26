@@ -32,7 +32,7 @@ class UserAccessScreen extends ConsumerWidget {
             ? null
             : () => _showAddUserDialog(context, ref),
         icon: const Icon(Icons.person_add),
-        label: const Text('Add User'),
+        label: const Text('Add Admin'),
       ),
       body: usersState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -59,6 +59,9 @@ class UserAccessScreen extends ConsumerWidget {
 
               return _AuthorizedUserTile(
                 user: user,
+                canManageProfile:
+                    session.authorization.isOwner &&
+                    user.role == AuthorizedUserRole.admin,
                 isBusy: actionState.isLoading,
                 onDisable: () => _confirmDisableUser(context, ref, user),
                 onRestore: () => _restoreUser(context, ref, user),
@@ -77,7 +80,7 @@ class UserAccessScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Add Authorized User'),
+          title: const Text('Add Admin Profile'),
           content: TextField(
             controller: emailController,
             keyboardType: TextInputType.emailAddress,
@@ -117,7 +120,7 @@ class UserAccessScreen extends ConsumerWidget {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Access granted to ${email.trim()}.')),
+        SnackBar(content: Text('Admin access granted to ${email.trim()}.')),
       );
     } on AppException catch (error) {
       if (!context.mounted) {
@@ -209,12 +212,14 @@ class UserAccessScreen extends ConsumerWidget {
 class _AuthorizedUserTile extends StatelessWidget {
   const _AuthorizedUserTile({
     required this.user,
+    required this.canManageProfile,
     required this.isBusy,
     required this.onDisable,
     required this.onRestore,
   });
 
   final AuthorizedUser user;
+  final bool canManageProfile;
   final bool isBusy;
   final VoidCallback onDisable;
   final VoidCallback onRestore;
@@ -224,7 +229,6 @@ class _AuthorizedUserTile extends StatelessWidget {
     final roleLabel = switch (user.role) {
       AuthorizedUserRole.owner => 'Owner',
       AuthorizedUserRole.admin => 'Admin',
-      AuthorizedUserRole.user => 'User',
     };
 
     final statusLabel = user.active ? 'Active' : 'Disabled';
@@ -232,7 +236,6 @@ class _AuthorizedUserTile extends StatelessWidget {
     final icon = switch (user.role) {
       AuthorizedUserRole.owner => Icons.admin_panel_settings,
       AuthorizedUserRole.admin => Icons.manage_accounts,
-      AuthorizedUserRole.user => Icons.person,
     };
 
     return ListTile(
@@ -241,7 +244,7 @@ class _AuthorizedUserTile extends StatelessWidget {
       subtitle: Text('$roleLabel • $statusLabel'),
       trailing: user.isOwner
           ? const Chip(label: Text('Owner'))
-          : user.role == AuthorizedUserRole.admin
+          : !canManageProfile
           ? const Chip(label: Text('Admin'))
           : user.active
           ? OutlinedButton(

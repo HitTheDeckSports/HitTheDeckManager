@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/authentication/domain/models/authorized_user.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
 import '../features/inventory/domain/models/inventory_item.dart';
@@ -67,21 +66,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Once an authorized session exists, the login page is no longer needed.
       if (isLoginRoute) {
-        return AppRoutes.dashboard;
-      }
-
-      final isOrdinaryUser =
-          session.authorization.role == AuthorizedUserRole.user;
-      final path = state.uri.path;
-      final isRestrictedRoute =
-          path == AppRoutes.reports ||
-          path == AppRoutes.userAccess ||
-          (path.startsWith('/inventory/') && path.endsWith('/dispose')) ||
-          (path.startsWith('/repairs/') && path.endsWith('/edit')) ||
-          (path.startsWith('/disposals/') &&
-              path.endsWith('/warranty-replacement'));
-
-      if (isOrdinaryUser && isRestrictedRoute) {
         return AppRoutes.dashboard;
       }
 

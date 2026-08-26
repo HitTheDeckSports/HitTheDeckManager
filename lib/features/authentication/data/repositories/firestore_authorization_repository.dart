@@ -72,12 +72,23 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
           .orderBy('email')
           .snapshots()
           .map((snapshot) {
-            return snapshot.docs.map((document) {
-              return _authorizedUserFromData(
-                email: document.id,
-                data: document.data(),
-              );
-            }).toList();
+            final users = <AuthorizedUser>[
+              const AuthorizedUser(
+                email: rootOwnerEmail,
+                role: AuthorizedUserRole.owner,
+                active: true,
+              ),
+              ...snapshot.docs
+                  .map(
+                    (document) => _authorizedUserFromData(
+                      email: document.id,
+                      data: document.data(),
+                    ),
+                  )
+                  .whereType<AuthorizedUser>(),
+            ];
+
+            return List<AuthorizedUser>.unmodifiable(users);
           });
     } on FirebaseException catch (error) {
       throw _mapFirebaseException(error);
@@ -113,10 +124,9 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
 
       await reference.set({
         'email': normalizedEmail,
-        'role': 'user',
+        'role': 'admin',
         'active': true,
         'addedAt': FieldValue.serverTimestamp(),
-        'addedBy': rootOwnerEmail,
       });
     } on FirebaseException catch (error) {
       throw _mapFirebaseException(error);
@@ -179,30 +189,30 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
     }
   }
 
-  AuthorizedUser _authorizedUserFromData({
+  AuthorizedUser? _authorizedUserFromData({
     required String email,
     required Map<String, dynamic> data,
   }) {
     final active = data['active'];
-    final role = data['role'];
+    final role = _parseRole(data['role']);
+
+    if (role == null) {
+      return null;
+    }
 
     return AuthorizedUser(
       email: _normalizeEmail(email),
-      role: _parseRole(role),
+      role: role,
       active: active is bool ? active : false,
     );
   }
 
-  AuthorizedUserRole _parseRole(Object? value) {
-    switch (value) {
-      case 'owner':
-        return AuthorizedUserRole.owner;
-      case 'admin':
-        return AuthorizedUserRole.admin;
-      case 'user':
-      default:
-        return AuthorizedUserRole.user;
-    }
+  AuthorizedUserRole? _parseRole(Object? value) {
+    return switch (value) {
+      'owner' => AuthorizedUserRole.owner,
+      'admin' => AuthorizedUserRole.admin,
+      _ => null,
+    };
   }
 
   AppException _mapFirebaseException(FirebaseException error) {

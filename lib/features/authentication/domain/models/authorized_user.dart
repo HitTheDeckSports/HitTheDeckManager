@@ -1,5 +1,5 @@
-/// Access roles available within Hit the Deck Manager.
-enum AuthorizedUserRole { owner, admin, user }
+/// Access roles available within Hit the Deck Manager Version 1.0.
+enum AuthorizedUserRole { owner, admin }
 
 /// Application-level representation of an approved Hit the Deck Manager user.
 class AuthorizedUser {

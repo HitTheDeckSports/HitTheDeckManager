@@ -41,7 +41,11 @@ service cloud.firestore {
     }
 
     function isAuthorizedAppUser() {
-      return isRootOwner() || isActiveAuthorizedUser();
+      return isRootOwner()
+          || (
+            isActiveAuthorizedUser()
+            && currentAccessRecord().data.role == 'admin'
+          );
     }
 
     function isAdmin() {
@@ -61,16 +65,18 @@ service cloud.firestore {
       allow get: if hasVerifiedEmail()
           && userEmail() == userEmailDocument;
 
-      // Owner or admin may create ordinary user records.
+      // Owner and active Admins may add additional Admin profiles.
       allow create: if isAdmin()
           && userEmailDocument != 'sales.hitthedecksports@gmail.com'
-          && request.resource.data.role == 'user';
+          && request.resource.data.role == 'admin'
+          && request.resource.data.active == true;
 
-      // Owner or admin may update ordinary user records.
-      allow update: if isAdmin()
+      // Only the permanent Owner may disable or restore an existing Admin.
+      // Admins cannot modify another Admin or the Owner.
+      allow update: if isRootOwner()
           && userEmailDocument != 'sales.hitthedecksports@gmail.com'
-          && resource.data.role == 'user'
-          && request.resource.data.role == 'user';
+          && resource.data.role == 'admin'
+          && request.resource.data.role == 'admin';
 
       // Access records are disabled/restored instead of deleted.
       allow delete: if false;
