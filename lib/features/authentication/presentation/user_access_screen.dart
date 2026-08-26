@@ -74,43 +74,14 @@ class UserAccessScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddUserDialog(BuildContext context, WidgetRef ref) async {
-    final emailController = TextEditingController();
-
-    final shouldAdd = await showDialog<bool>(
+    final email = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add Admin Profile'),
-          content: TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Google account email',
-              hintText: 'name@example.com',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => const _AddAdminDialog(),
     );
 
-    if (shouldAdd != true) {
-      emailController.dispose();
+    if (email == null) {
       return;
     }
-
-    final email = emailController.text;
-    emailController.dispose();
 
     try {
       await ref.read(userAccessControllerProvider.notifier).addUser(email);
@@ -206,6 +177,55 @@ class UserAccessScreen extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text(error.message)));
     }
+  }
+}
+
+class _AddAdminDialog extends StatefulWidget {
+  const _AddAdminDialog();
+
+  @override
+  State<_AddAdminDialog> createState() => _AddAdminDialogState();
+}
+
+class _AddAdminDialogState extends State<_AddAdminDialog> {
+  late final TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Admin Profile'),
+      content: TextField(
+        controller: _emailController,
+        keyboardType: TextInputType.emailAddress,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Google account email',
+          hintText: 'name@example.com',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_emailController.text),
+          child: const Text('Add'),
+        ),
+      ],
+    );
   }
 }
 
