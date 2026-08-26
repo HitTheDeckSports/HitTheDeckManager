@@ -7,7 +7,9 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../application/contact_relationship.dart';
 import '../domain/models/contact.dart';
+import 'providers/contact_relationship_providers.dart';
 import 'providers/contact_providers.dart';
 
 class ContactDetailScreen extends ConsumerWidget {
@@ -53,7 +55,7 @@ class ContactDetailScreen extends ConsumerWidget {
   }
 }
 
-class _ContactDetailContent extends StatelessWidget {
+class _ContactDetailContent extends ConsumerWidget {
   const _ContactDetailContent({required this.contact});
 
   final Contact contact;
@@ -79,7 +81,13 @@ class _ContactDetailContent extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final relationshipsAsync = ref.watch(contactRelationshipsProvider);
+    final relationshipAsync = relationshipsAsync.whenData(
+      (relationships) =>
+          relationships[contact.id] ?? const ContactRelationship.empty(),
+    );
+
     return AppPage(
       title: contact.name,
       subtitle: 'Contact Details',
@@ -127,6 +135,8 @@ class _ContactDetailContent extends StatelessWidget {
                           'Business Contact',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
+                        const SizedBox(height: 8),
+                        _ContactStatusBadge(isActive: contact.isActive),
                       ],
                     ),
                   ),
@@ -168,10 +178,261 @@ class _ContactDetailContent extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _RelationshipSection(
+            relationshipAsync: relationshipAsync,
+            onRetry: () {
+              ref.invalidate(contactRelationshipsProvider);
+            },
+          ),
         ],
       ),
     );
   }
+}
+
+class _ContactStatusBadge extends StatelessWidget {
+  const _ContactStatusBadge({required this.isActive});
+
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isActive ? Colors.green : Colors.grey;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        key: Key(isActive ? 'activeContactBadge' : 'inactiveContactBadge'),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Text(
+            isActive ? 'Active' : 'Inactive',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RelationshipSection extends StatelessWidget {
+  const _RelationshipSection({
+    required this.relationshipAsync,
+    required this.onRetry,
+  });
+
+  final AsyncValue<ContactRelationship> relationshipAsync;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return relationshipAsync.when(
+      loading: () => const _ContactDetailSection(
+        title: 'Relationship Overview',
+        children: [AppLoadingState(message: 'Loading contact history...')],
+      ),
+      error: (error, stackTrace) => _ContactDetailSection(
+        title: 'Relationship Overview',
+        children: [
+          AppErrorState(
+            message: 'Unable to load contact history.',
+            details: error.toString(),
+            onRetry: onRetry,
+          ),
+        ],
+      ),
+      data: (relationship) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _RelationshipTotals(relationship: relationship),
+          const SizedBox(height: 16),
+          _ContactHistory(history: relationship.history),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelationshipTotals extends StatelessWidget {
+  const _RelationshipTotals({required this.relationship});
+
+  final ContactRelationship relationship;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ContactDetailSection(
+      title: 'Relationship Overview',
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = constraints.maxWidth >= 720
+                ? (constraints.maxWidth - 24) / 3
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _RelationshipMetric(
+                  key: const Key('boughtFromUsMetric'),
+                  width: cardWidth,
+                  label: 'Bought From Us',
+                  count: relationship.boughtFromUsCount,
+                  icon: Icons.shopping_bag_outlined,
+                ),
+                _RelationshipMetric(
+                  key: const Key('soldToUsMetric'),
+                  width: cardWidth,
+                  label: 'Sold To Us',
+                  count: relationship.soldToUsCount,
+                  icon: Icons.inventory_2_outlined,
+                ),
+                _RelationshipMetric(
+                  key: const Key('consignmentsMetric'),
+                  width: cardWidth,
+                  label: 'Consignments',
+                  count: relationship.consignmentCount,
+                  icon: Icons.handshake_outlined,
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _RelationshipMetric extends StatelessWidget {
+  const _RelationshipMetric({
+    required this.width,
+    required this.label,
+    required this.count,
+    required this.icon,
+    super.key,
+  });
+
+  final double width;
+  final String label;
+  final int count;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(icon, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$count',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    Text(label),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactHistory extends StatelessWidget {
+  const _ContactHistory({required this.history});
+
+  final List<ContactHistoryEntry> history;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ContactDetailSection(
+      title: 'Transaction History',
+      children: [
+        if (history.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('No linked transaction history.'),
+          )
+        else
+          for (var index = 0; index < history.length; index++) ...[
+            _ContactHistoryEntry(entry: history[index]),
+            if (index < history.length - 1) const Divider(height: 24),
+          ],
+      ],
+    );
+  }
+}
+
+class _ContactHistoryEntry extends StatelessWidget {
+  const _ContactHistoryEntry({required this.entry});
+
+  final ContactHistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          child: Icon(_historyIcon(entry.type), size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(entry.title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 2),
+              Text(entry.description),
+              const SizedBox(height: 4),
+              Text(
+                entry.date == null
+                    ? 'Date not available'
+                    : _formatDate(entry.date!),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+IconData _historyIcon(ContactHistoryType type) {
+  return switch (type) {
+    ContactHistoryType.sale => Icons.shopping_bag_outlined,
+    ContactHistoryType.purchase => Icons.inventory_2_outlined,
+    ContactHistoryType.trade => Icons.swap_horiz,
+    ContactHistoryType.consignment => Icons.handshake_outlined,
+  };
+}
+
+String _formatDate(DateTime date) {
+  return '${date.month}/${date.day}/${date.year}';
 }
 
 class _ContactDetailSection extends StatelessWidget {
