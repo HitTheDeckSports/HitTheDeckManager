@@ -25,6 +25,11 @@ void main() {
     expect(find.byKey(const Key('globalSearchHeaderButton')), findsOneWidget);
     expect(find.byKey(const Key('globalSettingsHeaderButton')), findsOneWidget);
     expect(find.byKey(const Key('globalSearchFloatingButton')), findsNothing);
+
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.backgroundColor, const Color(0xFF031C35));
+    expect(find.text('HIT THE DECK'), findsOneWidget);
+    expect(find.text('MANAGER'), findsOneWidget);
   });
 
   testWidgets('mobile bottom navigation routes to core destinations', (

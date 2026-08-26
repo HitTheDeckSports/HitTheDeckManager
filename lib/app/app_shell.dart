@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/theme/app_theme.dart';
 import '../features/authentication/presentation/providers/app_permissions_provider.dart';
 import '../features/authentication/presentation/providers/authentication_controller.dart';
 import 'app_routes.dart';
@@ -41,7 +42,7 @@ class AppShell extends ConsumerWidget {
                   labelType: NavigationRailLabelType.all,
                   leading: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Icon(Icons.sports_baseball, size: 32),
+                    child: _BrandMark(compact: true),
                   ),
                   trailing: Padding(
                     padding: const EdgeInsets.only(top: 24),
@@ -66,20 +67,36 @@ class AppShell extends ConsumerWidget {
         return Scaffold(
           appBar: _buildAppBar(context),
           body: child,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex(
-              currentLocation,
-              canAccessReports: canAccessReports,
+          bottomNavigationBar: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppTheme.surface,
+              border: Border(top: BorderSide(color: Color(0xFFE4E8EE))),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x16062A4D),
+                  blurRadius: 12,
+                  offset: Offset(0, -3),
+                ),
+              ],
             ),
-            onDestinationSelected: (index) {
-              _navigateToIndex(
-                context,
-                index,
-                canAccessReports: canAccessReports,
-              );
-            },
-            destinations: _navigationDestinations(
-              canAccessReports: canAccessReports,
+            child: SafeArea(
+              top: false,
+              child: NavigationBar(
+                selectedIndex: _selectedIndex(
+                  currentLocation,
+                  canAccessReports: canAccessReports,
+                ),
+                onDestinationSelected: (index) {
+                  _navigateToIndex(
+                    context,
+                    index,
+                    canAccessReports: canAccessReports,
+                  );
+                },
+                destinations: _navigationDestinations(
+                  canAccessReports: canAccessReports,
+                ),
+              ),
             ),
           ),
         );
@@ -89,13 +106,17 @@ class AppShell extends ConsumerWidget {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      title: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.sports_baseball),
-          SizedBox(width: 10),
-          Flexible(child: Text('Hit the Deck Manager')),
-        ],
+      backgroundColor: AppTheme.navyDark,
+      foregroundColor: Colors.white,
+      toolbarHeight: 74,
+      titleSpacing: 16,
+      title: const _BrandMark(),
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(3),
+        child: SizedBox(
+          height: 3,
+          child: ColoredBox(color: AppTheme.primaryRed),
+        ),
       ),
       actions: [
         IconButton(
@@ -110,6 +131,7 @@ class AppShell extends ConsumerWidget {
           icon: const Icon(Icons.settings_outlined),
           onPressed: () => context.go(AppRoutes.settings),
         ),
+        const SizedBox(width: 6),
       ],
     );
   }
@@ -229,5 +251,59 @@ class AppShell extends ConsumerWidget {
     };
 
     context.go(route);
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return const Icon(
+        Icons.sports_baseball,
+        color: AppTheme.primaryRed,
+        size: 34,
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.sports_baseball, color: Colors.white, size: 35),
+        const SizedBox(width: 9),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text(
+              'HIT THE DECK',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                letterSpacing: 0.4,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'MANAGER',
+              style: TextStyle(
+                color: AppTheme.primaryRed,
+                fontSize: 13,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
