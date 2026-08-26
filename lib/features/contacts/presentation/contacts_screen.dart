@@ -7,10 +7,20 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../application/contact_relationship.dart';
 import '../domain/models/contact.dart';
+import 'providers/contact_relationship_providers.dart';
 import 'providers/contact_providers.dart';
 
 enum _ContactStatusFilter { all, active, inactive }
+
+enum _ContactRelationshipFilter {
+  all,
+  hasBoughtFromUs,
+  hasSoldToUs,
+  hasConsignments,
+  hasNotBoughtYet,
+}
 
 class ContactsScreen extends ConsumerStatefulWidget {
   const ContactsScreen({super.key});
@@ -22,8 +32,12 @@ class ContactsScreen extends ConsumerStatefulWidget {
 class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   String _query = '';
   _ContactStatusFilter _status = _ContactStatusFilter.all;
+  _ContactRelationshipFilter _relationship = _ContactRelationshipFilter.all;
 
-  List<Contact> _filter(List<Contact> contacts) {
+  List<Contact> _filter(
+    List<Contact> contacts,
+    Map<String, ContactRelationship> relationships,
+  ) {
     final query = _query.trim().toLowerCase();
     return contacts
         .where((contact) {
@@ -33,6 +47,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             _ContactStatusFilter.inactive => !contact.isActive,
           };
           if (!statusMatches) return false;
+          final relationship =
+              relationships[contact.id] ?? const ContactRelationship.empty();
+          final relationshipMatches = switch (_relationship) {
+            _ContactRelationshipFilter.all => true,
+            _ContactRelationshipFilter.hasBoughtFromUs =>
+              relationship.boughtFromUsCount > 0,
+            _ContactRelationshipFilter.hasSoldToUs =>
+              relationship.soldToUsCount > 0,
+            _ContactRelationshipFilter.hasConsignments =>
+              relationship.consignmentCount > 0,
+            _ContactRelationshipFilter.hasNotBoughtYet =>
+              relationship.boughtFromUsCount == 0,
+          };
+          if (!relationshipMatches) return false;
           if (query.isEmpty) return true;
           return [
             contact.name,
@@ -50,6 +78,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(contactsProvider);
+    final relationshipsAsync = ref.watch(contactRelationshipsProvider);
     return AppPage(
       title: 'Contacts',
       subtitle: 'Manage customers, sellers, and other business contacts.',
@@ -77,61 +106,112 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   'Customers, sellers, and other business contacts will appear here.',
             );
           }
-          final filtered = _filter(contacts);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                key: const Key('contactSearchField'),
-                decoration: const InputDecoration(
-                  labelText: 'Search contacts',
-                  hintText: 'Name, phone, email, address, or notes',
-                  prefixIcon: Icon(Icons.search),
-                ),
-                onChanged: (value) => setState(() => _query = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<_ContactStatusFilter>(
-                key: const Key('contactStatusFilter'),
-                initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: const [
-                  DropdownMenuItem(
-                    value: _ContactStatusFilter.all,
-                    child: Text('All contacts'),
+          return relationshipsAsync.when(
+            loading: () => const AppLoadingState(
+              message: 'Loading contact relationships...',
+            ),
+            error: (error, stackTrace) => AppErrorState(
+              message: 'Unable to load contact relationships.',
+              details: error.toString(),
+              onRetry: () => ref.invalidate(contactRelationshipsProvider),
+            ),
+            data: (relationships) {
+              final filtered = _filter(contacts, relationships);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const Key('contactSearchField'),
+                    decoration: const InputDecoration(
+                      labelText: 'Search contacts',
+                      hintText: 'Name, phone, email, address, or notes',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) => setState(() => _query = value),
                   ),
-                  DropdownMenuItem(
-                    value: _ContactStatusFilter.active,
-                    child: Text('Active'),
-                  ),
-                  DropdownMenuItem(
-                    value: _ContactStatusFilter.inactive,
-                    child: Text('Inactive'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _status = value);
-                },
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '${filtered.length} of ${contacts.length} contact'
-                '${contacts.length == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              if (filtered.isEmpty)
-                const AppEmptyState(
-                  icon: Icons.person_search_outlined,
-                  title: 'No matching contacts.',
-                  message: 'Try changing the search or status filter.',
-                )
-              else
-                for (final contact in filtered) ...[
-                  _ContactCard(contact: contact),
                   const SizedBox(height: 12),
+                  DropdownButtonFormField<_ContactStatusFilter>(
+                    key: const Key('contactStatusFilter'),
+                    initialValue: _status,
+                    decoration: const InputDecoration(labelText: 'Status'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: _ContactStatusFilter.all,
+                        child: Text('All contacts'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactStatusFilter.active,
+                        child: Text('Active'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactStatusFilter.inactive,
+                        child: Text('Inactive'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _status = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<_ContactRelationshipFilter>(
+                    key: const Key('contactRelationshipFilter'),
+                    initialValue: _relationship,
+                    decoration: const InputDecoration(
+                      labelText: 'Relationship',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: _ContactRelationshipFilter.all,
+                        child: Text('All relationships'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactRelationshipFilter.hasBoughtFromUs,
+                        child: Text('Has bought from us'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactRelationshipFilter.hasSoldToUs,
+                        child: Text('Has sold to us'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactRelationshipFilter.hasConsignments,
+                        child: Text('Has consignments'),
+                      ),
+                      DropdownMenuItem(
+                        value: _ContactRelationshipFilter.hasNotBoughtYet,
+                        child: Text('Has not bought yet'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _relationship = value);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${filtered.length} of ${contacts.length} contact'
+                    '${contacts.length == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  if (filtered.isEmpty)
+                    const AppEmptyState(
+                      icon: Icons.person_search_outlined,
+                      title: 'No matching contacts.',
+                      message:
+                          'Try changing the search, status, or relationship filter.',
+                    )
+                  else
+                    for (final contact in filtered) ...[
+                      _ContactCard(
+                        contact: contact,
+                        relationship:
+                            relationships[contact.id] ??
+                            const ContactRelationship.empty(),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                 ],
-            ],
+              );
+            },
           );
         },
       ),
@@ -140,9 +220,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
 }
 
 class _ContactCard extends StatelessWidget {
-  const _ContactCard({required this.contact});
+  const _ContactCard({required this.contact, required this.relationship});
 
   final Contact contact;
+  final ContactRelationship relationship;
 
   String _initials() {
     final parts = contact.name
@@ -216,6 +297,28 @@ class _ContactCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _RelationshipCount(
+                          key: Key('contactBoughtFromUs-${contact.id}'),
+                          label: 'Bought From Us',
+                          count: relationship.boughtFromUsCount,
+                        ),
+                        _RelationshipCount(
+                          key: Key('contactSoldToUs-${contact.id}'),
+                          label: 'Sold To Us',
+                          count: relationship.soldToUsCount,
+                        ),
+                        _RelationshipCount(
+                          key: Key('contactConsignments-${contact.id}'),
+                          label: 'Consignments',
+                          count: relationship.consignmentCount,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -225,6 +328,35 @@ class _ContactCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RelationshipCount extends StatelessWidget {
+  const _RelationshipCount({
+    required this.label,
+    required this.count,
+    super.key,
+  });
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          '$label: $count',
+          style: Theme.of(context).textTheme.labelMedium,
         ),
       ),
     );
