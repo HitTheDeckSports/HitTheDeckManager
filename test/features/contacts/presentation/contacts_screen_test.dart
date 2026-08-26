@@ -67,7 +67,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('2 contacts'), findsOneWidget);
+    expect(find.text('2 of 2 contacts'), findsOneWidget);
 
     expect(find.text('Alex Johnson'), findsOneWidget);
     expect(find.text('Jordan Smith'), findsOneWidget);
@@ -111,11 +111,56 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('1 contact'), findsOneWidget);
+    expect(find.text('1 of 1 contact'), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsOneWidget);
     expect(find.text('TM'), findsOneWidget);
 
-    expect(find.text('No phone or email entered.'), findsOneWidget);
+    expect(find.text('No contact information entered.'), findsOneWidget);
+  });
+
+  testWidgets('searches contacts and filters inactive contacts', (
+    WidgetTester tester,
+  ) async {
+    final repository = InMemoryContactRepository(
+      initialContacts: const [
+        Contact(id: 'active', name: 'Alex Johnson', phone: '555-1111'),
+        Contact(
+          id: 'inactive',
+          name: 'Jordan Smith',
+          email: 'jordan@example.com',
+          isActive: false,
+        ),
+      ],
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [contactRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(home: Scaffold(body: ContactsScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('activeContactBadge')), findsOneWidget);
+    expect(find.byKey(const Key('inactiveContactBadge')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('contactSearchField')),
+      'jordan@example.com',
+    );
+    await tester.pump();
+    expect(find.text('1 of 2 contacts'), findsOneWidget);
+    expect(find.text('Jordan Smith'), findsOneWidget);
+    expect(find.text('Alex Johnson'), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('contactSearchField')), '');
+    await tester.tap(find.byKey(const Key('contactStatusFilter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Inactive').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Jordan Smith'), findsOneWidget);
+    expect(find.text('Alex Johnson'), findsNothing);
   });
   testWidgets('tapping a contact opens its detail screen', (
     WidgetTester tester,

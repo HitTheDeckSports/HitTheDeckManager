@@ -21,6 +21,7 @@ void main() {
       expect(state.address, isEmpty);
       expect(state.notes, isEmpty);
       expect(state.photoUrl, isNull);
+      expect(state.isActive, isTrue);
     });
 
     test('updates form fields', () {
@@ -35,6 +36,7 @@ void main() {
       controller.setAddress('100 Main Street');
       controller.setNotes('Repeat customer.');
       controller.setPhotoUrl('contact-photo.jpg');
+      controller.setIsActive(false);
 
       final state = container.read(contactFormControllerProvider);
 
@@ -44,6 +46,7 @@ void main() {
       expect(state.address, '100 Main Street');
       expect(state.notes, 'Repeat customer.');
       expect(state.photoUrl, 'contact-photo.jpg');
+      expect(state.isActive, isFalse);
     });
 
     test('loads an existing contact for editing', () {
@@ -60,6 +63,7 @@ void main() {
         address: '100 Main Street',
         notes: 'Repeat customer.',
         photoUrl: 'contact-photo.jpg',
+        isActive: false,
       );
 
       controller.loadContact(contact);
@@ -74,6 +78,7 @@ void main() {
       expect(state.address, '100 Main Street');
       expect(state.notes, 'Repeat customer.');
       expect(state.photoUrl, 'contact-photo.jpg');
+      expect(state.isActive, isFalse);
     });
 
     test('returns null and preserves state when form is invalid', () async {

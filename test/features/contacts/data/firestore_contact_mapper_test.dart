@@ -70,5 +70,13 @@ void main() {
       expect(data['notes'], 'Customer note');
       expect(data['photoUrl'], 'https://example.com/test.jpg');
     });
+
+    test('stores inactive status', () {
+      const contact = Contact(name: 'Archived Contact', isActive: false);
+
+      final data = FirestoreContactMapper.toFirestore(contact);
+
+      expect(data['isActive'], isFalse);
+    });
   });
 }

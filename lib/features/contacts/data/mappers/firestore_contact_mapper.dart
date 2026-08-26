@@ -17,6 +17,7 @@ abstract final class FirestoreContactMapper {
       'address': normalized.address,
       'notes': normalized.notes,
       'photoUrl': normalized.photoUrl,
+      'isActive': normalized.isActive,
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -41,6 +42,7 @@ abstract final class FirestoreContactMapper {
       address: _stringOrNull(data['address']),
       notes: _stringOrNull(data['notes']),
       photoUrl: _stringOrNull(data['photoUrl']),
+      isActive: data['isActive'] is bool ? data['isActive'] as bool : true,
     );
   }
 

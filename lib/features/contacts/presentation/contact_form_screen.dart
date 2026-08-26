@@ -248,6 +248,17 @@ class _ContactFormScreenState extends ConsumerState<ContactFormScreen> {
               ),
               onChanged: formController.setNotes,
             ),
+            const SizedBox(height: 16),
+            SwitchListTile.adaptive(
+              key: const Key('contactActiveSwitch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Active contact'),
+              subtitle: const Text(
+                'Inactive contacts remain available in historical records.',
+              ),
+              value: ref.watch(contactFormControllerProvider).isActive,
+              onChanged: isSaving ? null : formController.setIsActive,
+            ),
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('contactSubmitButton'),
