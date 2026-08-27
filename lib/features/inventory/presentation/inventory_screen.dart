@@ -124,8 +124,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       .where((item) => item.status == _quickStatus)
                       .toList();
             final hasQuery = _query.trim().isNotEmpty;
-            final isFiltering =
-                hasQuery || _filters.isActive || _quickStatus != null;
+            final statusCounts = <InventoryStatus, int>{
+              for (final status in InventoryStatus.values)
+                status: items.where((item) => item.status == status).length,
+            };
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -193,35 +195,41 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     children: [
                       _QuickFilterChip(
                         label: 'All',
+                        count: items.length,
                         selected: _quickStatus == null,
                         onSelected: () => _selectQuickStatus(null),
                       ),
                       _QuickFilterChip(
                         label: 'Available',
+                        count: statusCounts[InventoryStatus.available] ?? 0,
                         selected: _quickStatus == InventoryStatus.available,
                         onSelected: () =>
                             _selectQuickStatus(InventoryStatus.available),
                       ),
                       _QuickFilterChip(
                         label: 'Sold',
+                        count: statusCounts[InventoryStatus.sold] ?? 0,
                         selected: _quickStatus == InventoryStatus.sold,
                         onSelected: () =>
                             _selectQuickStatus(InventoryStatus.sold),
                       ),
                       _QuickFilterChip(
                         label: 'Needs Repair',
+                        count: statusCounts[InventoryStatus.broken] ?? 0,
                         selected: _quickStatus == InventoryStatus.broken,
                         onSelected: () =>
                             _selectQuickStatus(InventoryStatus.broken),
                       ),
                       _QuickFilterChip(
                         label: 'Inactive',
+                        count: statusCounts[InventoryStatus.inactive] ?? 0,
                         selected: _quickStatus == InventoryStatus.inactive,
                         onSelected: () =>
                             _selectQuickStatus(InventoryStatus.inactive),
                       ),
                       _QuickFilterChip(
                         label: 'Disposed',
+                        count: statusCounts[InventoryStatus.disposed] ?? 0,
                         selected: _quickStatus == InventoryStatus.disposed,
                         onSelected: () =>
                             _selectQuickStatus(InventoryStatus.disposed),
@@ -259,17 +267,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 8),
-                Text(
-                  isFiltering
-                      ? '${filteredItems.length} of ${items.length} items'
-                      : '${items.length} inventory '
-                            'item${items.length == 1 ? '' : 's'}',
-                  key: const Key('inventoryResultCount'),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppTheme.textSecondary,
+                if (hasQuery || _filters.isActive) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '${filteredItems.length} of ${items.length} items',
+                    key: const Key('inventoryResultCount'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 8),
                 if (filteredItems.isEmpty)
                   AppEmptyState(
@@ -340,11 +347,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 class _QuickFilterChip extends StatelessWidget {
   const _QuickFilterChip({
     required this.label,
+    required this.count,
     required this.selected,
     required this.onSelected,
   });
 
   final String label;
+  final int count;
   final bool selected;
   final VoidCallback onSelected;
 
@@ -353,7 +362,22 @@ class _QuickFilterChip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(label),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            const SizedBox(width: 4),
+            Text(
+              '($count)',
+              key: ValueKey('inventoryQuickFilterCount-$label'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white70 : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
         selected: selected,
         onSelected: (_) => onSelected(),
         visualDensity: VisualDensity.compact,

@@ -117,7 +117,15 @@ void main() {
     expect(find.byKey(const Key('inventoryFilterButton')), findsOneWidget);
     expect(find.byKey(const Key('inventoryQuickFilters')), findsOneWidget);
     expect(find.text('All'), findsOneWidget);
-    expect(find.text('1 inventory item'), findsOneWidget);
+    expect(find.text('1 inventory item'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('inventoryQuickFilterCount-All')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickFilterCount-Available')),
+      findsOneWidget,
+    );
     expect(find.text('Combat Spec H1'), findsOneWidget);
     expect(find.text('BAT-2607-0001'), findsOneWidget);
     expect(find.text('Bat â€¢ 32 in â€¢ 29 oz â€¢ -3'), findsOneWidget);
@@ -231,7 +239,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('2 inventory items'), findsOneWidget);
+    expect(find.text('2 inventory items'), findsNothing);
     expect(find.text('Combat Spec H1'), findsOneWidget);
     expect(find.text('Easton Hype Fire'), findsOneWidget);
 
@@ -249,7 +257,7 @@ void main() {
     await tester.tap(find.byKey(const Key('inventorySearchClearButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 inventory items'), findsOneWidget);
+    expect(find.text('2 inventory items'), findsNothing);
     expect(find.text('Combat Spec H1'), findsOneWidget);
     expect(find.text('Easton Hype Fire'), findsOneWidget);
   });
