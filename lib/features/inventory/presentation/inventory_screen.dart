@@ -572,24 +572,31 @@ class _InventoryStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final (background, foreground) = switch (status) {
+    final (background, foreground, label) = switch (status) {
       InventoryStatus.available => (
-        colorScheme.primaryContainer,
-        colorScheme.onPrimaryContainer,
+        const Color(0xFFE2F4E8),
+        const Color(0xFF137A37),
+        'Available',
       ),
       InventoryStatus.sold => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
+        const Color(0xFFE4EEFC),
+        const Color(0xFF1768C5),
+        'Sold',
+      ),
+      InventoryStatus.broken => (
+        const Color(0xFFFFEED8),
+        const Color(0xFFC46A00),
+        'Needs Repair',
       ),
       InventoryStatus.inactive => (
-        colorScheme.surfaceContainerHighest,
-        colorScheme.onSurfaceVariant,
+        const Color(0xFFECEFF3),
+        const Color(0xFF596573),
+        'Inactive',
       ),
-      InventoryStatus.broken => (const Color(0xFFFFECEC), AppTheme.primaryRed),
       InventoryStatus.disposed => (
-        colorScheme.surfaceContainerHigh,
-        colorScheme.onSurface,
+        const Color(0xFFFFE4E6),
+        AppTheme.primaryRed,
+        'Disposed',
       ),
     };
 
@@ -601,10 +608,11 @@ class _InventoryStatusChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          status == InventoryStatus.broken ? 'Needs Repair' : status.label,
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: foreground),
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
