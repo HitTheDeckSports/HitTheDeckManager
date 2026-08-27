@@ -407,6 +407,7 @@ class _InventoryItemCard extends StatelessWidget {
         : CurrencyFormatter.formatCents(item.askingPriceCents!);
     final condition = item.condition?.label;
     final age = _inventoryAgeLabel(item.purchaseDate);
+    final categoryColor = _inventoryCategoryColor(item.category);
 
     return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 8),
@@ -421,57 +422,37 @@ class _InventoryItemCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: SizedBox(
-                height: 84,
+                height: 96,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: AppTheme.navy,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.05,
-                                ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            price,
-                            key: ValueKey('inventoryItemPrice-${item.id}'),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: AppTheme.navy,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      title,
+                      key: ValueKey('inventoryItemTitle-${item.id}'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.navy,
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       item.inventoryNumber ?? 'Not assigned',
                       key: ValueKey('inventoryItemNumber-${item.id}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
+                        color: categoryColor,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       specs == null
                           ? item.category.label
-                          : '${item.category.label} â€¢ $specs',
+                          : '${item.category.label} • $specs',
                       key: ValueKey('inventoryItemSize-${item.id}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -498,27 +479,47 @@ class _InventoryItemCard extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (age != null) ...[
-                          const Spacer(),
-                          Text(
-                            age,
-                            key: ValueKey('inventoryItemAge-${item.id}'),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
                       ],
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 78,
+              height: 96,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      price,
+                      key: ValueKey('inventoryItemPrice-${item.id}'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (age != null)
+                    Text(
+                      age,
+                      key: ValueKey('inventoryItemAge-${item.id}'),
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
             const SizedBox(width: 2),
             const Padding(
-              padding: EdgeInsets.only(top: 30),
+              padding: EdgeInsets.only(top: 36),
               child: Icon(
                 Icons.chevron_right,
                 size: 22,
@@ -545,8 +546,8 @@ class _InventoryThumbnail extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         key: ValueKey('inventoryItemPhoto-${item.id}'),
-        width: 84,
-        height: 84,
+        width: 88,
+        height: 96,
         child: photoUrl == null
             ? _InventoryPhotoPlaceholder(category: item.category)
             : Image.network(
@@ -643,6 +644,16 @@ class _InventoryStatusChip extends StatelessWidget {
   }
 }
 
+Color _inventoryCategoryColor(InventoryCategory category) {
+  return switch (category) {
+    InventoryCategory.bat => const Color(0xFF1768C5),
+    InventoryCategory.glove => const Color(0xFFB45A18),
+    InventoryCategory.catchersGear => const Color(0xFF6F42C1),
+    InventoryCategory.helmet => AppTheme.navy,
+    InventoryCategory.other => const Color(0xFF657382),
+  };
+}
+
 String? _inventorySizeLabel(InventoryItem item) {
   final parts = <String>[];
 
@@ -678,7 +689,7 @@ String? _inventorySizeLabel(InventoryItem item) {
       break;
   }
 
-  return parts.isEmpty ? null : parts.join(' â€¢ ');
+  return parts.isEmpty ? null : parts.join(' • ');
 }
 
 String? _inventoryAgeLabel(DateTime? purchaseDate) {

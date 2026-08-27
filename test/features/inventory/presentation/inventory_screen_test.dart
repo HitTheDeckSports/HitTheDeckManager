@@ -128,7 +128,16 @@ void main() {
     );
     expect(find.text('Combat Spec H1'), findsOneWidget);
     expect(find.text('BAT-2607-0001'), findsOneWidget);
-    expect(find.text('Bat â€¢ 32 in â€¢ 29 oz â€¢ -3'), findsOneWidget);
+    final inventoryNumber = tester.widget<Text>(
+      find.byKey(const ValueKey('inventoryItemNumber-item-1')),
+    );
+    expect(inventoryNumber.style?.color, const Color(0xFF1768C5));
+
+    final titleWidget = tester.widget<Text>(
+      find.byKey(const ValueKey('inventoryItemTitle-item-1')),
+    );
+    expect(titleWidget.maxLines, 2);
+    expect(find.text('Bat • 32 in • 29 oz • -3'), findsOneWidget);
     final itemCard = find.byKey(const ValueKey('inventoryItemTile-item-1'));
     expect(
       find.descendant(of: itemCard, matching: find.text('Available')),
@@ -146,6 +155,39 @@ void main() {
     );
     expect(find.text(r'Cost: $200.00'), findsNothing);
     expect(find.text('No inventory items yet.'), findsNothing);
+  });
+
+  testWidgets('Inventory card allows long specialty names to use two lines', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'long-title',
+      inventoryNumber: 'BAT-2608-0099',
+      category: InventoryCategory.bat,
+      brand: 'Louisville Slugger',
+      model: 'Meta Limited Edition College World Series Paint Scheme',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 34900,
+    );
+
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [inventoryRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final title = tester.widget<Text>(
+      find.byKey(const ValueKey('inventoryItemTitle-long-title')),
+    );
+
+    expect(title.maxLines, 2);
+    expect(title.overflow, TextOverflow.ellipsis);
+    expect(find.text(r'$349.00'), findsOneWidget);
   });
 
   testWidgets('InventoryScreen displays helmet size on its card', (
