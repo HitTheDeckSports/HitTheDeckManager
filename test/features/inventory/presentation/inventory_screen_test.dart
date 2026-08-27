@@ -25,14 +25,14 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Inventory'), findsOneWidget);
+    expect(find.text('Inventory'), findsNothing);
     expect(find.text('No inventory items yet.'), findsOneWidget);
     expect(
-      find.text('Use Buy Inventory to add your first item.'),
+      find.text('Use Add Inventory to add your first item.'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('inventoryScanQrButton')), findsOneWidget);
-    expect(find.text('Scan QR'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryAddButton')), findsOneWidget);
   });
 
   testWidgets('Scan QR button opens the inventory scanner route', (
@@ -86,7 +86,7 @@ void main() {
   testWidgets('InventoryScreen displays photo-forward inventory cards', (
     WidgetTester tester,
   ) async {
-    const item = InventoryItem(
+    final item = InventoryItem(
       id: 'item-1',
       inventoryNumber: 'BAT-2607-0001',
       category: InventoryCategory.bat,
@@ -95,6 +95,8 @@ void main() {
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 20000,
       askingPriceCents: 32500,
+      condition: InventoryCondition.likeNew,
+      purchaseDate: DateTime.now().subtract(const Duration(days: 25)),
       lengthInches: 32,
       weightOunces: 29,
       drop: -3,
@@ -112,12 +114,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inventorySearchField')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryFilterButton')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryQuickFilters')), findsOneWidget);
+    expect(find.text('All'), findsOneWidget);
     expect(find.text('1 inventory item'), findsOneWidget);
     expect(find.text('Combat Spec H1'), findsOneWidget);
     expect(find.text('BAT-2607-0001'), findsOneWidget);
     expect(find.text('Bat â€¢ 32 in â€¢ 29 oz â€¢ -3'), findsOneWidget);
-    expect(find.text('Available'), findsOneWidget);
+    final itemCard = find.byKey(const ValueKey('inventoryItemTile-item-1'));
+    expect(
+      find.descendant(of: itemCard, matching: find.text('Available')),
+      findsOneWidget,
+    );
     expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text('Like New'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryItemAge-item-1')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('inventoryItemPhoto-item-1')),
       findsOneWidget,
@@ -154,7 +168,7 @@ void main() {
   testWidgets('Inventory cards never display acquisition cost', (
     WidgetTester tester,
   ) async {
-    const item = InventoryItem(
+    final item = InventoryItem(
       id: 'item-1',
       inventoryNumber: 'BAT-2607-0001',
       category: InventoryCategory.bat,
@@ -227,7 +241,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('1 of 2 inventory items'), findsOneWidget);
+    expect(find.text('1 of 2 items'), findsOneWidget);
     expect(find.text('Combat Spec H1'), findsNothing);
     expect(find.text('Easton Hype Fire'), findsOneWidget);
     expect(find.byKey(const Key('inventorySearchClearButton')), findsOneWidget);
@@ -243,7 +257,7 @@ void main() {
   testWidgets('Inventory search displays a no-results state', (
     WidgetTester tester,
   ) async {
-    const item = InventoryItem(
+    final item = InventoryItem(
       id: 'item-1',
       inventoryNumber: 'BAT-2608-0001',
       category: InventoryCategory.bat,
@@ -270,7 +284,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('0 of 1 inventory item'), findsOneWidget);
+    expect(find.text('0 of 1 items'), findsOneWidget);
     expect(find.text('Combat Spec H1'), findsNothing);
     expect(find.text('No inventory items match your search.'), findsOneWidget);
     expect(
@@ -282,7 +296,7 @@ void main() {
   testWidgets('tapping an inventory item opens its detail screen', (
     WidgetTester tester,
   ) async {
-    const item = InventoryItem(
+    final item = InventoryItem(
       id: 'item-1',
       inventoryNumber: 'BAT-2608-0001',
       category: InventoryCategory.bat,
