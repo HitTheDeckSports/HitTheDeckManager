@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
+import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_location_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_location.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/forms/buy_inventory_form_controller.dart';
+import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_location_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/buy_inventory_screen.dart';
 import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memory_contact_repository.dart';
@@ -16,16 +19,30 @@ import 'package:hit_the_deck_manager/features/contacts/presentation/providers/co
 void main() {
   late InMemoryInventoryRepository inventoryRepository;
   late InMemoryContactRepository contactRepository;
+  late InMemoryInventoryLocationRepository locationRepository;
   late ProviderContainer container;
 
   setUp(() {
     inventoryRepository = InMemoryInventoryRepository();
     contactRepository = InMemoryContactRepository();
+    locationRepository = InMemoryInventoryLocationRepository(
+      initialLocations: const [
+        InventoryLocation(id: 'main-rack', name: 'Main Rack'),
+        InventoryLocation(
+          id: 'old-display',
+          name: 'Old Display',
+          active: false,
+        ),
+      ],
+    );
 
     container = ProviderContainer(
       overrides: [
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         contactRepositoryProvider.overrideWithValue(contactRepository),
+        inventoryLocationRepositoryProvider.overrideWithValue(
+          locationRepository,
+        ),
         currentAppPermissionsProvider.overrideWithValue(
           const AppPermissions.ownerOrAdmin(),
         ),
@@ -37,12 +54,22 @@ void main() {
     container.dispose();
     await inventoryRepository.dispose();
     await contactRepository.dispose();
+    await locationRepository.dispose();
   });
 
   Widget createTestApp() {
     return UncontrolledProviderScope(
       container: container,
       child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+    );
+  }
+
+  Widget createEditTestApp(InventoryItem item) {
+    return UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+      ),
     );
   }
 
@@ -58,6 +85,7 @@ void main() {
     expect(find.text('Brand'), findsOneWidget);
     expect(find.text('Model'), findsOneWidget);
     expect(find.text('Acquisition Type'), findsOneWidget);
+    expect(find.text('Location'), findsOneWidget);
     expect(find.text('Acquisition Value'), findsOneWidget);
     expect(find.text('Condition'), findsOneWidget);
     expect(find.text('Purchase Date'), findsOneWidget);
@@ -87,6 +115,7 @@ void main() {
       find.byKey(const Key('buyInventoryAcquisitionValueField')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('buyInventoryLocationField')), findsOneWidget);
     expect(find.byKey(const Key('buyInventoryConditionField')), findsOneWidget);
     expect(
       find.byKey(const Key('buyInventoryPurchaseDateField')),
@@ -109,6 +138,65 @@ void main() {
     );
     expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
     expect(find.byKey(const Key('buyInventorySubmitButton')), findsOneWidget);
+  });
+  testWidgets('location selector shows active locations and Unassigned', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('buyInventoryLocationField'));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unassigned').last, findsOneWidget);
+    expect(find.text('Main Rack').last, findsOneWidget);
+    expect(find.text('Old Display (Inactive)'), findsNothing);
+  });
+
+  testWidgets('selecting a location updates the inventory form state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('buyInventoryLocationField'));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Rack').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(buyInventoryFormControllerProvider).locationId,
+      'main-rack',
+    );
+  });
+
+  testWidgets('editing preserves an inactive assigned location', (
+    WidgetTester tester,
+  ) async {
+    const existingItem = InventoryItem(
+      id: 'item-with-old-location',
+      inventoryNumber: 'BAT-2608-0200',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 15000,
+      locationId: 'old-display',
+    );
+
+    await tester.pumpWidget(createEditTestApp(existingItem));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('buyInventoryLocationField')), findsOneWidget);
+    expect(find.text('Old Display (Inactive)'), findsOneWidget);
+    expect(
+      container.read(buyInventoryFormControllerProvider).locationId,
+      'old-display',
+    );
   });
   testWidgets('shows glove-specific fields when Glove is selected', (
     WidgetTester tester,

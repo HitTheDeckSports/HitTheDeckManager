@@ -13,6 +13,7 @@ import '../domain/models/inventory_item.dart';
 import '../application/photos/inventory_photo_workflow.dart';
 import 'forms/buy_inventory_form_controller.dart';
 import 'providers/inventory_controller.dart';
+import 'providers/inventory_location_providers.dart';
 import 'providers/inventory_providers.dart';
 import 'providers/inventory_photo_providers.dart';
 import 'widgets/inventory_photo_section.dart';
@@ -477,6 +478,7 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     final inventoryControllerState = ref.watch(inventoryControllerProvider);
 
     final contactsAsync = ref.watch(contactsProvider);
+    final locationsAsync = ref.watch(inventoryLocationsProvider);
     final permissions = ref.watch(currentAppPermissionsProvider);
     final showAcquisitionValue =
         !widget.isEditing || permissions.canViewFinancialData;
@@ -575,6 +577,88 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                 if (acquisitionType != null) {
                   formController.setAcquisitionType(acquisitionType);
                 }
+              },
+            ),
+            const SizedBox(height: 16),
+            locationsAsync.when(
+              loading: () => const InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Loading locations...'),
+                  ],
+                ),
+              ),
+              error: (error, stackTrace) => InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(),
+                  errorText: 'Unable to load locations.',
+                ),
+                child: Text(error.toString()),
+              ),
+              data: (locations) {
+                final selectedId = formState.locationId;
+                final activeLocations = locations
+                    .where((location) => location.active)
+                    .toList(growable: true);
+
+                if (selectedId != null &&
+                    !activeLocations.any(
+                      (location) => location.id == selectedId,
+                    )) {
+                  for (final location in locations) {
+                    if (location.id == selectedId) {
+                      activeLocations.add(location);
+                      break;
+                    }
+                  }
+                }
+
+                activeLocations.sort(
+                  (a, b) =>
+                      a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                );
+
+                final selectedExists =
+                    selectedId == null ||
+                    activeLocations.any(
+                      (location) => location.id == selectedId,
+                    );
+
+                return DropdownButtonFormField<String?>(
+                  key: const Key('buyInventoryLocationField'),
+                  initialValue: selectedExists ? selectedId : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Location',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Unassigned'),
+                    ),
+                    for (final location in activeLocations)
+                      DropdownMenuItem<String?>(
+                        value: location.id,
+                        child: Text(
+                          location.active
+                              ? location.name
+                              : '${location.name} (Inactive)',
+                        ),
+                      ),
+                  ],
+                  onChanged: isSaving ? null : formController.setLocationId,
+                );
               },
             ),
             if (showAcquisitionValue) ...[
