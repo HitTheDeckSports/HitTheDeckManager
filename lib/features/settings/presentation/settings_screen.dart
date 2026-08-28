@@ -28,6 +28,20 @@ class SettingsScreen extends ConsumerWidget {
               'Additional application preferences will be added here.',
             ),
           ),
+          const SizedBox(height: 24),
+          const _SettingsSectionHeader(title: 'Inventory'),
+          ListTile(
+            key: const Key('settingsInventoryLocationsTile'),
+            leading: const Icon(Icons.location_on_outlined),
+            title: const Text('Inventory Locations'),
+            subtitle: const Text(
+              'Manage preset display, storage, and repair locations.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              context.goNamed(AppRouteNames.inventoryLocations);
+            },
+          ),
 
           if (session?.authorization.isAdmin == true) ...[
             const SizedBox(height: 24),

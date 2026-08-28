@@ -102,6 +102,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /inventory_locations/{locationId} {
+      allow read, create, update: if isAuthorizedAppUser();
+      allow delete: if false;
+    }
+
     match /inventory_number_counters/{counterId} {
       // Inventory-number generation uses Firestore transactions.
       allow get: if isAuthorizedAppUser();

@@ -11,6 +11,7 @@ import '../features/contacts/presentation/edit_contact_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/inventory/presentation/inventory_item_detail_screen.dart';
+import '../features/inventory/presentation/inventory_locations_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/search/presentation/universal_search_screen.dart';
 import '../features/settings/presentation/more_screen.dart';
@@ -313,6 +314,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.settings,
             name: AppRouteNames.settings,
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.inventoryLocations,
+            name: AppRouteNames.inventoryLocations,
+            builder: (context, state) => const InventoryLocationsScreen(),
           ),
           GoRoute(
             path: AppRoutes.userAccess,

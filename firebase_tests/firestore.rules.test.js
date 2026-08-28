@@ -7,6 +7,7 @@ const {
 } = require('@firebase/rules-unit-testing');
 
 const {
+  deleteDoc,
   doc,
   getDoc,
   setDoc,
@@ -56,6 +57,11 @@ async function seedAccessRecords(testEnv) {
       acquisitionValueCents: 20000,
       askingPriceCents: 30000,
       minimumPriceCents: 25000,
+    });
+    await setDoc(doc(db, 'inventory_locations', 'main-rack'), {
+      name: 'Main Rack',
+      normalizedName: 'main rack',
+      active: true,
     });
   });
 }
@@ -145,6 +151,16 @@ async function main() {
         status: 'available',
       });
     });
+
+    await assertSucceeds(getDoc(doc(rootOwner.firestore(), 'inventory_locations', 'main-rack')));
+    await assertSucceeds(getDoc(doc(admin.firestore(), 'inventory_locations', 'main-rack')));
+    await assertFails(getDoc(doc(unauthorized.firestore(), 'inventory_locations', 'main-rack')));
+    await assertSucceeds(setDoc(doc(admin.firestore(), 'inventory_locations', 'facility-a'), {
+      name: 'Facility A', normalizedName: 'facility a', active: true,
+    }));
+    await assertSucceeds(updateDoc(doc(admin.firestore(), 'inventory_locations', 'facility-a'), { active: false }));
+    await assertSucceeds(updateDoc(doc(rootOwner.firestore(), 'inventory_locations', 'facility-a'), { active: true }));
+    await assertFails(deleteDoc(doc(admin.firestore(), 'inventory_locations', 'facility-a')));
 
     // Both Owner and Admin may add additional Admin profiles.
     await assertSucceeds(

@@ -14,6 +14,7 @@ abstract final class AppRoutes {
   static const String more = '/more';
   static const String search = '/search';
   static const String settings = '/settings';
+  static const String inventoryLocations = '/settings/inventory-locations';
   static const String userAccess = '/settings/user-access';
 
   static const String buyInventory = '/inventory/buy';
@@ -45,6 +46,7 @@ abstract final class AppRouteNames {
   static const String more = 'more';
   static const String search = 'search';
   static const String settings = 'settings';
+  static const String inventoryLocations = 'inventoryLocations';
   static const String userAccess = 'userAccess';
 
   static const String buyInventory = 'buyInventory';
