@@ -15,6 +15,7 @@ class BuyInventoryFormState {
     this.askingPrice = '',
     this.minimumPrice = '',
     this.sellerContactId,
+    this.locationId,
     this.notes = '',
     this.lengthInches = '',
     this.weightOunces = '',
@@ -39,6 +40,7 @@ class BuyInventoryFormState {
       askingPrice: _formatOptionalCentsForInput(item.askingPriceCents),
       minimumPrice: _formatOptionalCentsForInput(item.minimumPriceCents),
       sellerContactId: item.sellerContactId,
+      locationId: item.locationId,
       notes: item.notes ?? '',
       lengthInches: _formatOptionalNumber(item.lengthInches),
       weightOunces: _formatOptionalNumber(item.weightOunces),
@@ -62,6 +64,7 @@ class BuyInventoryFormState {
   final String askingPrice;
   final String minimumPrice;
   final String? sellerContactId;
+  final String? locationId;
   final String notes;
 
   final String lengthInches;
@@ -99,6 +102,7 @@ class BuyInventoryFormState {
       askingPriceCents: CurrencyFormatter.tryParseToCents(askingPrice),
       minimumPriceCents: CurrencyFormatter.tryParseToCents(minimumPrice),
       sellerContactId: sellerContactId,
+      locationId: locationId,
       notes: _emptyToNull(notes),
       lengthInches: category == InventoryCategory.bat
           ? double.tryParse(lengthInches.trim())
@@ -142,6 +146,7 @@ class BuyInventoryFormState {
     String? askingPrice,
     String? minimumPrice,
     Object? sellerContactId = _unset,
+    Object? locationId = _unset,
     String? notes,
     String? lengthInches,
     String? weightOunces,
@@ -171,6 +176,9 @@ class BuyInventoryFormState {
       sellerContactId: identical(sellerContactId, _unset)
           ? this.sellerContactId
           : sellerContactId as String?,
+      locationId: identical(locationId, _unset)
+          ? this.locationId
+          : locationId as String?,
       notes: notes ?? this.notes,
       lengthInches: lengthInches ?? this.lengthInches,
       weightOunces: weightOunces ?? this.weightOunces,

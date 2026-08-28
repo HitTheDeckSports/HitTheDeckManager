@@ -64,6 +64,10 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     state = state.copyWith(sellerContactId: sellerContactId);
   }
 
+  void setLocationId(String? locationId) {
+    state = state.copyWith(locationId: locationId);
+  }
+
   void setNotes(String notes) {
     state = state.copyWith(notes: notes);
   }

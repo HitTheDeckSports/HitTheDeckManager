@@ -18,6 +18,7 @@ class InventoryItem {
     this.askingPriceCents,
     this.minimumPriceCents,
     this.sellerContactId,
+    this.locationId,
     this.notes,
     this.lengthInches,
     this.weightOunces,
@@ -55,6 +56,11 @@ class InventoryItem {
 
   /// Identifier of the contact who sold, traded, or consigned the item.
   final String? sellerContactId;
+
+  /// Stable identifier of the managed inventory location.
+  ///
+  /// Null means the item is currently unassigned.
+  final String? locationId;
 
   final String? notes;
 
@@ -151,6 +157,7 @@ class InventoryItem {
     Object? askingPriceCents = _unset,
     Object? minimumPriceCents = _unset,
     Object? sellerContactId = _unset,
+    Object? locationId = _unset,
     Object? notes = _unset,
     Object? lengthInches = _unset,
     Object? weightOunces = _unset,
@@ -192,6 +199,9 @@ class InventoryItem {
       sellerContactId: identical(sellerContactId, _unset)
           ? this.sellerContactId
           : sellerContactId as String?,
+      locationId: identical(locationId, _unset)
+          ? this.locationId
+          : locationId as String?,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
       lengthInches: identical(lengthInches, _unset)
           ? this.lengthInches
