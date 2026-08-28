@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
-import '../../../core/formatting/currency_formatter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -14,6 +13,7 @@ import '../application/filters/inventory_filter.dart';
 import '../application/search/inventory_search.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
+import '../../transactions/presentation/providers/transaction_providers.dart';
 import 'providers/inventory_providers.dart';
 import 'widgets/inventory_filter_dialog.dart';
 
@@ -58,20 +58,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
+    final repairsAsync = ref.watch(repairTransactionsProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         key: const Key('inventoryAddButton'),
         onPressed: () => context.goNamed(AppRouteNames.buyInventory),
         backgroundColor: AppTheme.primaryRed,
         foregroundColor: Colors.white,
-        shape: const StadiumBorder(),
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'ADD INVENTORY',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
+        tooltip: 'Add Inventory',
+        child: const Icon(Icons.add, size: 30),
       ),
       body: AppPage(
         title: 'Inventory',
@@ -128,6 +125,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               for (final status in InventoryStatus.values)
                 status: items.where((item) => item.status == status).length,
             };
+            final repairCostsByInventoryItemId = repairsAsync
+                .when<Map<String, int>?>(
+                  data: (repairs) {
+                    final totals = <String, int>{};
+                    for (final repair in repairs) {
+                      totals.update(
+                        repair.inventoryItemId,
+                        (current) => current + repair.costCents,
+                        ifAbsent: () => repair.costCents,
+                      );
+                    }
+                    return totals;
+                  },
+                  loading: () => null,
+                  error: (error, stackTrace) => null,
+                );
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -214,7 +227,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             _selectQuickStatus(InventoryStatus.sold),
                       ),
                       _QuickFilterChip(
-                        label: 'Needs Repair',
+                        label: 'Repair',
                         count: statusCounts[InventoryStatus.broken] ?? 0,
                         selected: _quickStatus == InventoryStatus.broken,
                         onSelected: () =>
@@ -293,6 +306,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     _InventoryItemCard(
                       key: ValueKey('inventoryItemTile-${item.id}'),
                       item: item,
+                      repairCostCents: repairCostsByInventoryItemId == null
+                          ? null
+                          : repairCostsByInventoryItemId[item.id] ?? 0,
                       onTap: item.id == null
                           ? null
                           : () {
@@ -302,7 +318,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               );
                             },
                     ),
-                const SizedBox(height: 72),
+                const SizedBox(height: 96),
               ],
             );
           },
@@ -389,11 +405,13 @@ class _QuickFilterChip extends StatelessWidget {
 class _InventoryItemCard extends StatelessWidget {
   const _InventoryItemCard({
     required this.item,
+    required this.repairCostCents,
     required this.onTap,
     super.key,
   });
 
   final InventoryItem item;
+  final int? repairCostCents;
   final VoidCallback? onTap;
 
   @override
@@ -401,13 +419,18 @@ class _InventoryItemCard extends StatelessWidget {
     final title = item.model == null || item.model!.trim().isEmpty
         ? item.brand
         : '${item.brand} ${item.model}';
-    final specs = _inventorySizeLabel(item);
+    final specs = _inventoryCardSpecs(item);
     final price = item.askingPriceCents == null
-        ? 'Call'
-        : CurrencyFormatter.formatCents(item.askingPriceCents!);
+        ? r'$---'
+        : _formatWholeDollarCents(item.askingPriceCents!);
     final condition = item.condition?.label;
     final age = _inventoryAgeLabel(item.purchaseDate);
     final categoryColor = _inventoryCategoryColor(item.category);
+    final profitCents = item.askingPriceCents == null || repairCostCents == null
+        ? null
+        : item.askingPriceCents! -
+              item.acquisitionValueCents -
+              repairCostCents!;
 
     return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 8),
@@ -416,115 +439,168 @@ class _InventoryItemCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(9),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _InventoryThumbnail(item: item),
             const SizedBox(width: 10),
             Expanded(
-              child: SizedBox(
-                height: 96,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 92),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      key: ValueKey('inventoryItemTitle-${item.id}'),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.navy,
-                        fontWeight: FontWeight.w900,
-                        height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.inventoryNumber ?? 'Not assigned',
-                      key: ValueKey('inventoryItemNumber-${item.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: categoryColor,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      specs == null
-                          ? item.category.label
-                          : '${item.category.label} • $specs',
-                      key: ValueKey('inventoryItemSize-${item.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
                     Row(
                       children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: categoryColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            item.inventoryNumber ?? 'Not assigned',
+                            key: ValueKey('inventoryItemNumber-${item.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: categoryColor,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
                         _InventoryStatusChip(status: item.status),
-                        if (condition != null) ...[
-                          const SizedBox(width: 6),
-                          Flexible(
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            key: ValueKey('inventoryItemTitle-${item.id}'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: AppTheme.navy,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.12,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 72,
+                          child: Text(
+                            price,
+                            key: ValueKey('inventoryItemPrice-${item.id}'),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: AppTheme.navy,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            specs ?? item.category.label,
+                            key: ValueKey('inventoryItemSize-${item.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppTheme.textPrimary),
+                          ),
+                        ),
+                        if (profitCents != null) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 72,
                             child: Text(
-                              condition,
+                              _formatSignedWholeDollarCents(profitCents),
+                              key: ValueKey('inventoryItemProfit-${item.id}'),
+                              textAlign: TextAlign.right,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                    fontWeight: FontWeight.w700,
+                                    color: profitCents > 0
+                                        ? const Color(0xFF137A37)
+                                        : profitCents < 0
+                                        ? AppTheme.primaryRed
+                                        : AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w800,
                                   ),
                             ),
                           ),
                         ],
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (condition != null)
+                          Flexible(
+                            child: Container(
+                              key: ValueKey(
+                                'inventoryItemCondition-${item.id}',
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F2F5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                condition,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: AppTheme.navy,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        const Spacer(),
+                        if (age != null)
+                          Text(
+                            age,
+                            key: ValueKey('inventoryItemAge-${item.id}'),
+                            textAlign: TextAlign.right,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 78,
-              height: 96,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      price,
-                      key: ValueKey('inventoryItemPrice-${item.id}'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (age != null)
-                    Text(
-                      age,
-                      key: ValueKey('inventoryItemAge-${item.id}'),
-                      textAlign: TextAlign.right,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                ],
-              ),
-            ),
             const SizedBox(width: 2),
-            const Padding(
-              padding: EdgeInsets.only(top: 36),
-              child: Icon(
-                Icons.chevron_right,
-                size: 22,
-                color: AppTheme.textSecondary,
-              ),
+            const Icon(
+              Icons.chevron_right,
+              size: 22,
+              color: AppTheme.textSecondary,
             ),
           ],
         ),
@@ -547,7 +623,7 @@ class _InventoryThumbnail extends StatelessWidget {
       child: SizedBox(
         key: ValueKey('inventoryItemPhoto-${item.id}'),
         width: 88,
-        height: 96,
+        height: 92,
         child: photoUrl == null
             ? _InventoryPhotoPlaceholder(category: item.category)
             : Image.network(
@@ -611,7 +687,7 @@ class _InventoryStatusChip extends StatelessWidget {
       InventoryStatus.broken => (
         const Color(0xFFFFEED8),
         const Color(0xFFC46A00),
-        'Needs Repair',
+        'Repair',
       ),
       InventoryStatus.inactive => (
         const Color(0xFFECEFF3),
@@ -654,6 +730,59 @@ Color _inventoryCategoryColor(InventoryCategory category) {
   };
 }
 
+String? _inventoryCardSpecs(InventoryItem item) {
+  switch (item.category) {
+    case InventoryCategory.bat:
+      final parts = <String>[];
+      if (item.lengthInches != null) {
+        parts.add('${_formatMeasurement(item.lengthInches!)}"');
+      }
+      if (item.weightOunces != null) {
+        parts.add('${_formatMeasurement(item.weightOunces!)} oz');
+      }
+
+      final size = parts.isEmpty ? null : parts.join(' / ');
+      final certification = item.certification?.trim();
+
+      if (size != null && certification != null && certification.isNotEmpty) {
+        return '$size * $certification';
+      }
+      return size ??
+          (certification != null && certification.isNotEmpty
+              ? certification
+              : null);
+    case InventoryCategory.glove:
+      final parts = <String>[];
+      if (item.gloveSizeInches != null) {
+        parts.add('${_formatMeasurement(item.gloveSizeInches!)}"');
+      }
+      if (item.handOrientation != null &&
+          item.handOrientation!.trim().isNotEmpty) {
+        parts.add(_inventoryGloveHandLabel(item.handOrientation!));
+      }
+      return parts.isEmpty ? null : parts.join(' • ');
+    case InventoryCategory.catchersGear:
+    case InventoryCategory.helmet:
+      return _inventorySizeLabel(item);
+    case InventoryCategory.other:
+      return null;
+  }
+}
+
+String _inventoryGloveHandLabel(String value) {
+  final trimmed = value.trim();
+  final normalized = trimmed.toLowerCase();
+
+  if (normalized.contains('right')) {
+    return 'Right Hander';
+  }
+  if (normalized.contains('left')) {
+    return 'Left Hander';
+  }
+
+  return trimmed;
+}
+
 String? _inventorySizeLabel(InventoryItem item) {
   final parts = <String>[];
 
@@ -692,6 +821,30 @@ String? _inventorySizeLabel(InventoryItem item) {
   return parts.isEmpty ? null : parts.join(' • ');
 }
 
+String _formatWholeDollarCents(int cents) {
+  final roundedDollars = (cents / 100).round();
+  final absoluteDigits = roundedDollars.abs().toString();
+  final grouped = StringBuffer();
+
+  for (var index = 0; index < absoluteDigits.length; index++) {
+    if (index > 0 && (absoluteDigits.length - index) % 3 == 0) {
+      grouped.write(',');
+    }
+    grouped.write(absoluteDigits[index]);
+  }
+
+  final sign = roundedDollars < 0 ? '-' : '';
+  return '$sign\$${grouped.toString()}';
+}
+
+String _formatSignedWholeDollarCents(int cents) {
+  if (cents == 0) {
+    return '\$0';
+  }
+  final absolute = _formatWholeDollarCents(cents.abs());
+  return cents > 0 ? '+$absolute' : '-$absolute';
+}
+
 String? _inventoryAgeLabel(DateTime? purchaseDate) {
   if (purchaseDate == null) {
     return null;
@@ -702,7 +855,7 @@ String? _inventoryAgeLabel(DateTime? purchaseDate) {
     return null;
   }
 
-  return '$days d';
+  return '$days day${days == 1 ? '' : 's'}';
 }
 
 String _formatMeasurement(double value) {
