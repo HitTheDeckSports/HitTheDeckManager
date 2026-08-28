@@ -24,7 +24,7 @@ class AppShell extends ConsumerWidget {
 
         if (useNavigationRail) {
           return Scaffold(
-            appBar: _buildAppBar(context),
+            appBar: _buildAppBar(context, currentLocation),
             body: Row(
               children: [
                 NavigationRail(
@@ -65,7 +65,7 @@ class AppShell extends ConsumerWidget {
         }
 
         return Scaffold(
-          appBar: _buildAppBar(context),
+          appBar: _buildAppBar(context, currentLocation),
           body: child,
           bottomNavigationBar: DecoratedBox(
             decoration: const BoxDecoration(
@@ -104,12 +104,28 @@ class AppShell extends ConsumerWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    String currentLocation,
+  ) {
+    final inventoryDetailItemId = _inventoryDetailItemId(currentLocation);
+    final isInventoryDetail = inventoryDetailItemId != null;
+
     return AppBar(
       backgroundColor: AppTheme.navyDark,
       foregroundColor: Colors.white,
       toolbarHeight: 74,
-      titleSpacing: 16,
+      centerTitle: isInventoryDetail,
+      titleSpacing: isInventoryDetail ? 0 : 16,
+      leadingWidth: isInventoryDetail ? 64 : null,
+      leading: isInventoryDetail
+          ? IconButton(
+              key: const Key('inventoryDetailHeaderBackButton'),
+              tooltip: 'Back to Inventory',
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.goNamed(AppRouteNames.inventory),
+            )
+          : null,
       title: const _BrandMark(),
       bottom: const PreferredSize(
         preferredSize: Size.fromHeight(3),
@@ -118,22 +134,48 @@ class AppShell extends ConsumerWidget {
           child: ColoredBox(color: AppTheme.primaryRed),
         ),
       ),
-      actions: [
-        IconButton(
-          key: const Key('globalSearchHeaderButton'),
-          tooltip: 'Search',
-          icon: const Icon(Icons.search),
-          onPressed: () => context.go(AppRoutes.search),
-        ),
-        IconButton(
-          key: const Key('globalSettingsHeaderButton'),
-          tooltip: 'Settings',
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () => context.go(AppRoutes.settings),
-        ),
-        const SizedBox(width: 6),
-      ],
+      actions: isInventoryDetail
+          ? [
+              IconButton(
+                key: const Key('inventoryDetailHeaderEditButton'),
+                tooltip: 'Edit inventory item',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () {
+                  context.goNamed(
+                    AppRouteNames.inventoryEdit,
+                    pathParameters: {'itemId': inventoryDetailItemId},
+                  );
+                },
+              ),
+              const SizedBox(width: 6),
+            ]
+          : [
+              IconButton(
+                key: const Key('globalSearchHeaderButton'),
+                tooltip: 'Search',
+                icon: const Icon(Icons.search),
+                onPressed: () => context.go(AppRoutes.search),
+              ),
+              IconButton(
+                key: const Key('globalSettingsHeaderButton'),
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => context.go(AppRoutes.settings),
+              ),
+              const SizedBox(width: 6),
+            ],
     );
+  }
+
+  String? _inventoryDetailItemId(String location) {
+    final segments = Uri.parse(location).pathSegments;
+    if (segments.length != 2 || segments.first != 'inventory') {
+      return null;
+    }
+
+    const reserved = {'buy', 'sell', 'scan'};
+    final candidate = segments[1];
+    return reserved.contains(candidate) ? null : candidate;
   }
 
   List<NavigationDestination> _navigationDestinations({

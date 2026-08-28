@@ -73,6 +73,31 @@ void main() {
     expect(find.text('Settings destination'), findsOneWidget);
   });
 
+  testWidgets('Inventory Detail uses route-specific global header', (
+    WidgetTester tester,
+  ) async {
+    final router = await _pumpShell(tester);
+
+    router.go('/inventory/item-1');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryDetailHeaderBackButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryDetailHeaderEditButton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('globalSearchHeaderButton')), findsNothing);
+    expect(find.byKey(const Key('globalSettingsHeaderButton')), findsNothing);
+    expect(find.text('HIT THE DECK'), findsOneWidget);
+    expect(find.text('MANAGER'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inventoryDetailHeaderEditButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Inventory edit destination'), findsOneWidget);
+  });
   testWidgets('ordinary User navigation hides Reports', (
     WidgetTester tester,
   ) async {
@@ -124,6 +149,18 @@ Future<GoRouter> _pumpShell(
         routes: [
           _route(AppRoutes.dashboard, 'Dashboard destination'),
           _route(AppRoutes.inventory, 'Inventory destination'),
+          GoRoute(
+            path: AppRoutes.inventoryDetail,
+            name: AppRouteNames.inventoryDetail,
+            builder: (context, state) =>
+                const Center(child: Text('Inventory detail destination')),
+          ),
+          GoRoute(
+            path: AppRoutes.inventoryEdit,
+            name: AppRouteNames.inventoryEdit,
+            builder: (context, state) =>
+                const Center(child: Text('Inventory edit destination')),
+          ),
           _route(AppRoutes.transactions, 'Transactions destination'),
           _route(AppRoutes.contacts, 'Contacts destination'),
           _route(AppRoutes.reports, 'Reports destination'),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/app/app_shell.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -75,12 +76,7 @@ void main() {
 
     expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
-    expect(find.byKey(const Key('inventoryItemBackButton')), findsOneWidget);
-    expect(
-      find.byKey(const Key('inventoryDetailActionHeader')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('inventoryItemEditButton')), findsOneWidget);
+
     expect(find.byKey(const Key('inventoryItemQuickInfoGrid')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('inventoryQuickInfoLabel-Category')),
@@ -108,6 +104,7 @@ void main() {
     expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
     expect(find.text(r'$499.99'), findsOneWidget);
     expect(find.text(r'$325'), findsOneWidget);
+    expect(find.text('Asking Price'), findsAtLeastNWidgets(1));
     expect(find.text(r'$275.00'), findsOneWidget);
     expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
 
@@ -128,6 +125,41 @@ void main() {
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
+  testWidgets('quick-info QR action opens QR dialog', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'qr-item',
+      inventoryNumber: 'BAT-2608-0099',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'qr-item'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoAction-QR Code')),
+      findsOneWidget,
+    );
+
+    final qrAction = find.byKey(
+      const ValueKey('inventoryQuickInfoAction-QR Code'),
+    );
+    await tester.ensureVisible(qrAction);
+    await tester.pumpAndSettle();
+    await tester.tap(qrAction);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('BAT-2608-0099'), findsAtLeastNWidgets(1));
+  });
   testWidgets('displays saved helmet size', (WidgetTester tester) async {
     const item = InventoryItem(
       id: 'helmet-1',
@@ -516,33 +548,51 @@ void main() {
     );
 
     final repository = InMemoryInventoryRepository(initialItems: [item]);
-
     addTearDown(repository.dispose);
 
     final router = GoRouter(
       initialLocation: '/inventory/item-1',
       routes: [
-        GoRoute(
-          path: AppRoutes.inventoryDetail,
-          name: AppRouteNames.inventoryDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: InventoryItemDetailScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.inventoryEdit,
-          name: AppRouteNames.inventoryEdit,
-          builder: (context, state) {
-            return Scaffold(
-              body: EditInventoryScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
+        ShellRoute(
+          builder: (context, state, child) => AppShell(child: child),
+          routes: [
+            GoRoute(
+              path: AppRoutes.inventory,
+              name: AppRouteNames.inventory,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Inventory destination')),
+            ),
+            GoRoute(
+              path: AppRoutes.inventoryDetail,
+              name: AppRouteNames.inventoryDetail,
+              builder: (context, state) {
+                return InventoryItemDetailScreen(
+                  itemId: state.pathParameters['itemId']!,
+                );
+              },
+            ),
+            GoRoute(
+              path: AppRoutes.inventoryEdit,
+              name: AppRouteNames.inventoryEdit,
+              builder: (context, state) {
+                return EditInventoryScreen(
+                  itemId: state.pathParameters['itemId']!,
+                );
+              },
+            ),
+            GoRoute(
+              path: AppRoutes.search,
+              name: AppRouteNames.search,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Search destination')),
+            ),
+            GoRoute(
+              path: AppRoutes.settings,
+              name: AppRouteNames.settings,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Settings destination')),
+            ),
+          ],
         ),
       ],
     );
@@ -558,8 +608,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final editButton = find.byKey(const Key('inventoryItemEditButton'));
-
+    final editButton = find.byKey(const Key('inventoryDetailHeaderEditButton'));
     expect(editButton, findsOneWidget);
 
     await tester.tap(editButton);
@@ -571,11 +620,9 @@ void main() {
     final brandField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryBrandField')),
     );
-
     final modelField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryModelField')),
     );
-
     final acquisitionValueField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryAcquisitionValueField')),
     );
@@ -585,9 +632,7 @@ void main() {
     expect(acquisitionValueField.initialValue, '200.00');
 
     expect(find.byKey(const Key('buyInventoryLengthField')), findsOneWidget);
-
     expect(find.byKey(const Key('buyInventoryWeightField')), findsOneWidget);
-
     expect(find.byKey(const Key('buyInventoryDropField')), findsOneWidget);
   });
   testWidgets('changes and persists inventory status', (
