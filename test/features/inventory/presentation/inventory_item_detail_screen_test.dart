@@ -75,40 +75,56 @@ void main() {
 
     expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
-
-    expect(find.text('Basic Information'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemBackButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryDetailActionHeader')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventoryItemEditButton')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemQuickInfoGrid')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Category')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoValue-Category')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Location')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoValue-Location')),
+      findsOneWidget,
+    );
     expect(find.text('Bat'), findsOneWidget);
-    expect(find.text('Purchased'), findsOneWidget);
-    expect(find.text('Like New'), findsOneWidget);
+    expect(find.text('Purchased'), findsAtLeastNWidgets(1));
+    expect(find.text('Like New'), findsAtLeastNWidgets(1));
     expect(find.text('Available'), findsAtLeastNWidgets(1));
     expect(find.text('08/02/2026'), findsOneWidget);
 
-    expect(find.text('Pricing'), findsOneWidget);
+    expect(find.text('Additional Pricing'), findsOneWidget);
     expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
     expect(find.text(r'$499.99'), findsOneWidget);
-    expect(find.text(r'$325.00'), findsAtLeastNWidgets(2));
+    expect(find.text(r'$325'), findsOneWidget);
     expect(find.text(r'$275.00'), findsOneWidget);
     expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
-    expect(
-      find.byKey(const Key('inventoryItemTotalCostMetric')),
-      findsOneWidget,
-    );
+
     expect(
       find.byKey(const Key('inventoryItemEstimatedProfitMetric')),
       findsOneWidget,
     );
-    expect(find.text('Est. Profit'), findsOneWidget);
-    expect(find.text(r'$125.00'), findsOneWidget);
+    expect(find.text(r'+$125'), findsOneWidget);
     expect(
       find.byKey(const Key('inventoryPrimaryPhotoPlaceholder')),
       findsOneWidget,
     );
 
-    expect(find.text('Item Details'), findsOneWidget);
-    expect(find.text('32 in'), findsOneWidget);
-    expect(find.text('29 oz'), findsOneWidget);
-    expect(find.text('-3'), findsOneWidget);
-    expect(find.text('BBCOR'), findsOneWidget);
+    expect(find.textContaining('32"'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('29 oz'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('-3'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('BBCOR'), findsAtLeastNWidgets(1));
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
@@ -129,8 +145,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Helmet Size'), findsOneWidget);
-    expect(find.text('L/XL'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('L/XL'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('ordinary User does not see inventory cost or profit', (
@@ -169,8 +184,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Asking Price'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
+    expect(find.text(r'$325'), findsAtLeastNWidgets(1));
     expect(find.text('Acquisition Value'), findsNothing);
     expect(find.text('Total Cost'), findsNothing);
     expect(find.text('Est. Profit'), findsNothing);
@@ -455,8 +469,8 @@ void main() {
     expect(find.text('Rawlings Heart of the Hide'), findsAtLeastNWidgets(1));
     expect(find.text('Glove'), findsOneWidget);
     expect(find.text('Traded'), findsOneWidget);
-    expect(find.text('11.5 in'), findsOneWidget);
-    expect(find.text('Right Hand Throw'), findsOneWidget);
+    expect(find.textContaining('11.5"'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('Right Hand Throw'), findsAtLeastNWidgets(1));
 
     expect(find.text('Bat Length'), findsNothing);
     expect(find.text('Bat Weight'), findsNothing);
