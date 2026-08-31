@@ -130,63 +130,71 @@ class _InventoryItemDetailContent extends ConsumerWidget {
               children: [_DetailRow(label: 'Notes', value: item.notes!.trim())],
             ),
           ],
-          const SizedBox(height: 16),
-          _DetailSection(
-            title: 'Additional Pricing',
-            children: [
-              _DetailRow(
-                label: 'New Value',
-                value: _formatOptionalMoney(item.newValueCents),
-              ),
-              _DetailRow(
-                label: 'Minimum Acceptable Price',
-                value: _formatOptionalMoney(item.minimumPriceCents),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          if (item.newValueCents == null && item.minimumPriceCents == null)
+            const _CompactStatusSection(
+              key: Key('inventoryAdditionalPricingEmpty'),
+              icon: Icons.price_change_outlined,
+              title: 'Additional Pricing',
+              message: 'No additional pricing has been recorded.',
+            )
+          else
+            _DetailSection(
+              title: 'Additional Pricing',
+              children: [
+                _DetailRow(
+                  label: 'New Value',
+                  value: _formatOptionalMoney(item.newValueCents),
+                ),
+                _DetailRow(
+                  label: 'Minimum Acceptable Price',
+                  value: _formatOptionalMoney(item.minimumPriceCents),
+                ),
+              ],
+            ),
+          const SizedBox(height: 10),
           _SellerInformationSection(sellerContactId: item.sellerContactId),
           if (item.acquisitionType == AcquisitionType.consignment &&
               item.id != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _ConsignmentSection(item: item),
           ],
           if (item.id != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _RepairHistorySection(
               inventoryItemId: item.id!,
               acquisitionValueCents: item.acquisitionValueCents,
               canViewFinancialData: permissions.canViewFinancialData,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _DisposalHistorySection(inventoryItemId: item.id!),
           ],
           if (item.status == InventoryStatus.sold && item.id != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _SaleInformationSection(
               inventoryItemId: item.id!,
               canViewFinancialData: permissions.canViewFinancialData,
             ),
           ],
           if (item.id != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _TradeHistorySection(
               inventoryItemId: item.id!,
               canViewFinancialData: permissions.canViewFinancialData,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _InventoryDealSection(
               inventoryItemId: item.id!,
               status: item.status,
             ),
           ],
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           _InventoryPrimaryActions(
             item: item,
             canDisposeInventory: permissions.canDisposeInventory,
             isUpdatingStatus: isUpdatingStatus,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
         ],
       ),
     );
@@ -1361,9 +1369,11 @@ class _TradeHistorySection extends ConsumerWidget {
       ),
       data: (trades) {
         if (trades.isEmpty) {
-          return const _DetailSection(
+          return const _CompactStatusSection(
+            key: Key('inventoryTradeHistoryEmpty'),
+            icon: Icons.swap_horiz,
             title: 'Trade History',
-            children: [Text('This inventory item is not linked to a trade.')],
+            message: 'This inventory item is not linked to a trade.',
           );
         }
 
@@ -1573,9 +1583,11 @@ class _DisposalHistorySection extends ConsumerWidget {
       ),
       data: (disposals) {
         if (disposals.isEmpty) {
-          return const _DetailSection(
+          return const _CompactStatusSection(
+            key: Key('inventoryDisposalHistoryEmpty'),
+            icon: Icons.delete_outline,
             title: 'Disposal History',
-            children: [Text('This inventory item has not been disposed.')],
+            message: 'This inventory item has not been disposed.',
           );
         }
         return _DetailSection(
@@ -1763,6 +1775,63 @@ class _RepairHistoryContent extends StatelessWidget {
 
     final trueCostCents = acquisitionValueCents + totalRepairCostCents;
 
+    if (repairs.isEmpty) {
+      return Card(
+        key: const Key('inventoryRepairHistoryEmpty'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.build_outlined,
+                    size: 19,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Repair History',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 7),
+              Wrap(
+                spacing: 16,
+                runSpacing: 4,
+                children: [
+                  const _CompactMetric(label: 'Number of Repairs', value: '0'),
+                  if (canViewFinancialData)
+                    _CompactMetric(
+                      label: 'Total Repair Cost',
+                      value: CurrencyFormatter.formatCents(
+                        totalRepairCostCents,
+                      ),
+                    ),
+                  if (canViewFinancialData)
+                    _CompactMetric(
+                      label: 'True Cost',
+                      value: CurrencyFormatter.formatCents(trueCostCents),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'No repairs have been recorded for this item.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return _DetailSection(
       title: 'Repair History',
       children: [
@@ -1780,17 +1849,14 @@ class _RepairHistoryContent extends StatelessWidget {
             value: CurrencyFormatter.formatCents(trueCostCents),
           ),
         ],
-        const SizedBox(height: 12),
-        if (repairs.isEmpty)
-          const Text('No repairs have been recorded for this item.')
-        else
-          for (var index = 0; index < repairs.length; index++) ...[
-            if (index > 0) const Divider(height: 32),
-            _RepairHistoryEntry(
-              repair: repairs[index],
-              canViewFinancialData: canViewFinancialData,
-            ),
-          ],
+        const SizedBox(height: 8),
+        for (var index = 0; index < repairs.length; index++) ...[
+          if (index > 0) const Divider(height: 24),
+          _RepairHistoryEntry(
+            repair: repairs[index],
+            canViewFinancialData: canViewFinancialData,
+          ),
+        ],
       ],
     );
   }
@@ -1854,9 +1920,11 @@ class _SellerInformationSection extends ConsumerWidget {
     final contactId = sellerContactId?.trim() ?? '';
 
     if (contactId.isEmpty) {
-      return const _DetailSection(
+      return const _CompactStatusSection(
+        key: Key('inventorySellerEmpty'),
+        icon: Icons.person_outline,
         title: 'Seller Information',
-        children: [_DetailRow(label: 'Seller', value: 'No seller linked')],
+        message: 'No seller linked',
       );
     }
 
@@ -2139,6 +2207,78 @@ class _SaleBuyerInformation extends ConsumerWidget {
   }
 }
 
+class _CompactMetric extends StatelessWidget {
+  const _CompactMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 5),
+        Text(value, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _CompactStatusSection extends StatelessWidget {
+  const _CompactStatusSection({
+    required this.icon,
+    required this.title,
+    required this.message,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailSection extends StatelessWidget {
   const _DetailSection({required this.title, required this.children});
 
@@ -2149,12 +2289,17 @@ class _DetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 7),
             ...children,
           ],
         ),
@@ -2172,17 +2317,28 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 190,
-            child: Text(label, style: Theme.of(context).textTheme.labelLarge),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Text(value)),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final labelWidth = constraints.maxWidth < 420 ? 132.0 : 190.0;
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: labelWidth,
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(value)),
+            ],
+          );
+        },
       ),
     );
   }

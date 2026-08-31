@@ -125,6 +125,40 @@ void main() {
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
+  testWidgets('empty lower detail sections use compact presentation', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'compact-item',
+      inventoryNumber: 'BAT-2608-0101',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'compact-item'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryAdditionalPricingEmpty')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventorySellerEmpty')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryRepairHistoryEmpty')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryDisposalHistoryEmpty')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventoryTradeHistoryEmpty')), findsOneWidget);
+  });
   testWidgets('quick-info QR action opens QR dialog', (
     WidgetTester tester,
   ) async {
