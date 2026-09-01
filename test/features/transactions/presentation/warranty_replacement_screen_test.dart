@@ -107,6 +107,16 @@ void main() {
         find.byKey(const Key('warrantyReplacementLengthField')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('inventoryPhotoSection')), findsOneWidget);
+      expect(find.byKey(const Key('inventoryPhotoCount')), findsOneWidget);
+      expect(find.text('0 of 10 photos'), findsOneWidget);
+      expect(find.byKey(const Key('inventoryTakePhotoButton')), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventoryChoosePhotoButton')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('storedInventoryPhoto-0')), findsNothing);
+
       expect(
         find.byKey(const Key('createWarrantyReplacementDealButton')),
         findsOneWidget,

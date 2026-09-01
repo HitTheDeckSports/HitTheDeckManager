@@ -7,12 +7,17 @@ import '../../../core/formatting/currency_formatter.dart';
 import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
+import '../../../shared/media/photo_source.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../inventory/domain/models/inventory_enums.dart';
+import '../../inventory/application/photos/inventory_photo_workflow.dart';
 import '../../inventory/domain/models/inventory_item.dart';
+import '../../inventory/presentation/providers/inventory_controller.dart';
 import '../../inventory/presentation/providers/inventory_location_providers.dart';
+import '../../inventory/presentation/providers/inventory_photo_providers.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
+import '../../inventory/presentation/widgets/inventory_photo_section.dart';
 import '../domain/models/disposal_reason.dart';
 import '../domain/models/warranty_replacement_inventory_draft.dart';
 import 'providers/transaction_providers.dart';
@@ -144,6 +149,9 @@ class _WarrantyReplacementFormState
   InventoryCategory _category = InventoryCategory.bat;
   InventoryCondition? _condition = InventoryCondition.newItem;
   String? _locationId;
+  final List<PendingInventoryPhoto> _pendingPhotos = [];
+  bool _isPickingPhoto = false;
+  bool _isUploadingPhotos = false;
 
   @override
   void initState() {
@@ -274,6 +282,54 @@ class _WarrantyReplacementFormState
     );
   }
 
+  Future<void> _pickReplacementPhoto(PhotoSource source) async {
+    if (_isPickingPhoto || _isUploadingPhotos) {
+      return;
+    }
+
+    setState(() {
+      _isPickingPhoto = true;
+    });
+
+    try {
+      final selectedPhoto = await ref
+          .read(inventoryPhotoWorkflowProvider)
+          .pickPhoto(
+            source: source,
+            storedPhotoCount: 0,
+            pendingPhotoCount: _pendingPhotos.length,
+          );
+
+      if (!mounted || selectedPhoto == null) {
+        return;
+      }
+
+      setState(() {
+        _pendingPhotos.add(selectedPhoto);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add replacement photo: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingPhoto = false;
+        });
+      }
+    }
+  }
+
+  void _removePendingPhoto(String photoId) {
+    setState(() {
+      _pendingPhotos.removeWhere((photo) => photo.id == photoId);
+    });
+  }
+
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() != true) {
       return;
@@ -306,19 +362,72 @@ class _WarrantyReplacementFormState
             notes: _warrantyNotesController.text,
           );
 
+      final replacementId = deal.replacementInventoryItemId;
+      var photoMessage = 'Warranty replacement inventory created.';
+
+      if (_pendingPhotos.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _isUploadingPhotos = true;
+          });
+        }
+
+        try {
+          final savedReplacement = await ref.read(
+            inventoryItemProvider(replacementId).future,
+          );
+
+          if (savedReplacement == null) {
+            throw StateError(
+              'Replacement inventory could not be reloaded for photo upload.',
+            );
+          }
+
+          final uploadResult = await ref
+              .read(inventoryPhotoWorkflowProvider)
+              .uploadPendingPhotos(
+                item: savedReplacement,
+                pendingPhotos: List<PendingInventoryPhoto>.unmodifiable(
+                  _pendingPhotos,
+                ),
+              );
+
+          if (uploadResult.uploadedPhotos.isNotEmpty) {
+            await ref
+                .read(inventoryControllerProvider.notifier)
+                .updateItem(uploadResult.updatedItem);
+            ref.invalidate(inventoryItemProvider(replacementId));
+          }
+
+          if (uploadResult.hasFailures) {
+            photoMessage =
+                'Replacement created. Some photos could not be uploaded.';
+          } else {
+            photoMessage = 'Warranty replacement inventory and photos created.';
+          }
+        } catch (error) {
+          photoMessage =
+              'Replacement created, but photos could not be uploaded: $error';
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isUploadingPhotos = false;
+            });
+          }
+        }
+      }
+
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Warranty replacement inventory created.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(photoMessage)));
 
       context.goNamed(
         AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': deal.replacementInventoryItemId},
+        pathParameters: {'itemId': replacementId},
       );
     } catch (error) {
       if (!mounted) {
@@ -341,7 +450,7 @@ class _WarrantyReplacementFormState
       warrantyReplacementDealForDisposalProvider(widget.disposalId),
     );
     final locationsAsync = ref.watch(activeInventoryLocationsProvider);
-    final isSaving = controllerState.isLoading;
+    final isSaving = controllerState.isLoading || _isUploadingPhotos;
 
     return existingDealAsync.when(
       loading: () => const AppPage(
@@ -546,6 +655,16 @@ class _WarrantyReplacementFormState
                 ),
                 const SizedBox(height: 16),
                 ..._categoryFields(isSaving),
+                InventoryPhotoSection(
+                  storedPhotoUrls: const [],
+                  pendingPhotos: _pendingPhotos,
+                  onTakePhoto: () => _pickReplacementPhoto(PhotoSource.camera),
+                  onChoosePhoto: () =>
+                      _pickReplacementPhoto(PhotoSource.gallery),
+                  onRemovePendingPhoto: _removePendingPhoto,
+                  isBusy: isSaving || _isPickingPhoto,
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   key: const Key('warrantyReplacementItemNotesField'),
                   controller: _itemNotesController,
