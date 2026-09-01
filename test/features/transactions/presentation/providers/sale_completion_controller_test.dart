@@ -7,6 +7,7 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/incoming_trade_item_draft.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/sale_completion_controller.dart';
@@ -82,6 +83,80 @@ void main() {
       );
     });
 
+    test(
+      'refreshes lifetime Trade History when an existing item is sold in a trade',
+      () async {
+        const item = InventoryItem(
+          id: 'item-1',
+          inventoryNumber: 'BAT-2608-0001',
+          category: InventoryCategory.bat,
+          brand: 'Combat',
+          model: 'Spec H1',
+          acquisitionType: AcquisitionType.traded,
+          acquisitionValueCents: 20000,
+          status: InventoryStatus.available,
+        );
+
+        final inventoryRepository = InMemoryInventoryRepository(
+          initialItems: const [item],
+        );
+        final transactionRepository = InMemoryTransactionRepository();
+        final dealRepository = InMemoryDealRepository();
+
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            transactionRepositoryProvider.overrideWithValue(
+              transactionRepository,
+            ),
+            dealRepositoryProvider.overrideWithValue(dealRepository),
+          ],
+        );
+
+        addTearDown(container.dispose);
+        addTearDown(inventoryRepository.dispose);
+        addTearDown(transactionRepository.dispose);
+        addTearDown(dealRepository.dispose);
+
+        expect(
+          await container.read(tradesForInventoryItemProvider('item-1').future),
+          isEmpty,
+        );
+
+        final sale = SaleTransaction(
+          inventoryItemId: 'item-1',
+          salePriceCents: 32500,
+          saleDate: DateTime(2026, 9, 1),
+          paymentMethod: PaymentMethod.cash,
+          acquisitionValueCents: 20000,
+        );
+
+        await container
+            .read(saleCompletionControllerProvider.notifier)
+            .completeSale(
+              item: item,
+              sale: sale,
+              tradeInItems: const [
+                IncomingTradeItemDraft(
+                  brand: 'Easton',
+                  model: 'Hype Fire',
+                  acquisitionValueCents: 10000,
+                ),
+              ],
+            );
+
+        final refreshedTrades = await container.read(
+          tradesForInventoryItemProvider('item-1').future,
+        );
+
+        expect(refreshedTrades, hasLength(1));
+        expect(
+          refreshedTrades.single.outgoingInventoryItemIds,
+          contains('item-1'),
+        );
+        expect(refreshedTrades.single.incomingInventoryItemIds, hasLength(1));
+      },
+    );
     test('rejects a sale for inventory that is not available', () async {
       const item = InventoryItem(
         id: 'item-1',
