@@ -78,6 +78,9 @@ class SaleCompletionController extends AsyncNotifier<void> {
     final transactionRepository = ref.read(transactionRepositoryProvider);
     final dealRepository = ref.read(dealRepositoryProvider);
 
+    final existingLineageDeal = await dealRepository
+        .getDealForLineageInventoryItem(itemId);
+
     ConsignmentTransaction? originalConsignment;
     if (item.acquisitionType == AcquisitionType.consignment) {
       originalConsignment = await transactionRepository
@@ -116,6 +119,8 @@ class SaleCompletionController extends AsyncNotifier<void> {
     SaleTransaction? savedSale;
     TradeTransaction? savedTrade;
     Deal? savedDeal;
+    Deal? originalDealBeforeLineageUpdate;
+    var createdNewDeal = false;
     ConsignmentTransaction? updatedConsignment;
     final createdTradeInItems = <InventoryItem>[];
 
@@ -185,13 +190,29 @@ class SaleCompletionController extends AsyncNotifier<void> {
           ),
         );
 
-        savedDeal = await dealRepository.createDeal(
-          Deal(
-            parentSaleTransactionId: savedSale.id!,
-            childInventoryItemIds: childInventoryItemIds,
-            notes: 'Automatically created from trade-in sale.',
-          ),
-        );
+        if (existingLineageDeal != null) {
+          originalDealBeforeLineageUpdate = existingLineageDeal;
+
+          final extendedLineage = <String>{
+            ...existingLineageDeal.effectiveLineageInventoryItemIds,
+            ...childInventoryItemIds,
+          }.toList(growable: false);
+
+          savedDeal = await dealRepository.updateDeal(
+            existingLineageDeal.copyWith(
+              lineageInventoryItemIds: extendedLineage,
+            ),
+          );
+        } else {
+          savedDeal = await dealRepository.createDeal(
+            Deal(
+              parentSaleTransactionId: savedSale.id!,
+              childInventoryItemIds: childInventoryItemIds,
+              notes: 'Automatically created from trade-in sale.',
+            ),
+          );
+          createdNewDeal = true;
+        }
       }
 
       ref.invalidate(inventoryItemsProvider);
@@ -217,9 +238,19 @@ class SaleCompletionController extends AsyncNotifier<void> {
       ref.invalidate(consignmentForInventoryItemProvider(itemId));
       ref.invalidate(dealsProvider);
 
+      if (savedDeal != null) {
+        for (final inventoryId in savedDeal.effectiveLineageInventoryItemIds) {
+          ref.invalidate(dealForLineageInventoryItemProvider(inventoryId));
+        }
+      }
+
       return SaleCompletionResult(sale: savedSale, soldItem: updatedItem);
     } catch (error, stackTrace) {
-      if (savedDeal?.id != null) {
+      if (originalDealBeforeLineageUpdate != null) {
+        try {
+          await dealRepository.updateDeal(originalDealBeforeLineageUpdate);
+        } catch (_) {}
+      } else if (createdNewDeal && savedDeal?.id != null) {
         try {
           await dealRepository.deleteDeal(savedDeal!.id!);
         } catch (_) {}

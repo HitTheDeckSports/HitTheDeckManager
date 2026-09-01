@@ -7,6 +7,7 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_deal_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/incoming_trade_item_draft.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
@@ -155,6 +156,177 @@ void main() {
           contains('item-1'),
         );
         expect(refreshedTrades.single.incomingInventoryItemIds, hasLength(1));
+      },
+    );
+    test(
+      'extends the same Deal when a lineage item is later sold with trade-ins',
+      () async {
+        const item = InventoryItem(
+          id: 'item-b',
+          inventoryNumber: 'BAT-2608-0002',
+          category: InventoryCategory.bat,
+          brand: 'Easton',
+          model: 'Hype Fire',
+          acquisitionType: AcquisitionType.traded,
+          acquisitionValueCents: 20000,
+          status: InventoryStatus.available,
+        );
+
+        const originalDeal = Deal(
+          id: 'deal-a',
+          parentSaleTransactionId: 'sale-a',
+          childInventoryItemIds: ['item-b'],
+          lineageInventoryItemIds: ['item-b'],
+        );
+
+        final inventoryRepository = InMemoryInventoryRepository(
+          initialItems: const [item],
+        );
+        final transactionRepository = InMemoryTransactionRepository();
+        final dealRepository = InMemoryDealRepository(
+          initialDeals: const [originalDeal],
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            transactionRepositoryProvider.overrideWithValue(
+              transactionRepository,
+            ),
+            dealRepositoryProvider.overrideWithValue(dealRepository),
+          ],
+        );
+
+        addTearDown(container.dispose);
+        addTearDown(inventoryRepository.dispose);
+        addTearDown(transactionRepository.dispose);
+        addTearDown(dealRepository.dispose);
+
+        final sale = SaleTransaction(
+          inventoryItemId: 'item-b',
+          salePriceCents: 30000,
+          saleDate: DateTime(2026, 9, 2),
+          paymentMethod: PaymentMethod.cash,
+          acquisitionValueCents: 20000,
+        );
+
+        await container
+            .read(saleCompletionControllerProvider.notifier)
+            .completeSale(
+              item: item,
+              sale: sale,
+              tradeInItems: const [
+                IncomingTradeItemDraft(
+                  brand: 'Louisville Slugger',
+                  model: 'Atlas',
+                  acquisitionValueCents: 12000,
+                ),
+                IncomingTradeItemDraft(
+                  brand: 'Rawlings',
+                  model: 'Icon',
+                  acquisitionValueCents: 8000,
+                ),
+              ],
+            );
+
+        final deals = await dealRepository.getDeals();
+        expect(deals, hasLength(1));
+
+        final extendedDeal = deals.single;
+        expect(extendedDeal.id, 'deal-a');
+        expect(extendedDeal.parentSaleTransactionId, 'sale-a');
+        expect(extendedDeal.childInventoryItemIds, const ['item-b']);
+
+        final trades = await transactionRepository.getTrades();
+        expect(trades, hasLength(1));
+        final newTradeInIds = trades.single.incomingInventoryItemIds;
+        expect(newTradeInIds, hasLength(2));
+
+        expect(
+          extendedDeal.effectiveLineageInventoryItemIds,
+          containsAll(['item-b', ...newTradeInIds]),
+        );
+        expect(extendedDeal.effectiveLineageInventoryItemIds, hasLength(3));
+
+        for (final newItemId in newTradeInIds) {
+          expect(
+            (await dealRepository.getDealForLineageInventoryItem(
+              newItemId,
+            ))?.id,
+            'deal-a',
+          );
+        }
+
+        final descendantSale = await transactionRepository
+            .getSaleForInventoryItem('item-b');
+        expect(descendantSale, isNotNull);
+        expect(
+          await dealRepository.getDealForParentSale(descendantSale!.id!),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'new trade Deal initializes direct children and lineage together',
+      () async {
+        const item = InventoryItem(
+          id: 'root-item',
+          inventoryNumber: 'BAT-2608-0090',
+          category: InventoryCategory.bat,
+          brand: 'Combat',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 15000,
+          status: InventoryStatus.available,
+        );
+
+        final inventoryRepository = InMemoryInventoryRepository(
+          initialItems: const [item],
+        );
+        final transactionRepository = InMemoryTransactionRepository();
+        final dealRepository = InMemoryDealRepository();
+
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            transactionRepositoryProvider.overrideWithValue(
+              transactionRepository,
+            ),
+            dealRepositoryProvider.overrideWithValue(dealRepository),
+          ],
+        );
+
+        addTearDown(container.dispose);
+        addTearDown(inventoryRepository.dispose);
+        addTearDown(transactionRepository.dispose);
+        addTearDown(dealRepository.dispose);
+
+        final sale = SaleTransaction(
+          inventoryItemId: 'root-item',
+          salePriceCents: 25000,
+          saleDate: DateTime(2026, 9, 2),
+          paymentMethod: PaymentMethod.cash,
+          acquisitionValueCents: 15000,
+        );
+
+        await container
+            .read(saleCompletionControllerProvider.notifier)
+            .completeSale(
+              item: item,
+              sale: sale,
+              tradeInItems: const [
+                IncomingTradeItemDraft(
+                  brand: 'Marucci',
+                  model: 'CatX',
+                  acquisitionValueCents: 10000,
+                ),
+              ],
+            );
+
+        final deal = (await dealRepository.getDeals()).single;
+
+        expect(deal.childInventoryItemIds, hasLength(1));
+        expect(deal.lineageInventoryItemIds, deal.childInventoryItemIds);
       },
     );
     test('rejects a sale for inventory that is not available', () async {
