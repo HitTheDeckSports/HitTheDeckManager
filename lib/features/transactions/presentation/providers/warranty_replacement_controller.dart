@@ -6,6 +6,7 @@ import '../../../inventory/presentation/providers/inventory_providers.dart';
 import '../../domain/models/disposal_reason.dart';
 import '../../domain/models/disposal_transaction.dart';
 import '../../domain/models/warranty_replacement_deal.dart';
+import 'deal_providers.dart';
 import 'transaction_providers.dart';
 import 'warranty_replacement_providers.dart';
 
@@ -83,11 +84,18 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
 
     final inventoryRepository = ref.read(inventoryRepositoryProvider);
     final transactionRepository = ref.read(transactionRepositoryProvider);
-    final dealRepository = ref.read(warrantyReplacementDealRepositoryProvider);
+    final warrantyDealRepository = ref.read(
+      warrantyReplacementDealRepositoryProvider,
+    );
+    final lineageDealRepository = ref.read(dealRepositoryProvider);
+
+    final existingLineageDeal = await lineageDealRepository
+        .getDealForLineageInventoryItem(disposedItemId);
 
     InventoryItem? replacementItem;
-    WarrantyReplacementDeal? savedDeal;
+    WarrantyReplacementDeal? savedWarrantyDeal;
     DisposalTransaction? updatedDisposal;
+    var lineageDealUpdated = false;
 
     try {
       replacementItem = await inventoryRepository.createInventoryItem(
@@ -120,7 +128,7 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
         disposal.copyWith(replacementInventoryItemId: replacementItem.id),
       );
 
-      savedDeal = await dealRepository.createDeal(
+      savedWarrantyDeal = await warrantyDealRepository.createDeal(
         WarrantyReplacementDeal(
           disposalTransactionId: disposalId,
           disposedInventoryItemId: disposedItemId,
@@ -129,6 +137,21 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
           notes: _optionalText(notes),
         ),
       );
+
+      if (existingLineageDeal != null) {
+        final replacementId = replacementItem.id!;
+        final extendedLineage = <String>{
+          ...existingLineageDeal.effectiveLineageInventoryItemIds,
+          replacementId,
+        }.toList(growable: false);
+
+        await lineageDealRepository.updateDeal(
+          existingLineageDeal.copyWith(
+            lineageInventoryItemIds: extendedLineage,
+          ),
+        );
+        lineageDealUpdated = true;
+      }
 
       ref.invalidate(inventoryItemsProvider);
       ref.invalidate(inventoryItemProvider(disposedItemId));
@@ -144,11 +167,27 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
         warrantyReplacementDealForInventoryProvider(replacementItem.id!),
       );
 
-      return savedDeal;
+      if (existingLineageDeal != null) {
+        ref.invalidate(dealsProvider);
+        for (final inventoryId in {
+          ...existingLineageDeal.effectiveLineageInventoryItemIds,
+          replacementItem.id!,
+        }) {
+          ref.invalidate(dealForLineageInventoryItemProvider(inventoryId));
+        }
+      }
+
+      return savedWarrantyDeal;
     } catch (error, stackTrace) {
-      if (savedDeal?.id != null) {
+      if (lineageDealUpdated && existingLineageDeal != null) {
         try {
-          await dealRepository.deleteDeal(savedDeal!.id!);
+          await lineageDealRepository.updateDeal(existingLineageDeal);
+        } catch (_) {}
+      }
+
+      if (savedWarrantyDeal?.id != null) {
+        try {
+          await warrantyDealRepository.deleteDeal(savedWarrantyDeal!.id!);
         } catch (_) {}
       }
 
