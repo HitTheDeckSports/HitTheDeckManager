@@ -10,6 +10,7 @@ import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_
 import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/disposal_reason.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/disposal_transaction.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/warranty_replacement_inventory_draft.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/warranty_replacement_controller.dart';
@@ -97,6 +98,114 @@ void main() {
     },
   );
 
+  test(
+    'fresh warranty replacement uses entered physical data and carries cost basis',
+    () async {
+      const oldItem = InventoryItem(
+        id: 'different-old-item',
+        inventoryNumber: 'BAT-2608-0088',
+        category: InventoryCategory.bat,
+        brand: 'Easton',
+        model: 'Old Model',
+        acquisitionType: AcquisitionType.traded,
+        acquisitionValueCents: 17500,
+        condition: InventoryCondition.good,
+        status: InventoryStatus.disposed,
+        sellerContactId: 'original-seller',
+        locationId: 'old-location',
+        notes: 'Old physical item notes',
+        lengthInches: 31,
+        weightOunces: 28,
+        certification: 'USA',
+        photoUrls: ['old-photo-1', 'old-photo-2'],
+      );
+
+      final warrantyDisposal = DisposalTransaction(
+        id: 'fresh-disposal',
+        inventoryItemId: 'different-old-item',
+        disposalDate: DateTime(2026, 9, 4),
+        reason: DisposalReason.warrantyReplacement,
+      );
+
+      final inventoryRepository = InMemoryInventoryRepository(
+        initialItems: const [oldItem],
+      );
+      final transactionRepository = InMemoryTransactionRepository(
+        initialDisposals: [warrantyDisposal],
+      );
+      final warrantyDealRepository =
+          InMemoryWarrantyReplacementDealRepository();
+      final lineageDealRepository = InMemoryDealRepository();
+
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(transactionRepository.dispose);
+      addTearDown(warrantyDealRepository.dispose);
+      addTearDown(lineageDealRepository.dispose);
+
+      final container = ProviderContainer(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+          warrantyReplacementDealRepositoryProvider.overrideWithValue(
+            warrantyDealRepository,
+          ),
+          dealRepositoryProvider.overrideWithValue(lineageDealRepository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(warrantyReplacementControllerProvider.future);
+
+      final warrantyDeal = await container
+          .read(warrantyReplacementControllerProvider.notifier)
+          .createReplacementFromDraft(
+            disposal: warrantyDisposal,
+            disposedItem: oldItem,
+            replacementDate: DateTime(2026, 9, 5),
+            replacementDraft: const WarrantyReplacementInventoryDraft(
+              category: InventoryCategory.glove,
+              brand: 'Rawlings',
+              model: 'REV1X',
+              condition: InventoryCondition.newItem,
+              newValueCents: 39900,
+              askingPriceCents: 32500,
+              minimumPriceCents: 29000,
+              locationId: 'showroom',
+              notes: 'Actual warranty replacement received.',
+              gloveSizeInches: 11.5,
+              handOrientation: 'Right Hand Throw',
+              photoUrls: ['new-photo'],
+            ),
+            notes: 'Manufacturer claim approved.',
+          );
+
+      final replacement = await inventoryRepository.getInventoryItem(
+        warrantyDeal.replacementInventoryItemId,
+      );
+
+      expect(replacement, isNotNull);
+      expect(replacement?.category, InventoryCategory.glove);
+      expect(replacement?.brand, 'Rawlings');
+      expect(replacement?.model, 'REV1X');
+      expect(replacement?.condition, InventoryCondition.newItem);
+      expect(replacement?.gloveSizeInches, 11.5);
+
+      // Financial lineage is carried from the disposed item.
+      expect(replacement?.acquisitionType, AcquisitionType.traded);
+      expect(replacement?.acquisitionValueCents, 17500);
+
+      // Physical/source metadata is not copied from the disposed item.
+      expect(replacement?.sellerContactId, isNull);
+      expect(replacement?.locationId, 'showroom');
+      expect(replacement?.notes, 'Actual warranty replacement received.');
+      expect(replacement?.photoUrls, const ['new-photo']);
+      expect(replacement?.photoUrls, isNot(contains('old-photo-1')));
+      expect(replacement?.lengthInches, isNull);
+      expect(replacement?.certification, isNull);
+    },
+  );
   test(
     'warranty replacement continues the same recursive Deal lineage',
     () async {
