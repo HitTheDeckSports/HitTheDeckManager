@@ -11,6 +11,8 @@ abstract interface class DealRepository {
 
   Future<Deal?> getDealForChildInventoryItem(String inventoryItemId);
 
+  Future<Deal?> getDealForLineageInventoryItem(String inventoryItemId);
+
   Future<Deal> createDeal(Deal deal);
 
   Future<Deal> updateDeal(Deal deal);

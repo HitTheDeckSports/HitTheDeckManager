@@ -2,6 +2,7 @@ class Deal {
   const Deal({
     required this.parentSaleTransactionId,
     required this.childInventoryItemIds,
+    this.lineageInventoryItemIds = const [],
     this.id,
     this.notes,
   });
@@ -20,21 +21,39 @@ class Deal {
   /// evolve without changing existing Deal records.
   final List<String> childInventoryItemIds;
 
+  /// Every inventory item that belongs to this Deal lineage, including direct
+  /// children and later descendants produced by trades or warranty
+  /// replacements.
+  ///
+  /// Legacy Deal records may not contain this field. An empty stored/model
+  /// value therefore falls back to [childInventoryItemIds].
+  final List<String> lineageInventoryItemIds;
+
+  List<String> get effectiveLineageInventoryItemIds =>
+      lineageInventoryItemIds.isEmpty
+      ? childInventoryItemIds
+      : lineageInventoryItemIds;
+
   final String? notes;
 
   bool get isValid {
     final parentId = parentSaleTransactionId.trim();
     final childIds = _normalizedIds(childInventoryItemIds);
+    final lineageIds = _normalizedIds(effectiveLineageInventoryItemIds);
 
     return parentId.isNotEmpty &&
         childIds.isNotEmpty &&
-        childIds.length == childIds.toSet().length;
+        childIds.length == childIds.toSet().length &&
+        lineageIds.isNotEmpty &&
+        lineageIds.length == lineageIds.toSet().length &&
+        childIds.every(lineageIds.contains);
   }
 
   Deal copyWith({
     Object? id = _unset,
     String? parentSaleTransactionId,
     List<String>? childInventoryItemIds,
+    List<String>? lineageInventoryItemIds,
     Object? notes = _unset,
   }) {
     return Deal(
@@ -43,6 +62,8 @@ class Deal {
           parentSaleTransactionId ?? this.parentSaleTransactionId,
       childInventoryItemIds:
           childInventoryItemIds ?? this.childInventoryItemIds,
+      lineageInventoryItemIds:
+          lineageInventoryItemIds ?? this.lineageInventoryItemIds,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
     );
   }
@@ -54,6 +75,10 @@ class Deal {
             other.id == id &&
             other.parentSaleTransactionId == parentSaleTransactionId &&
             _listsEqual(other.childInventoryItemIds, childInventoryItemIds) &&
+            _listsEqual(
+              other.lineageInventoryItemIds,
+              lineageInventoryItemIds,
+            ) &&
             other.notes == notes;
   }
 
@@ -63,6 +88,7 @@ class Deal {
       id,
       parentSaleTransactionId,
       Object.hashAll(childInventoryItemIds),
+      Object.hashAll(lineageInventoryItemIds),
       notes,
     );
   }

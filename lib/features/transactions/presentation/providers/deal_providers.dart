@@ -40,6 +40,13 @@ final dealForChildInventoryItemProvider = FutureProvider.family<Deal?, String>((
       .getDealForChildInventoryItem(inventoryItemId);
 });
 
+final dealForLineageInventoryItemProvider =
+    FutureProvider.family<Deal?, String>((ref, inventoryItemId) {
+      return ref
+          .watch(dealRepositoryProvider)
+          .getDealForLineageInventoryItem(inventoryItemId);
+    });
+
 final dealSummaryProvider = FutureProvider.family<DealSummary?, String>((
   ref,
   dealId,

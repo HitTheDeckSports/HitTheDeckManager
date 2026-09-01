@@ -62,34 +62,54 @@ class InMemoryDealRepository implements DealRepository {
   }
 
   @override
+  Future<Deal?> getDealForLineageInventoryItem(String inventoryItemId) async {
+    for (final deal in _deals) {
+      if (deal.effectiveLineageInventoryItemIds.contains(inventoryItemId)) {
+        return deal;
+      }
+    }
+
+    return null;
+  }
+
+  @override
   Future<Deal> createDeal(Deal deal) async {
-    if (!deal.isValid) {
+    final normalizedDeal = deal.lineageInventoryItemIds.isEmpty
+        ? deal.copyWith(
+            lineageInventoryItemIds: List<String>.unmodifiable(
+              deal.childInventoryItemIds,
+            ),
+          )
+        : deal;
+
+    if (!normalizedDeal.isValid) {
       throw const ValidationException(
         'The Deal contains invalid relationship information.',
       );
     }
 
-    if (await getDealForParentSale(deal.parentSaleTransactionId) != null) {
+    if (await getDealForParentSale(normalizedDeal.parentSaleTransactionId) !=
+        null) {
       throw DuplicateException(
-        'Sale ${deal.parentSaleTransactionId} already has a Deal.',
+        'Sale ${normalizedDeal.parentSaleTransactionId} already has a Deal.',
       );
     }
 
-    for (final childId in deal.childInventoryItemIds) {
-      if (await getDealForChildInventoryItem(childId) != null) {
+    for (final lineageId in normalizedDeal.effectiveLineageInventoryItemIds) {
+      if (await getDealForLineageInventoryItem(lineageId) != null) {
         throw DuplicateException(
-          'Inventory item $childId already belongs to another Deal.',
+          'Inventory item $lineageId already belongs to another Deal.',
         );
       }
     }
 
-    final id = deal.id ?? _uuid.v4();
+    final id = normalizedDeal.id ?? _uuid.v4();
 
     if (_deals.any((existing) => existing.id == id)) {
       throw DuplicateException('A Deal with ID $id already exists.');
     }
 
-    final savedDeal = deal.copyWith(id: id);
+    final savedDeal = normalizedDeal.copyWith(id: id);
     _deals.add(savedDeal);
     _notifyChanged();
 
@@ -130,16 +150,16 @@ class InMemoryDealRepository implements DealRepository {
       );
     }
 
-    for (final childId in deal.childInventoryItemIds) {
-      final childConflict = _deals.any(
+    for (final lineageId in deal.effectiveLineageInventoryItemIds) {
+      final lineageConflict = _deals.any(
         (existing) =>
             existing.id != id &&
-            existing.childInventoryItemIds.contains(childId),
+            existing.effectiveLineageInventoryItemIds.contains(lineageId),
       );
 
-      if (childConflict) {
+      if (lineageConflict) {
         throw DuplicateException(
-          'Inventory item $childId already belongs to another Deal.',
+          'Inventory item $lineageId already belongs to another Deal.',
         );
       }
     }
