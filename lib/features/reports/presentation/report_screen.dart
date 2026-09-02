@@ -6,8 +6,10 @@ import '../../authentication/presentation/providers/app_permissions_provider.dar
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../transactions/domain/models/deal_lineage_edge_type.dart';
 import '../../transactions/domain/models/deal_status.dart';
 import '../application/deal_rollup_report.dart';
+import '../application/recursive_deal_report.dart';
 import '../application/financial_performance_report.dart';
 import '../application/inventory_aging_report.dart';
 import '../application/report_date_range.dart';
@@ -193,7 +195,10 @@ class _ReportsContent extends StatelessWidget {
         const SizedBox(height: 28),
         _InventoryAgingSection(report: snapshot.inventoryAging),
         const SizedBox(height: 28),
-        _DealsSection(report: snapshot.deals),
+        _DealsSection(
+          report: snapshot.deals,
+          recursiveReport: snapshot.recursiveDeals,
+        ),
       ],
     );
   }
@@ -493,12 +498,17 @@ class _InventoryAgingRowWidget extends StatelessWidget {
 }
 
 class _DealsSection extends StatelessWidget {
-  const _DealsSection({required this.report});
+  const _DealsSection({required this.report, required this.recursiveReport});
 
   final DealRollupReport report;
+  final RecursiveDealReport recursiveReport;
 
   @override
   Widget build(BuildContext context) {
+    if (recursiveReport.rows.isNotEmpty) {
+      return _RecursiveDealsSection(report: recursiveReport);
+    }
+
     final uncompleted = report.rows
         .where((row) => row.status != DealStatus.completed)
         .toList();
@@ -536,6 +546,286 @@ class _DealsSection extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RecursiveDealsSection extends StatelessWidget {
+  const _RecursiveDealsSection({required this.report});
+
+  final RecursiveDealReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final uncompleted = report.rows
+        .where((row) => row.summary.status != DealStatus.completed)
+        .toList(growable: false);
+    final completed = report.rows
+        .where((row) => row.summary.status == DealStatus.completed)
+        .toList(growable: false);
+
+    return _ReportSection(
+      key: const Key('dealsSection'),
+      title: 'Deals',
+      subtitle:
+          'Full Deal trees with overall and branch-level realized/projected results.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Uncompleted Deals',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (uncompleted.isEmpty)
+            const _EmptyReportState(message: 'No uncompleted Deals.')
+          else
+            for (final row in uncompleted) _RecursiveDealCard(row: row),
+          const SizedBox(height: 16),
+          Text(
+            'Completed Deals',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (completed.isEmpty)
+            const _EmptyReportState(message: 'No completed Deals.')
+          else
+            for (final row in completed) _RecursiveDealCard(row: row),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecursiveDealCard extends StatelessWidget {
+  const _RecursiveDealCard({required this.row});
+
+  final RecursiveDealReportRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = row.summary;
+    final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
+
+    return Card(
+      key: Key('recursiveDealCard_$displayId'),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        key: Key('recursiveDealExpansion_$displayId'),
+        title: Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(displayId, style: Theme.of(context).textTheme.titleSmall),
+            Chip(label: Text(summary.status.label)),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _LabeledValue(
+                label: 'Parent Item',
+                value: row.parentSale.inventoryItemId,
+              ),
+              _LabeledValue(
+                label: 'Realized',
+                value: CurrencyFormatter.formatCents(
+                  summary.realizedDealProfitCents,
+                ),
+              ),
+              _LabeledValue(
+                label: 'Projected',
+                value: CurrencyFormatter.formatCents(
+                  summary.projectedDealProfitCents,
+                ),
+              ),
+            ],
+          ),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        children: [
+          const Divider(),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Deal Summary',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              _LabeledValue(
+                label: 'Parent Sale Profit',
+                value: CurrencyFormatter.formatCents(
+                  summary.parentTransactionProfitCents,
+                ),
+              ),
+              _LabeledValue(
+                label: 'Branch Realized',
+                value: CurrencyFormatter.formatCents(
+                  summary.realizedBranchProfitCents,
+                ),
+              ),
+              _LabeledValue(
+                label: 'Open Projection',
+                value: CurrencyFormatter.formatCents(
+                  summary.projectedOpenBranchProfitCents,
+                ),
+              ),
+              _LabeledValue(
+                label: 'Open Items',
+                value: summary.openInventoryCount.toString(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Branches',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final branch in summary.branches)
+            _RecursiveDealBranchCard(row: row, branch: branch),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecursiveDealBranchCard extends StatelessWidget {
+  const _RecursiveDealBranchCard({required this.row, required this.branch});
+
+  final RecursiveDealReportRow row;
+  final dynamic branch;
+
+  @override
+  Widget build(BuildContext context) {
+    final rootItem = row.inventoryItemFor(branch.rootChildInventoryItemId);
+    final rootLabel = _inventoryLabel(
+      rootItem,
+      branch.rootChildInventoryItemId as String,
+    );
+    final branchNodes = row.tree.branchFor(
+      branch.rootChildInventoryItemId as String,
+    );
+
+    return Card(
+      key: Key('recursiveDealBranch_${branch.rootChildInventoryItemId}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        key: Key(
+          'recursiveDealBranchExpansion_${branch.rootChildInventoryItemId}',
+        ),
+        title: Text(rootLabel),
+        subtitle: Wrap(
+          spacing: 14,
+          runSpacing: 4,
+          children: [
+            _LabeledValue(
+              label: 'Realized',
+              value: CurrencyFormatter.formatCents(
+                branch.realizedProfitCents as int,
+              ),
+            ),
+            _LabeledValue(
+              label: 'Projected',
+              value: CurrencyFormatter.formatCents(
+                branch.projectedBranchProfitCents as int,
+              ),
+            ),
+            _LabeledValue(
+              label: 'Open',
+              value: (branch.openInventoryCount as int).toString(),
+            ),
+          ],
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        children: [
+          for (final node in branchNodes)
+            _DealLineageItemRow(
+              label: _inventoryLabel(
+                row.inventoryItemFor(node.inventoryItemId),
+                node.inventoryItemId,
+              ),
+              depth: node.depth,
+              relationship: node.edgeTypeFromParent,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DealLineageItemRow extends StatelessWidget {
+  const _DealLineageItemRow({
+    required this.label,
+    required this.depth,
+    required this.relationship,
+  });
+
+  final String label;
+  final int depth;
+  final DealLineageEdgeType? relationship;
+
+  @override
+  Widget build(BuildContext context) {
+    final relationshipLabel = switch (relationship) {
+      DealLineageEdgeType.trade => 'Trade',
+      DealLineageEdgeType.warrantyReplacement => 'Warranty',
+      null => 'Branch Root',
+    };
+
+    return Padding(
+      padding: EdgeInsets.only(left: depth * 14.0, top: 6, bottom: 6),
+      child: Row(
+        children: [
+          Icon(
+            relationship == DealLineageEdgeType.warrantyReplacement
+                ? Icons.verified_outlined
+                : relationship == DealLineageEdgeType.trade
+                ? Icons.swap_horiz
+                : Icons.account_tree_outlined,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label)),
+          const SizedBox(width: 8),
+          Text(relationshipLabel, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+String _inventoryLabel(dynamic item, String fallbackId) {
+  if (item == null) {
+    return fallbackId;
+  }
+
+  final inventoryNumber = item.inventoryNumber as String?;
+  final brand = item.brand as String;
+  final model = item.model as String?;
+
+  final descriptiveName = [
+    brand.trim(),
+    if (model != null && model.trim().isNotEmpty) model.trim(),
+  ].where((value) => value.isNotEmpty).join(' ');
+
+  if (inventoryNumber != null && inventoryNumber.trim().isNotEmpty) {
+    return descriptiveName.isEmpty
+        ? inventoryNumber
+        : '$inventoryNumber - $descriptiveName';
+  }
+
+  return descriptiveName.isEmpty ? fallbackId : descriptiveName;
 }
 
 class _DealReportCard extends StatelessWidget {

@@ -11,15 +11,28 @@ import '../../transactions/domain/services/deal_lineage_service.dart';
 import '../../transactions/domain/services/deal_tree_profit_service.dart';
 
 class RecursiveDealReportRow {
-  const RecursiveDealReportRow({
+  RecursiveDealReportRow({
     required this.deal,
+    required this.parentSale,
     required this.tree,
     required this.summary,
-  });
+    required List<InventoryItem> lineageInventoryItems,
+  }) : lineageInventoryItems = List.unmodifiable(lineageInventoryItems),
+       _inventoryById = {
+         for (final item in lineageInventoryItems)
+           if (item.id != null) item.id!: item,
+       };
 
   final Deal deal;
+  final SaleTransaction parentSale;
   final DealLineageTree tree;
   final DealTreeProfitSummary summary;
+  final List<InventoryItem> lineageInventoryItems;
+  final Map<String, InventoryItem> _inventoryById;
+
+  InventoryItem? inventoryItemFor(String inventoryItemId) {
+    return _inventoryById[inventoryItemId];
+  }
 }
 
 class RecursiveDealReport {
@@ -113,7 +126,13 @@ class RecursiveDealReport {
       );
 
       rows.add(
-        RecursiveDealReportRow(deal: deal, tree: tree, summary: summary),
+        RecursiveDealReportRow(
+          deal: deal,
+          parentSale: parentSale,
+          tree: tree,
+          summary: summary,
+          lineageInventoryItems: lineageItems,
+        ),
       );
     }
 
