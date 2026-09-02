@@ -1,10 +1,14 @@
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../transactions/domain/models/deal.dart';
+import '../../transactions/domain/models/disposal_transaction.dart';
 import '../../transactions/domain/models/repair_transaction.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
+import '../../transactions/domain/models/trade_transaction.dart';
+import '../../transactions/domain/models/warranty_replacement_deal.dart';
 import 'deal_rollup_report.dart';
 import 'financial_performance_report.dart';
 import 'inventory_aging_report.dart';
+import 'recursive_deal_report.dart';
 import 'report_date_range.dart';
 import 'sales_analysis_report.dart';
 
@@ -16,6 +20,7 @@ class ReportsSnapshot {
     required this.salesByModel,
     required this.inventoryAging,
     required this.deals,
+    this.recursiveDeals = const RecursiveDealReport(rows: []),
   });
 
   final FinancialPerformanceReport financialPerformance;
@@ -25,11 +30,20 @@ class ReportsSnapshot {
   final InventoryAgingReport inventoryAging;
   final DealRollupReport deals;
 
+  /// Recursive, branch-aware Deal economics used by the new Deal reporting UI.
+  ///
+  /// [deals] remains temporarily available for backward-compatible screen and
+  /// test coverage while Phase 6 migrates the presentation layer.
+  final RecursiveDealReport recursiveDeals;
+
   factory ReportsSnapshot.calculate({
     required List<InventoryItem> inventoryItems,
     required List<SaleTransaction> sales,
     required List<RepairTransaction> repairs,
     required List<Deal> deals,
+    List<TradeTransaction> trades = const [],
+    List<DisposalTransaction> disposals = const [],
+    List<WarrantyReplacementDeal> warrantyReplacements = const [],
     required DateTime asOf,
     required ReportDateRange dateRange,
     int dealMaxDepth = 10,
@@ -68,6 +82,15 @@ class ReportsSnapshot {
         sales: sales,
         repairs: repairs,
         maxDepth: dealMaxDepth,
+      ),
+      recursiveDeals: RecursiveDealReport.calculate(
+        deals: deals,
+        inventoryItems: inventoryItems,
+        sales: sales,
+        repairs: repairs,
+        trades: trades,
+        disposals: disposals,
+        warrantyReplacements: warrantyReplacements,
       ),
     );
   }
