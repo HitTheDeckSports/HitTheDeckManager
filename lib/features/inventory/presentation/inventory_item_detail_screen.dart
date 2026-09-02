@@ -190,6 +190,8 @@ class _InventoryItemDetailContent extends ConsumerWidget {
                       canViewFinancialData: permissions.canViewFinancialData,
                     ),
                     const SizedBox(height: 10),
+                    _InventoryWarrantySection(inventoryItemId: item.id!),
+                    const SizedBox(height: 10),
                     _InventoryDealSection(
                       inventoryItemId: item.id!,
                       status: item.status,
@@ -1258,6 +1260,70 @@ class _ConsignmentAgreementDetails extends ConsumerWidget {
   }
 }
 
+class _InventoryWarrantySection extends ConsumerWidget {
+  const _InventoryWarrantySection({required this.inventoryItemId});
+
+  final String inventoryItemId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final warrantyAsync = ref.watch(
+      warrantyReplacementDealForInventoryProvider(inventoryItemId),
+    );
+
+    return warrantyAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (warrantyDeal) {
+        if (warrantyDeal == null) {
+          return const SizedBox.shrink();
+        }
+
+        final isReplacement =
+            warrantyDeal.replacementInventoryItemId == inventoryItemId;
+        final relatedInventoryItemId = isReplacement
+            ? warrantyDeal.disposedInventoryItemId
+            : warrantyDeal.replacementInventoryItemId;
+        final relationship = isReplacement
+            ? 'This item was received as a warranty replacement.'
+            : 'This item was replaced under warranty.';
+
+        return _CollapsibleDetailSection(
+          key: const Key('inventoryWarrantySection'),
+          icon: Icons.verified_outlined,
+          title: 'Warranty',
+          summary: relationship,
+          children: [
+            _DetailRow(label: 'Relationship', value: relationship),
+            _DetailRow(
+              label: 'Replacement Date',
+              value: _formatDate(warrantyDeal.replacementDate),
+            ),
+            if (warrantyDeal.notes != null &&
+                warrantyDeal.notes!.trim().isNotEmpty)
+              _DetailRow(label: 'Notes', value: warrantyDeal.notes!.trim()),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('inventoryWarrantyViewItemButton'),
+                onPressed: () {
+                  context.goNamed(
+                    AppRouteNames.inventoryDetail,
+                    pathParameters: {'itemId': relatedInventoryItemId},
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('View Item'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _InventoryDealSection extends ConsumerWidget {
   const _InventoryDealSection({
     required this.inventoryItemId,
@@ -1269,18 +1335,24 @@ class _InventoryDealSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final childDealAsync = ref.watch(
-      dealForChildInventoryItemProvider(inventoryItemId),
+    final lineageDealAsync = ref.watch(
+      dealForLineageInventoryItemProvider(inventoryItemId),
     );
 
-    return childDealAsync.when(
+    return lineageDealAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stackTrace) => const SizedBox.shrink(),
-      data: (childDeal) {
-        if (childDeal != null) {
+      data: (lineageDeal) {
+        if (lineageDeal != null) {
+          final isDirectChild = lineageDeal.childInventoryItemIds.contains(
+            inventoryItemId,
+          );
+
           return _DealLinkSection(
-            dealId: childDeal.id,
-            message: 'This inventory item is a direct child of a Deal.',
+            dealId: lineageDeal.id,
+            message: isDirectChild
+                ? 'This inventory item is a direct child of a Deal.'
+                : 'This inventory item is part of a continuing Deal lineage.',
           );
         }
 
@@ -1297,7 +1369,6 @@ class _InventoryDealSection extends ConsumerWidget {
           error: (error, stackTrace) => const SizedBox.shrink(),
           data: (sale) {
             final saleId = sale?.id;
-
             if (saleId == null || saleId.trim().isEmpty) {
               return const SizedBox.shrink();
             }
@@ -1345,7 +1416,7 @@ class _DealLinkSection extends StatelessWidget {
     return _CollapsibleDetailSection(
       key: const Key('inventoryDealSection'),
       icon: Icons.handshake_outlined,
-      title: 'Deal / Warranty',
+      title: 'Deal',
       summary: message,
       children: [
         Text(message),
