@@ -152,6 +152,8 @@ class _WarrantyReplacementFormState
   final List<PendingInventoryPhoto> _pendingPhotos = [];
   bool _isPickingPhoto = false;
   bool _isUploadingPhotos = false;
+  String? _createdReplacementId;
+  String? _photoUploadError;
 
   @override
   void initState() {
@@ -383,7 +385,121 @@ class _WarrantyReplacementFormState
   void _removePendingPhoto(String photoId) {
     setState(() {
       _pendingPhotos.removeWhere((photo) => photo.id == photoId);
+      if (_pendingPhotos.isEmpty) {
+        _photoUploadError = null;
+      }
     });
+  }
+
+  Future<bool> _uploadPendingReplacementPhotos(String replacementId) async {
+    if (_pendingPhotos.isEmpty) {
+      return true;
+    }
+
+    final photosToUpload = List<PendingInventoryPhoto>.unmodifiable(
+      _pendingPhotos,
+    );
+
+    setState(() {
+      _isUploadingPhotos = true;
+      _photoUploadError = null;
+    });
+
+    try {
+      final savedReplacement = await ref
+          .read(inventoryRepositoryProvider)
+          .getInventoryItem(replacementId);
+
+      if (savedReplacement == null) {
+        throw StateError(
+          'Replacement inventory could not be reloaded for photo upload.',
+        );
+      }
+
+      final uploadResult = await ref
+          .read(inventoryPhotoWorkflowProvider)
+          .uploadPendingPhotos(
+            item: savedReplacement,
+            pendingPhotos: photosToUpload,
+          );
+
+      if (uploadResult.uploadedPhotos.isNotEmpty) {
+        await ref
+            .read(inventoryControllerProvider.notifier)
+            .updateItem(uploadResult.updatedItem);
+        ref.invalidate(inventoryItemProvider(replacementId));
+        ref.invalidate(inventoryItemsProvider);
+      }
+
+      if (mounted) {
+        setState(() {
+          _pendingPhotos
+            ..clear()
+            ..addAll(uploadResult.failedPhotos);
+          _photoUploadError = uploadResult.hasFailures
+              ? '${uploadResult.failedPhotos.length} replacement photo'
+                    '${uploadResult.failedPhotos.length == 1 ? '' : 's'} '
+                    'could not be uploaded. Retry before leaving this screen.'
+              : null;
+        });
+      }
+
+      return !uploadResult.hasFailures;
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          for (var index = 0; index < _pendingPhotos.length; index++) {
+            _pendingPhotos[index] = _pendingPhotos[index].copyWith(
+              status: PendingInventoryPhotoStatus.failed,
+              errorMessage: error.toString(),
+            );
+          }
+          _photoUploadError =
+              'Replacement photo upload failed. Retry before leaving this screen.';
+        });
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhotos = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryPendingPhotoUploads() async {
+    final replacementId = _createdReplacementId;
+    if (replacementId == null || replacementId.trim().isEmpty) {
+      return;
+    }
+
+    final success = await _uploadPendingReplacementPhotos(replacementId);
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Photo upload still failed. The replacement is saved; retry again or add photos later.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Replacement photos uploaded successfully.'),
+      ),
+    );
+
+    context.goNamed(
+      AppRouteNames.inventoryDetail,
+      pathParameters: {'itemId': replacementId},
+    );
   }
 
   Future<void> _submit() async {
@@ -419,57 +535,26 @@ class _WarrantyReplacementFormState
           );
 
       final replacementId = deal.replacementInventoryItemId;
-      var photoMessage = 'Warranty replacement inventory created.';
+      _createdReplacementId = replacementId;
 
       if (_pendingPhotos.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _isUploadingPhotos = true;
-          });
+        final photosUploaded = await _uploadPendingReplacementPhotos(
+          replacementId,
+        );
+
+        if (!mounted) {
+          return;
         }
 
-        try {
-          final savedReplacement = await ref.read(
-            inventoryItemProvider(replacementId).future,
+        if (!photosUploaded) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Replacement saved, but one or more photos need attention.',
+              ),
+            ),
           );
-
-          if (savedReplacement == null) {
-            throw StateError(
-              'Replacement inventory could not be reloaded for photo upload.',
-            );
-          }
-
-          final uploadResult = await ref
-              .read(inventoryPhotoWorkflowProvider)
-              .uploadPendingPhotos(
-                item: savedReplacement,
-                pendingPhotos: List<PendingInventoryPhoto>.unmodifiable(
-                  _pendingPhotos,
-                ),
-              );
-
-          if (uploadResult.uploadedPhotos.isNotEmpty) {
-            await ref
-                .read(inventoryControllerProvider.notifier)
-                .updateItem(uploadResult.updatedItem);
-            ref.invalidate(inventoryItemProvider(replacementId));
-          }
-
-          if (uploadResult.hasFailures) {
-            photoMessage =
-                'Replacement created. Some photos could not be uploaded.';
-          } else {
-            photoMessage = 'Warranty replacement inventory and photos created.';
-          }
-        } catch (error) {
-          photoMessage =
-              'Replacement created, but photos could not be uploaded: $error';
-        } finally {
-          if (mounted) {
-            setState(() {
-              _isUploadingPhotos = false;
-            });
-          }
+          return;
         }
       }
 
@@ -477,9 +562,11 @@ class _WarrantyReplacementFormState
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(photoMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Warranty replacement inventory created.'),
+        ),
+      );
 
       context.goNamed(
         AppRouteNames.inventoryDetail,
@@ -522,6 +609,83 @@ class _WarrantyReplacementFormState
       ),
       data: (existingDeal) {
         if (existingDeal != null) {
+          final replacementId = existingDeal.replacementInventoryItemId;
+          final hasRecoverablePhotoFailure =
+              _createdReplacementId == replacementId &&
+              _pendingPhotos.isNotEmpty;
+
+          if (hasRecoverablePhotoFailure) {
+            return AppPage(
+              title: 'Warranty Replacement',
+              child: Column(
+                key: const Key('warrantyReplacementPhotoRecovery'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.cloud_upload_outlined, size: 44),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Replacement saved. Photo upload needs attention.',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _photoUploadError ??
+                        'One or more replacement photos are waiting to retry.',
+                    key: const Key('warrantyReplacementPhotoRecoveryMessage'),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_pendingPhotos.length} photo'
+                    '${_pendingPhotos.length == 1 ? '' : 's'} waiting to retry.',
+                    key: const Key('warrantyReplacementPendingPhotoCount'),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    key: const Key('warrantyReplacementRetryPhotosButton'),
+                    onPressed: _isUploadingPhotos
+                        ? null
+                        : _retryPendingPhotoUploads,
+                    icon: _isUploadingPhotos
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(
+                      _isUploadingPhotos ? 'Retrying...' : 'Retry Photo Upload',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const Key(
+                      'warrantyReplacementViewItemAfterPhotoFailure',
+                    ),
+                    onPressed: _isUploadingPhotos
+                        ? null
+                        : () {
+                            context.goNamed(
+                              AppRouteNames.inventoryDetail,
+                              pathParameters: {'itemId': replacementId},
+                            );
+                          },
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('View Item'),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'The warranty replacement is already saved. Retry here, '
+                    'or open the item and add photos later.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
           return AppPage(
             title: 'Warranty Replacement',
             child: AppEmptyState(
