@@ -244,6 +244,62 @@ class _WarrantyReplacementFormState
     return value.isEmpty ? null : double.tryParse(value);
   }
 
+  void _onLengthChanged(String value) {
+    final parsedLength = double.tryParse(value.trim());
+    final parsedWeight = double.tryParse(_weightController.text.trim());
+    final parsedDrop = double.tryParse(_dropController.text.trim());
+    if (parsedLength == null || parsedLength <= 0) {
+      return;
+    }
+    if (parsedWeight != null && parsedWeight > 0) {
+      _dropController.text = _formatBatNumber(parsedWeight - parsedLength);
+      return;
+    }
+    if (parsedDrop != null && parsedDrop < 0) {
+      final calculatedWeight = parsedLength + parsedDrop;
+      if (calculatedWeight > 0) {
+        _weightController.text = _formatBatNumber(calculatedWeight);
+      }
+    }
+  }
+
+  void _onWeightChanged(String value) {
+    final parsedLength = double.tryParse(_lengthController.text.trim());
+    final parsedWeight = double.tryParse(value.trim());
+    if (parsedLength == null ||
+        parsedLength <= 0 ||
+        parsedWeight == null ||
+        parsedWeight <= 0) {
+      return;
+    }
+    _dropController.text = _formatBatNumber(parsedWeight - parsedLength);
+  }
+
+  void _onDropChanged(String value) {
+    final trimmedDrop = value.trim();
+    final enteredDrop = double.tryParse(trimmedDrop);
+    final parsedLength = double.tryParse(_lengthController.text.trim());
+    if (trimmedDrop.isEmpty || enteredDrop == null) {
+      return;
+    }
+    final signedDrop = -enteredDrop.abs();
+    final storedDrop = _formatBatNumber(signedDrop);
+    if (_dropController.text != storedDrop) {
+      _dropController.value = _dropController.value.copyWith(
+        text: storedDrop,
+        selection: TextSelection.collapsed(offset: storedDrop.length),
+        composing: TextRange.empty,
+      );
+    }
+    if (parsedLength == null || parsedLength <= 0) {
+      return;
+    }
+    final calculatedWeight = parsedLength + signedDrop;
+    if (calculatedWeight > 0) {
+      _weightController.text = _formatBatNumber(calculatedWeight);
+    }
+  }
+
   WarrantyReplacementInventoryDraft _buildDraft() {
     return WarrantyReplacementInventoryDraft(
       category: _category,
@@ -723,6 +779,7 @@ class _WarrantyReplacementFormState
                   controller: _lengthController,
                   enabled: !isSaving,
                   keyboardType: TextInputType.number,
+                  onChanged: _onLengthChanged,
                   decoration: const InputDecoration(labelText: 'Length'),
                 ),
               ),
@@ -733,6 +790,7 @@ class _WarrantyReplacementFormState
                   controller: _weightController,
                   enabled: !isSaving,
                   keyboardType: TextInputType.number,
+                  onChanged: _onWeightChanged,
                   decoration: const InputDecoration(labelText: 'Weight'),
                 ),
               ),
@@ -742,7 +800,11 @@ class _WarrantyReplacementFormState
                   key: const Key('warrantyReplacementDropField'),
                   controller: _dropController,
                   enabled: !isSaving,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                    decimal: true,
+                  ),
+                  onChanged: _onDropChanged,
                   decoration: const InputDecoration(labelText: 'Drop'),
                 ),
               ),
@@ -799,4 +861,14 @@ class _WarrantyReplacementFormState
         return const [];
     }
   }
+}
+
+String _formatBatNumber(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+  return value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }
