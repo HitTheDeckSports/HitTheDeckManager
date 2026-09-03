@@ -266,7 +266,7 @@ class _InventoryQuickInfoGrid extends StatelessWidget {
         const _QuickInfoData('Cost', 'Restricted', Icons.lock_outline),
       _QuickInfoData('Location', locationLabel, Icons.location_on_outlined),
       _QuickInfoData(
-        'Acquisition',
+        'Acquired By',
         item.acquisitionType.label,
         Icons.shopping_cart_outlined,
       ),
@@ -629,7 +629,7 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                           },
                     icon: const Icon(Icons.build_outlined, size: 18),
                     label: const Text(
-                      'Add Repair',
+                      'Repair',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -729,7 +729,7 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                               )
                             : const Icon(Icons.swap_horiz, size: 18),
                         label: Text(
-                          isUpdatingStatus ? 'Updating...' : 'Change Status',
+                          isUpdatingStatus ? 'Updating...' : 'Status',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1569,25 +1569,66 @@ class _TradeHistoryEntry extends StatelessWidget {
             inventoryItemId: relatedIds[index],
             item: inventoryById[relatedIds[index]],
             canViewFinancialData: canViewFinancialData,
+            showViewButton:
+                relatedIds.length != 1 ||
+                trade.saleTransactionId == null ||
+                trade.saleTransactionId!.trim().isEmpty,
           ),
         ],
         if (trade.saleTransactionId != null &&
             trade.saleTransactionId!.trim().isNotEmpty) ...[
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
-              onPressed: () {
-                context.goNamed(
-                  AppRouteNames.transactionDetail,
-                  pathParameters: {'transactionId': trade.saleTransactionId!},
-                );
-              },
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('View Original Sale'),
+          if (relatedIds.length == 1)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey(
+                      'inventoryTradeViewItemButton-${relatedIds.single}',
+                    ),
+                    onPressed: () {
+                      context.goNamed(
+                        AppRouteNames.inventoryDetail,
+                        pathParameters: {'itemId': relatedIds.single},
+                      );
+                    },
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('View Item'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
+                    onPressed: () {
+                      context.goNamed(
+                        AppRouteNames.transactionDetail,
+                        pathParameters: {
+                          'transactionId': trade.saleTransactionId!,
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('Original Sale'),
+                  ),
+                ),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
+                onPressed: () {
+                  context.goNamed(
+                    AppRouteNames.transactionDetail,
+                    pathParameters: {'transactionId': trade.saleTransactionId!},
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Original Sale'),
+              ),
             ),
-          ),
         ],
       ],
     );
@@ -1599,11 +1640,13 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
     required this.inventoryItemId,
     required this.item,
     required this.canViewFinancialData,
+    this.showViewButton = true,
   });
 
   final String inventoryItemId;
   final InventoryItem? item;
   final bool canViewFinancialData;
+  final bool showViewButton;
 
   @override
   Widget build(BuildContext context) {
@@ -1638,21 +1681,23 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
               relatedItem.acquisitionValueCents,
             ),
           ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: ValueKey('inventoryTradeViewItemButton-$inventoryItemId'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.inventoryDetail,
-                pathParameters: {'itemId': inventoryItemId},
-              );
-            },
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: const Text('View Inventory Item'),
+        if (showViewButton) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: ValueKey('inventoryTradeViewItemButton-$inventoryItemId'),
+              onPressed: () {
+                context.goNamed(
+                  AppRouteNames.inventoryDetail,
+                  pathParameters: {'itemId': inventoryItemId},
+                );
+              },
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('View Item'),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1803,7 +1848,7 @@ class _WarrantyReplacementDealEntry extends ConsumerWidget {
                   );
                 },
                 icon: const Icon(Icons.inventory_2_outlined),
-                label: const Text('View Replacement Item'),
+                label: const Text('View Item'),
               ),
             ),
           ],
@@ -1879,12 +1924,7 @@ class _RepairHistoryContent extends StatelessWidget {
     final trueCostCents = acquisitionValueCents + totalRepairCostCents;
 
     if (repairs.isEmpty) {
-      return const _StaticSummarySection(
-        key: Key('inventoryRepairHistoryEmpty'),
-        icon: Icons.build_outlined,
-        title: 'Repair History',
-        summary: 'No repairs have been recorded for this item.',
-      );
+      return const SizedBox.shrink(key: Key('inventoryRepairHistoryEmpty'));
     }
 
     return _CollapsibleDetailSection(
@@ -1982,7 +2022,7 @@ class _SellerInformationSection extends ConsumerWidget {
       return const _StaticSummarySection(
         key: Key('inventorySellerEmpty'),
         icon: Icons.person_outline,
-        title: 'Seller Information',
+        title: 'Seller',
         summary: 'No seller linked',
       );
     }
@@ -1991,28 +2031,28 @@ class _SellerInformationSection extends ConsumerWidget {
     return sellerAsync.when(
       loading: () => const _StaticSummarySection(
         icon: Icons.person_outline,
-        title: 'Seller Information',
+        title: 'Seller',
         summary: 'Loading seller...',
       ),
       error: (error, stackTrace) => _StaticSummarySection(
         icon: Icons.person_outline,
-        title: 'Seller Information',
+        title: 'Seller',
         summary: 'Unable to load seller information.',
       ),
       data: (seller) {
         if (seller == null) {
           return const _StaticSummarySection(
             icon: Icons.person_outline,
-            title: 'Seller Information',
+            title: 'Seller',
             summary:
                 'A seller is linked to this item, but the Contact record is unavailable.',
           );
         }
 
-        return _CollapsibleDetailSection(
+        return _SellerSummarySection(
           key: const Key('inventorySellerSection'),
           icon: Icons.person_outline,
-          title: 'Seller Information',
+          title: 'Seller',
           summary: seller.name,
           child: Align(
             alignment: Alignment.centerLeft,
@@ -2263,6 +2303,53 @@ class _CollapsibleDetailSectionState extends State<_CollapsibleDetailSection> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SellerSummarySection extends StatelessWidget {
+  const _SellerSummarySection({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.child,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String summary;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            child,
+          ],
         ),
       ),
     );

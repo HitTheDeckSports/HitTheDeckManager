@@ -191,8 +191,8 @@ void main() {
 
     expect(find.text('Notes'), findsOneWidget);
     expect(find.text('Additional Pricing'), findsOneWidget);
-    expect(find.text('Seller Information'), findsOneWidget);
-    expect(find.text('Repair History'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
+    expect(find.text('Repair History'), findsNothing);
 
     expect(
       find.byKey(const ValueKey('inventoryCollapsibleTitle-Notes')),
@@ -205,12 +205,12 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('inventoryStaticTitle-Seller Information')),
+      find.byKey(const ValueKey('inventoryStaticTitle-Seller')),
       findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('inventoryStaticTitle-Repair History')),
-      findsOneWidget,
+      findsNothing,
     );
   });
   testWidgets('expanded pricing labels remain visibly styled', (
@@ -1179,7 +1179,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
     expect(find.text('No seller linked'), findsOneWidget);
 
     expect(
@@ -1233,7 +1233,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsOneWidget);
     expect(find.text('555-123-4567'), findsNothing);
     expect(find.text('taylor@example.com'), findsNothing);
@@ -1284,7 +1284,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
 
     expect(
       find.text(
@@ -1726,7 +1726,7 @@ void main() {
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat buyer.'), findsOneWidget);
   });
-  testWidgets('Add Repair opens repair form for the selected item', (
+  testWidgets('Repair opens repair form for the selected item', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -1821,7 +1821,7 @@ void main() {
 
     expect(find.byKey(const Key('addRepairSubmitButton')), findsOneWidget);
   });
-  testWidgets('displays empty repair history and current true cost', (
+  testWidgets('hides empty repair history and keeps current true cost', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -1860,10 +1860,13 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Repair History'), findsOneWidget);
-
+    expect(find.text('Repair History'), findsNothing);
     expect(
       find.text('No repairs have been recorded for this item.'),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('inventoryRepairHistoryEmpty')),
       findsOneWidget,
     );
 
