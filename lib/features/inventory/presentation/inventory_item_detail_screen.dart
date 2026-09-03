@@ -930,6 +930,27 @@ class _InventoryPhotosSection extends StatelessWidget {
 
   final InventoryItem item;
 
+  void _openViewer(
+    BuildContext context,
+    List<String> photoUrls,
+    int initialIndex,
+  ) {
+    if (photoUrls.isEmpty) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) {
+        return _InventoryPhotoViewer(
+          photoUrls: photoUrls,
+          initialIndex: initialIndex,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final photoUrls = item.photoUrls;
@@ -959,21 +980,26 @@ class _InventoryPhotosSection extends StatelessWidget {
                           ),
                         ),
                       )
-                    : Image.network(
-                        photoUrls.first,
-                        key: const Key('inventoryPrimaryPhoto'),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const ColoredBox(
-                            color: Color(0xFFE0E0E0),
-                            child: Center(
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                size: 40,
+                    : GestureDetector(
+                        key: const Key('inventoryPrimaryPhotoTapTarget'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _openViewer(context, photoUrls, 0),
+                        child: Image.network(
+                          photoUrls.first,
+                          key: const Key('inventoryPrimaryPhoto'),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const ColoredBox(
+                              color: Color(0xFFE0E0E0),
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
               ),
             ),
@@ -1027,23 +1053,28 @@ class _InventoryPhotosSection extends StatelessWidget {
               itemBuilder: (context, index) {
                 final photoIndex = index + 1;
 
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 92,
-                    height: 92,
-                    child: Image.network(
-                      photoUrls[photoIndex],
-                      key: Key('inventoryPhotoThumbnail-$photoIndex'),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const ColoredBox(
-                          color: Color(0xFFE0E0E0),
-                          child: Center(
-                            child: Icon(Icons.broken_image_outlined),
-                          ),
-                        );
-                      },
+                return GestureDetector(
+                  key: Key('inventoryPhotoThumbnailTapTarget-$photoIndex'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openViewer(context, photoUrls, photoIndex),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 92,
+                      height: 92,
+                      child: Image.network(
+                        photoUrls[photoIndex],
+                        key: Key('inventoryPhotoThumbnail-$photoIndex'),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const ColoredBox(
+                            color: Color(0xFFE0E0E0),
+                            child: Center(
+                              child: Icon(Icons.broken_image_outlined),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -1052,6 +1083,120 @@ class _InventoryPhotosSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _InventoryPhotoViewer extends StatefulWidget {
+  const _InventoryPhotoViewer({
+    required this.photoUrls,
+    required this.initialIndex,
+  });
+
+  final List<String> photoUrls;
+  final int initialIndex;
+
+  @override
+  State<_InventoryPhotoViewer> createState() => _InventoryPhotoViewerState();
+}
+
+class _InventoryPhotoViewerState extends State<_InventoryPhotoViewer> {
+  late final PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('inventoryPhotoViewer'),
+      color: Colors.black,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              key: const Key('inventoryPhotoViewerPageView'),
+              controller: _pageController,
+              itemCount: widget.photoUrls.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return Center(
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: Image.network(
+                      widget.photoUrls[index],
+                      key: Key('inventoryPhotoViewerImage-$index'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            size: 64,
+                            color: Colors.white70,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                key: const Key('inventoryPhotoViewerCloseButton'),
+                tooltip: 'Close',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 18,
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.68),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} of ${widget.photoUrls.length}',
+                      key: const Key('inventoryPhotoViewerPositionLabel'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -396,7 +396,7 @@ void main() {
     );
   });
 
-  testWidgets('displays saved inventory photos on the detail screen', (
+  testWidgets('saved inventory photos open and swipe in the photo viewer', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -427,6 +427,38 @@ void main() {
     expect(find.byKey(const Key('inventoryPhotoCountLabel')), findsOneWidget);
     expect(find.text('2'), findsAtLeastNWidgets(1));
     expect(find.byKey(const Key('inventoryItemStatusBadge')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('inventoryPrimaryPhotoTapTarget')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsOneWidget);
+    expect(find.text('1 of 2'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('inventoryPhotoViewerPageView')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 of 2'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inventoryPhotoViewerCloseButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('inventoryPhotoThumbnailTapTarget-1')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsOneWidget);
+    expect(find.text('2 of 2'), findsOneWidget);
   });
 
   testWidgets('Sell Item opens a sale for the selected inventory item', (
