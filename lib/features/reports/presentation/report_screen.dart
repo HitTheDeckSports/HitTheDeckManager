@@ -6,6 +6,7 @@ import '../../authentication/presentation/providers/app_permissions_provider.dar
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../transactions/domain/models/deal_branch_summary.dart';
 import '../../transactions/domain/models/deal_lineage_edge_type.dart';
 import '../../transactions/domain/models/deal_status.dart';
 import '../application/deal_rollup_report.dart';
@@ -555,7 +556,7 @@ class _RecursiveDealsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uncompleted = report.rows
+    final active = report.rows
         .where((row) => row.summary.status != DealStatus.completed)
         .toList(growable: false);
     final completed = report.rows
@@ -566,19 +567,16 @@ class _RecursiveDealsSection extends StatelessWidget {
       key: const Key('dealsSection'),
       title: 'Deals',
       subtitle:
-          'Full Deal trees with overall and branch-level realized/projected results.',
+          'Track the original sale and each trade-in path through the full Deal.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Uncompleted Deals',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('Active Deals', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          if (uncompleted.isEmpty)
-            const _EmptyReportState(message: 'No uncompleted Deals.')
+          if (active.isEmpty)
+            const _EmptyReportState(message: 'No active Deals.')
           else
-            for (final row in uncompleted) _RecursiveDealCard(row: row),
+            for (final row in active) _RecursiveDealCard(row: row),
           const SizedBox(height: 16),
           Text(
             'Completed Deals',
@@ -604,96 +602,112 @@ class _RecursiveDealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final summary = row.summary;
     final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
+    final originalSaleLabel = _inventoryLabel(
+      row.parentInventoryItem,
+      row.parentSale.inventoryItemId,
+    );
+    final openPathCount = summary.branches
+        .where((branch) => branch.openInventoryCount > 0)
+        .length;
 
     return Card(
       key: Key('recursiveDealCard_$displayId'),
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
         key: Key('recursiveDealExpansion_$displayId'),
-        title: Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(displayId, style: Theme.of(context).textTheme.titleSmall),
-            Chip(label: Text(summary.status.label)),
+            Text(
+              originalSaleLabel,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            Text('Original Sale', style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 6,
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _LabeledValue(
-                label: 'Parent Item',
-                value: row.parentSale.inventoryItemId,
+              Chip(label: Text(_dealStatusLabel(summary.status))),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 20,
+                runSpacing: 8,
+                children: [
+                  _LabeledValue(
+                    label: 'Profit So Far',
+                    value: CurrencyFormatter.formatCents(
+                      summary.realizedDealProfitCents,
+                    ),
+                  ),
+                  _LabeledValue(
+                    label: 'Estimated Final Profit',
+                    value: CurrencyFormatter.formatCents(
+                      summary.projectedDealProfitCents,
+                    ),
+                  ),
+                ],
               ),
-              _LabeledValue(
-                label: 'Realized',
-                value: CurrencyFormatter.formatCents(
-                  summary.realizedDealProfitCents,
-                ),
-              ),
-              _LabeledValue(
-                label: 'Projected',
-                value: CurrencyFormatter.formatCents(
-                  summary.projectedDealProfitCents,
-                ),
+              const SizedBox(height: 8),
+              Text(
+                _openPathLabel(openPathCount),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
         ),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         children: [
           const Divider(),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Deal Summary',
-              style: Theme.of(context).textTheme.titleSmall,
+              'Original Sale',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              _LabeledValue(
-                label: 'Parent Sale Profit',
-                value: CurrencyFormatter.formatCents(
-                  summary.parentTransactionProfitCents,
-                ),
-              ),
-              _LabeledValue(
-                label: 'Branch Realized',
-                value: CurrencyFormatter.formatCents(
-                  summary.realizedBranchProfitCents,
-                ),
-              ),
-              _LabeledValue(
-                label: 'Open Projection',
-                value: CurrencyFormatter.formatCents(
-                  summary.projectedOpenBranchProfitCents,
-                ),
-              ),
-              _LabeledValue(
-                label: 'Open Items',
-                value: summary.openInventoryCount.toString(),
-              ),
-            ],
+          _BusinessEventCard(
+            icon: Icons.receipt_long_outlined,
+            title: originalSaleLabel,
+            label: 'Original Sale Profit',
+            value: CurrencyFormatter.formatCents(
+              summary.parentTransactionProfitCents,
+            ),
           ),
           const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Branches',
-              style: Theme.of(context).textTheme.titleSmall,
+              'Trade-In Paths',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(height: 6),
-          for (final branch in summary.branches)
-            _RecursiveDealBranchCard(row: row, branch: branch),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Each path starts with an item received in the original trade.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < summary.branches.length; i++)
+            _RecursiveDealBranchCard(
+              row: row,
+              branch: summary.branches[i],
+              pathNumber: i + 1,
+            ),
         ],
       ),
     );
@@ -701,21 +715,25 @@ class _RecursiveDealCard extends StatelessWidget {
 }
 
 class _RecursiveDealBranchCard extends StatelessWidget {
-  const _RecursiveDealBranchCard({required this.row, required this.branch});
+  const _RecursiveDealBranchCard({
+    required this.row,
+    required this.branch,
+    required this.pathNumber,
+  });
 
   final RecursiveDealReportRow row;
-  final dynamic branch;
+  final DealBranchSummary branch;
+  final int pathNumber;
 
   @override
   Widget build(BuildContext context) {
     final rootItem = row.inventoryItemFor(branch.rootChildInventoryItemId);
     final rootLabel = _inventoryLabel(
       rootItem,
-      branch.rootChildInventoryItemId as String,
+      branch.rootChildInventoryItemId,
     );
-    final branchNodes = row.tree.branchFor(
-      branch.rootChildInventoryItemId as String,
-    );
+    final branchNodes = row.tree.branchFor(branch.rootChildInventoryItemId);
+    final active = branch.openInventoryCount > 0;
 
     return Card(
       key: Key('recursiveDealBranch_${branch.rootChildInventoryItemId}'),
@@ -724,39 +742,65 @@ class _RecursiveDealBranchCard extends StatelessWidget {
         key: Key(
           'recursiveDealBranchExpansion_${branch.rootChildInventoryItemId}',
         ),
-        title: Text(rootLabel),
-        subtitle: Wrap(
-          spacing: 14,
-          runSpacing: 4,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _LabeledValue(
-              label: 'Realized',
-              value: CurrencyFormatter.formatCents(
-                branch.realizedProfitCents as int,
-              ),
+            Text(
+              'Trade-In $pathNumber',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            _LabeledValue(
-              label: 'Projected',
-              value: CurrencyFormatter.formatCents(
-                branch.projectedBranchProfitCents as int,
-              ),
-            ),
-            _LabeledValue(
-              label: 'Open',
-              value: (branch.openInventoryCount as int).toString(),
-            ),
+            const SizedBox(height: 2),
+            Text(rootLabel, style: Theme.of(context).textTheme.titleSmall),
           ],
         ),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        children: [
-          for (final node in branchNodes)
-            _DealLineageItemRow(
-              label: _inventoryLabel(
-                row.inventoryItemFor(node.inventoryItemId),
-                node.inventoryItemId,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 18,
+                runSpacing: 8,
+                children: [
+                  _LabeledValue(
+                    label: 'Path Profit So Far',
+                    value: CurrencyFormatter.formatCents(
+                      branch.realizedProfitCents,
+                    ),
+                  ),
+                  _LabeledValue(
+                    label: 'Est. Final Path Profit',
+                    value: CurrencyFormatter.formatCents(
+                      branch.projectedBranchProfitCents,
+                    ),
+                  ),
+                ],
               ),
-              depth: node.depth,
-              relationship: node.edgeTypeFromParent,
+              const SizedBox(height: 6),
+              Text(
+                active ? 'Still Active' : 'Completed',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+        children: [
+          for (var i = 0; i < branchNodes.length; i++)
+            _DealPathItemRow(
+              label: _inventoryLabel(
+                row.inventoryItemFor(branchNodes[i].inventoryItemId),
+                branchNodes[i].inventoryItemId,
+              ),
+              relationship: branchNodes[i].edgeTypeFromParent,
+              isRoot: i == 0,
+              isCurrent:
+                  i == branchNodes.length - 1 && branch.openInventoryCount > 0,
             ),
         ],
       ),
@@ -764,45 +808,129 @@ class _RecursiveDealBranchCard extends StatelessWidget {
   }
 }
 
-class _DealLineageItemRow extends StatelessWidget {
-  const _DealLineageItemRow({
+class _DealPathItemRow extends StatelessWidget {
+  const _DealPathItemRow({
     required this.label,
-    required this.depth,
     required this.relationship,
+    required this.isRoot,
+    required this.isCurrent,
   });
 
   final String label;
-  final int depth;
   final DealLineageEdgeType? relationship;
+  final bool isRoot;
+  final bool isCurrent;
 
   @override
   Widget build(BuildContext context) {
-    final relationshipLabel = switch (relationship) {
-      DealLineageEdgeType.trade => 'Trade',
-      DealLineageEdgeType.warrantyReplacement => 'Warranty',
-      null => 'Branch Root',
-    };
+    final eventLabel = isRoot
+        ? 'Received in Trade'
+        : switch (relationship) {
+            DealLineageEdgeType.trade => 'Received in Later Trade',
+            DealLineageEdgeType.warrantyReplacement => 'Warranty Replacement',
+            null => 'Continued Deal Item',
+          };
 
     return Padding(
-      padding: EdgeInsets.only(left: depth * 14.0, top: 6, bottom: 6),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            relationship == DealLineageEdgeType.warrantyReplacement
+            isRoot
+                ? Icons.input_outlined
+                : relationship == DealLineageEdgeType.warrantyReplacement
                 ? Icons.verified_outlined
-                : relationship == DealLineageEdgeType.trade
-                ? Icons.swap_horiz
-                : Icons.account_tree_outlined,
-            size: 18,
+                : Icons.swap_horiz,
+            size: 20,
           ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label)),
-          const SizedBox(width: 8),
-          Text(relationshipLabel, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eventLabel,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(label),
+                if (isCurrent) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Current Item',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _BusinessEventCard extends StatelessWidget {
+  const _BusinessEventCard({
+    required this.icon,
+    required this.title,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String title;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 6),
+                _LabeledValue(label: label, value: value),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _dealStatusLabel(DealStatus status) {
+  return switch (status) {
+    DealStatus.open => 'Active',
+    DealStatus.partiallyRealized => 'Partially Completed',
+    DealStatus.completed => 'Completed',
+  };
+}
+
+String _openPathLabel(int count) {
+  if (count == 0) {
+    return 'All Trade-In Paths Completed';
+  }
+  if (count == 1) {
+    return '1 Trade-In Path Still Open';
+  }
+  return '$count Trade-In Paths Still Open';
 }
 
 String _inventoryLabel(dynamic item, String fallbackId) {

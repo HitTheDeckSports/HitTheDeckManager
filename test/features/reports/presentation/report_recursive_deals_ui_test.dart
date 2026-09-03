@@ -24,10 +24,10 @@ import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_tr
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
 
 void main() {
-  testWidgets('Reports shows recursive Deal and branch profitability', (
+  testWidgets('Reports explains Deal economics in business language', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 900));
+    await tester.binding.setSurfaceSize(const Size(390, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -50,26 +50,50 @@ void main() {
     await tester.ensureVisible(dealCard);
 
     expect(dealCard, findsOneWidget);
-    expect(find.text('item-parent'), findsOneWidget);
+    expect(
+      find.text('BAT-2609-0001 - Louisville Slugger Atlas'),
+      findsOneWidget,
+    );
+    expect(find.text('Partially Completed'), findsOneWidget);
+    expect(find.text('Profit So Far'), findsOneWidget);
+    expect(find.text(r'$190.00'), findsOneWidget);
+    expect(find.text('Estimated Final Profit'), findsOneWidget);
     expect(find.text(r'$240.00'), findsOneWidget);
+    expect(find.text('1 Trade-In Path Still Open'), findsOneWidget);
+    expect(find.text('Parent Item'), findsNothing);
+    expect(find.text('Branch Realized'), findsNothing);
+    expect(find.text('Open Projection'), findsNothing);
 
     await tester.tap(find.byKey(const Key('recursiveDealExpansion_deal-a')));
     await tester.pumpAndSettle();
 
-    final branchCard = find.byKey(const Key('recursiveDealBranch_item-b'));
-    await tester.ensureVisible(branchCard);
+    expect(find.text('Original Sale'), findsWidgets);
+    expect(find.text('Original Sale Profit'), findsOneWidget);
+    expect(find.text(r'$150.00'), findsOneWidget);
+    expect(find.text('Trade-In Paths'), findsOneWidget);
 
-    expect(branchCard, findsOneWidget);
+    final pathCard = find.byKey(const Key('recursiveDealBranch_item-b'));
+    await tester.ensureVisible(pathCard);
+
+    expect(pathCard, findsOneWidget);
+    expect(find.text('Trade-In 1'), findsOneWidget);
     expect(find.text('BAT-2609-0002 - Easton Hype Fire'), findsOneWidget);
+    expect(find.text('Path Profit So Far'), findsOneWidget);
+    expect(find.text(r'$40.00'), findsOneWidget);
+    expect(find.text('Est. Final Path Profit'), findsOneWidget);
     expect(find.text(r'$90.00'), findsOneWidget);
+    expect(find.text('Still Active'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('recursiveDealBranchExpansion_item-b')),
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Received in Trade'), findsOneWidget);
+    expect(find.text('Warranty Replacement'), findsOneWidget);
     expect(find.text('BAT-2609-0003 - Marucci CatX2'), findsOneWidget);
-    expect(find.text('Warranty'), findsOneWidget);
+    expect(find.text('Current Item'), findsOneWidget);
+    expect(find.text('Branch Root'), findsNothing);
   });
 }
 
@@ -88,6 +112,17 @@ ReportsSnapshot _recursiveSnapshot() {
     saleDate: DateTime(2026, 9, 1),
     paymentMethod: PaymentMethod.cash,
     acquisitionValueCents: 10000,
+  );
+
+  const parentItem = InventoryItem(
+    id: 'item-parent',
+    inventoryNumber: 'BAT-2609-0001',
+    category: InventoryCategory.bat,
+    brand: 'Louisville Slugger',
+    model: 'Atlas',
+    acquisitionType: AcquisitionType.purchased,
+    acquisitionValueCents: 10000,
+    status: InventoryStatus.sold,
   );
 
   const itemB = InventoryItem(
@@ -150,6 +185,7 @@ ReportsSnapshot _recursiveSnapshot() {
       RecursiveDealReportRow(
         deal: deal,
         parentSale: parentSale,
+        parentInventoryItem: parentItem,
         tree: tree,
         summary: summary,
         lineageInventoryItems: const [itemB, itemW],

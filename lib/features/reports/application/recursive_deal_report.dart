@@ -14,6 +14,7 @@ class RecursiveDealReportRow {
   RecursiveDealReportRow({
     required this.deal,
     required this.parentSale,
+    required this.parentInventoryItem,
     required this.tree,
     required this.summary,
     required List<InventoryItem> lineageInventoryItems,
@@ -25,6 +26,7 @@ class RecursiveDealReportRow {
 
   final Deal deal;
   final SaleTransaction parentSale;
+  final InventoryItem? parentInventoryItem;
   final DealLineageTree tree;
   final DealTreeProfitSummary summary;
   final List<InventoryItem> lineageInventoryItems;
@@ -129,6 +131,7 @@ class RecursiveDealReport {
         RecursiveDealReportRow(
           deal: deal,
           parentSale: parentSale,
+          parentInventoryItem: inventoryById[parentSale.inventoryItemId],
           tree: tree,
           summary: summary,
           lineageInventoryItems: lineageItems,
