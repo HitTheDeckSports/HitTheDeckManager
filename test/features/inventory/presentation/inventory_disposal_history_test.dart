@@ -67,6 +67,14 @@ void main() {
 
     expect(find.text('Disposal History'), findsOneWidget);
     expect(find.text('Warranty Replacement'), findsOneWidget);
+
+    final disposalHistorySection = find.byKey(
+      const Key('inventoryDisposalHistorySection'),
+    );
+    await tester.ensureVisible(disposalHistorySection);
+    await tester.pumpAndSettle();
+    await tester.tap(disposalHistorySection);
+    await tester.pumpAndSettle();
     expect(find.text('Manufacturer approved replacement.'), findsOneWidget);
     expect(
       find.text('Warranty replacement: replacement Deal follow-up required.'),

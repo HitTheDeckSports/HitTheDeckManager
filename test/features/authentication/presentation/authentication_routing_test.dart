@@ -6,8 +6,25 @@ import 'package:hit_the_deck_manager/features/authentication/domain/models/auth_
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authenticated_session.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authorized_user.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/authorization_providers.dart';
+import 'package:hit_the_deck_manager/features/dashboard/application/dashboard_metrics.dart';
+import 'package:hit_the_deck_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:hit_the_deck_manager/features/settings/presentation/settings_screen.dart';
 
+const regressionTestDashboardMetrics = DashboardMetrics(
+  totalRevenueCents: 50000,
+  totalCostCents: 30000,
+  totalProfitCents: 20000,
+  grossMargin: 0.40,
+  openInventoryValueCents: 29000,
+  openInventoryCostCents: 18000,
+  openPotentialProfitCents: 11000,
+  inventoryCount: 3,
+  unitsSold: 7,
+  availableItems: 12,
+  averageDaysInInventory: 26,
+  brokenItems: 2,
+  dateRangeLabel: 'Month to Date',
+);
 const ownerSession = AuthenticatedSession(
   user: AuthUser(
     id: 'owner-id',
@@ -38,6 +55,9 @@ Widget buildAppWithSession(AuthenticatedSession? session) {
   return ProviderScope(
     overrides: [
       authenticatedSessionProvider.overrideWith((ref) => Stream.value(session)),
+      dashboardMetricsProvider.overrideWithValue(
+        const AsyncValue.data(regressionTestDashboardMetrics),
+      ),
     ],
     child: const HitTheDeckApp(),
   );
@@ -84,7 +104,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Dashboard'), findsWidgets);
-      expect(find.text('Add Inventory'), findsOneWidget);
+      expect(
+        find.byKey(const Key('dashboardInventoryCountCard')),
+        findsOneWidget,
+      );
       expect(find.text('Sign in with Google'), findsNothing);
     });
   });

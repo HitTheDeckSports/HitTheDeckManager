@@ -6,7 +6,24 @@ import 'package:hit_the_deck_manager/features/authentication/domain/models/auth_
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authenticated_session.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authorized_user.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/authorization_providers.dart';
+import 'package:hit_the_deck_manager/features/dashboard/application/dashboard_metrics.dart';
+import 'package:hit_the_deck_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
 
+const regressionTestDashboardMetrics = DashboardMetrics(
+  totalRevenueCents: 50000,
+  totalCostCents: 30000,
+  totalProfitCents: 20000,
+  grossMargin: 0.40,
+  openInventoryValueCents: 29000,
+  openInventoryCostCents: 18000,
+  openPotentialProfitCents: 11000,
+  inventoryCount: 3,
+  unitsSold: 7,
+  availableItems: 12,
+  averageDaysInInventory: 26,
+  brokenItems: 2,
+  dateRangeLabel: 'Month to Date',
+);
 const testOwnerSession = AuthenticatedSession(
   user: AuthUser(
     id: 'test-owner-id',
@@ -25,6 +42,9 @@ Widget buildAuthorizedApp() {
     overrides: [
       authenticatedSessionProvider.overrideWith(
         (ref) => Stream.value(testOwnerSession),
+      ),
+      dashboardMetricsProvider.overrideWithValue(
+        const AsyncValue.data(regressionTestDashboardMetrics),
       ),
     ],
     child: const HitTheDeckApp(),
@@ -47,8 +67,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Dashboard'), findsWidgets);
-    expect(find.text('Add Inventory'), findsOneWidget);
-    expect(find.text('Scan QR'), findsOneWidget);
+    expect(
+      find.byKey(const Key('dashboardAddInventoryButton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboardScanQrButton')), findsOneWidget);
 
     await tester.tap(find.text('Inventory'));
     await tester.pumpAndSettle();
@@ -75,7 +98,7 @@ void main() {
     await tester.pumpWidget(buildAuthorizedApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add Inventory'));
+    await tester.tap(find.byKey(const Key('dashboardAddInventoryButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('Buy Inventory'), findsOneWidget);

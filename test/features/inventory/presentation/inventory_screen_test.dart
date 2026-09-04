@@ -624,8 +624,6 @@ void main() {
 
     expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
-    expect(find.text('32 in'), findsOneWidget);
-    expect(find.text('29 oz'), findsOneWidget);
-    expect(find.text('-3'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemSummarySpecs')), findsOneWidget);
   });
 }

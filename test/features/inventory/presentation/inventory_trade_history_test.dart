@@ -82,10 +82,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Trade History'), findsOneWidget);
+
+    final tradeHistorySection = find.byKey(
+      const Key('inventoryTradeHistorySection'),
+    );
+    await tester.ensureVisible(tradeHistorySection);
+    await tester.pumpAndSettle();
+    await tester.tap(tradeHistorySection);
+    await tester.pumpAndSettle();
     expect(find.text('Sold item in a trade-in sale'), findsOneWidget);
     expect(find.text('GLV-2608-0001 \u2014 Wilson A2000'), findsOneWidget);
     expect(find.text(r'$140.00'), findsOneWidget);
-    expect(find.text('View Original Sale'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryTradeViewSaleButton-trade-1')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('incoming trade-in displays the original sold item', (
@@ -121,8 +132,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Trade History'), findsOneWidget);
+
+    final tradeHistorySection = find.byKey(
+      const Key('inventoryTradeHistorySection'),
+    );
+    await tester.ensureVisible(tradeHistorySection);
+    await tester.pumpAndSettle();
+    await tester.tap(tradeHistorySection);
+    await tester.pumpAndSettle();
     expect(find.text('Inventory received as a trade-in'), findsOneWidget);
     expect(find.text('BAT-2608-0001 \u2014 Combat Spec H1'), findsOneWidget);
-    expect(find.text('View Original Sale'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryTradeViewSaleButton-trade-1')),
+      findsOneWidget,
+    );
   });
 }

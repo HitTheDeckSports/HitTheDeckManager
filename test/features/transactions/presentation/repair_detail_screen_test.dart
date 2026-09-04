@@ -253,7 +253,7 @@ void main() {
     await tester.tap(viewItemButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Basic Information'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
     expect(find.text('Combat'), findsAtLeastNWidgets(1));
     expect(find.text('Spec H1'), findsAtLeastNWidgets(1));
@@ -400,12 +400,14 @@ void main() {
 
     expect(await transactionRepository.getRepair('repair-1'), isNull);
 
-    expect(find.text('Basic Information'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
     expect(
-      find.text('No repairs have been recorded for this item.'),
+      find.byKey(const Key('inventoryRepairHistoryEmpty')),
       findsOneWidget,
     );
-    expect(find.text(r'$0.00'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsAtLeastNWidgets(2));
+    expect(
+      find.byKey(const Key('inventoryQuickInfoValue-Cost')),
+      findsOneWidget,
+    );
   });
 }

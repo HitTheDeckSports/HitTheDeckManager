@@ -170,6 +170,13 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    final dealSection = find.byKey(const Key('inventoryDealSection'));
+    expect(dealSection, findsOneWidget);
+    await tester.ensureVisible(dealSection);
+    await tester.pumpAndSettle();
+    await tester.tap(dealSection);
+    await tester.pumpAndSettle();
+
     final button = find.byKey(const Key('inventoryViewDealButton'));
     expect(button, findsOneWidget);
 
