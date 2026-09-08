@@ -443,6 +443,9 @@ void main() {
     expect(thumbnailStrip, findsOneWidget);
     expect(tester.getSize(thumbnailStrip).width, closeTo(screenWidth, 0.5));
     expect(tester.getTopLeft(thumbnailStrip).dx, closeTo(0, 0.5));
+    final primaryBottom = tester.getBottomLeft(fullBleed).dy;
+    final stripTop = tester.getTopLeft(thumbnailStrip).dy;
+    expect(stripTop, closeTo(primaryBottom, 0.5));
 
     await tester.tap(
       find.byKey(const Key('inventoryPrimaryPhotoTapTarget')),

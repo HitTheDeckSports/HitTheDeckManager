@@ -1102,7 +1102,7 @@ class _InventoryPhotosSection extends StatelessWidget {
           ),
         ),
         if (photoUrls.length > 1) ...[
-          const SizedBox(height: 4),
+          const SizedBox.shrink(),
           SizedBox(
             key: const Key('inventoryPhotoThumbnailStrip'),
             width: screenWidth,
@@ -1111,7 +1111,7 @@ class _InventoryPhotosSection extends StatelessWidget {
               padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               itemCount: photoUrls.length - 1,
-              separatorBuilder: (context, index) => const SizedBox(width: 4),
+              separatorBuilder: (context, index) => const SizedBox.shrink(),
               itemBuilder: (context, index) {
                 final photoIndex = index + 1;
 
