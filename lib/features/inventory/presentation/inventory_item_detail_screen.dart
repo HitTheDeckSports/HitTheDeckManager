@@ -1102,13 +1102,16 @@ class _InventoryPhotosSection extends StatelessWidget {
           ),
         ),
         if (photoUrls.length > 1) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           SizedBox(
-            height: 92,
+            key: const Key('inventoryPhotoThumbnailStrip'),
+            width: screenWidth,
+            height: 96,
             child: ListView.separated(
+              padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               itemCount: photoUrls.length - 1,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              separatorBuilder: (context, index) => const SizedBox(width: 4),
               itemBuilder: (context, index) {
                 final photoIndex = index + 1;
 
@@ -1116,24 +1119,21 @@ class _InventoryPhotosSection extends StatelessWidget {
                   key: Key('inventoryPhotoThumbnailTapTarget-$photoIndex'),
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _openViewer(context, photoUrls, photoIndex),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 92,
-                      height: 92,
-                      child: Image.network(
-                        photoUrls[photoIndex],
-                        key: Key('inventoryPhotoThumbnail-$photoIndex'),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const ColoredBox(
-                            color: Color(0xFFE0E0E0),
-                            child: Center(
-                              child: Icon(Icons.broken_image_outlined),
-                            ),
-                          );
-                        },
-                      ),
+                  child: SizedBox(
+                    width: 96,
+                    height: 96,
+                    child: Image.network(
+                      photoUrls[photoIndex],
+                      key: Key('inventoryPhotoThumbnail-$photoIndex'),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const ColoredBox(
+                          color: Color(0xFFE0E0E0),
+                          child: Center(
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 );

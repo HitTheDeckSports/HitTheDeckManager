@@ -437,6 +437,12 @@ void main() {
     final screenWidth =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
     expect(tester.getSize(fullBleed).width, closeTo(screenWidth, 0.5));
+    final thumbnailStrip = find.byKey(
+      const Key('inventoryPhotoThumbnailStrip'),
+    );
+    expect(thumbnailStrip, findsOneWidget);
+    expect(tester.getSize(thumbnailStrip).width, closeTo(screenWidth, 0.5));
+    expect(tester.getTopLeft(thumbnailStrip).dx, closeTo(0, 0.5));
 
     await tester.tap(
       find.byKey(const Key('inventoryPrimaryPhotoTapTarget')),
