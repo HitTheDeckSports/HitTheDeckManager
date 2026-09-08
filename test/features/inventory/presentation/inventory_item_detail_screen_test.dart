@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -1301,6 +1301,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Seller'), findsOneWidget);
+    final sellerTitleFinder = find.byKey(const Key('inventorySellerTitle'));
+    expect(sellerTitleFinder, findsOneWidget);
+    final sellerTitle = tester.widget<Text>(sellerTitleFinder);
+    expect(sellerTitle.style?.color, const Color(0xFF082A4A));
+    expect(sellerTitle.style?.fontWeight, FontWeight.w900);
     expect(find.text('Taylor Morgan'), findsOneWidget);
     expect(find.text('555-123-4567'), findsNothing);
     expect(find.text('taylor@example.com'), findsNothing);
