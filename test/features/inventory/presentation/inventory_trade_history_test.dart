@@ -90,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(tradeHistorySection);
     await tester.pumpAndSettle();
-    expect(find.text('Sold item in a trade-in sale'), findsOneWidget);
+    expect(find.text('Sold in a Trade Sale'), findsOneWidget);
     expect(find.text('GLV-2608-0001 \u2014 Wilson A2000'), findsOneWidget);
     expect(find.text(r'$140.00'), findsOneWidget);
     expect(
@@ -140,7 +140,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(tradeHistorySection);
     await tester.pumpAndSettle();
-    expect(find.text('Inventory received as a trade-in'), findsOneWidget);
+    expect(find.text('Received as Trade-In'), findsOneWidget);
     expect(find.text('BAT-2608-0001 \u2014 Combat Spec H1'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('inventoryTradeViewSaleButton-trade-1')),

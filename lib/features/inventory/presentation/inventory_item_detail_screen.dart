@@ -108,97 +108,111 @@ class _InventoryItemDetailContent extends ConsumerWidget {
         Positioned.fill(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 72),
-            child: AppPage(
-              title: 'Inventory Item',
-              showHeader: false,
-              compact: true,
+            child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _InventoryPhotosSection(item: item),
-                  const SizedBox(height: 12),
-                  _InventorySummarySection(
-                    item: item,
-                    canViewFinancialData: permissions.canViewFinancialData,
-                  ),
-                  const SizedBox(height: 12),
-                  _InventoryQuickInfoGrid(
-                    item: item,
-                    locationLabel: locationLabel,
-                    canViewFinancialData: permissions.canViewFinancialData,
-                  ),
-                  if (item.notes != null && item.notes!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _CollapsibleDetailSection(
-                      key: const Key('inventoryNotesSection'),
-                      icon: Icons.description_outlined,
-                      title: 'Notes',
-                      summary: _singleLineSummary(item.notes!.trim()),
-                      child: Text(item.notes!.trim()),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  _CollapsibleDetailSection(
-                    key: const Key('inventoryAdditionalPricingSection'),
-                    icon: Icons.paid_outlined,
-                    title: 'Additional Pricing',
-                    child: _ThreeValueSummary(
-                      values: [
-                        ('Price New', _formatOptionalMoney(item.newValueCents)),
-                        (
-                          'Asking Price',
-                          _formatOptionalMoney(item.askingPriceCents),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _InventorySummarySection(
+                          item: item,
+                          canViewFinancialData:
+                              permissions.canViewFinancialData,
                         ),
-                        (
-                          'Min Price',
-                          _formatOptionalMoney(item.minimumPriceCents),
+                        const SizedBox(height: 12),
+                        _InventoryQuickInfoGrid(
+                          item: item,
+                          locationLabel: locationLabel,
+                          canViewFinancialData:
+                              permissions.canViewFinancialData,
                         ),
+                        if (item.notes != null &&
+                            item.notes!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _CollapsibleDetailSection(
+                            key: const Key('inventoryNotesSection'),
+                            icon: Icons.description_outlined,
+                            title: 'Notes',
+                            summary: _singleLineSummary(item.notes!.trim()),
+                            child: Text(item.notes!.trim()),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        _CollapsibleDetailSection(
+                          key: const Key('inventoryAdditionalPricingSection'),
+                          icon: Icons.paid_outlined,
+                          title: 'Additional Pricing',
+                          child: _ThreeValueSummary(
+                            values: [
+                              (
+                                'Price New',
+                                _formatOptionalMoney(item.newValueCents),
+                              ),
+                              (
+                                'Asking Price',
+                                _formatOptionalMoney(item.askingPriceCents),
+                              ),
+                              (
+                                'Min Price',
+                                _formatOptionalMoney(item.minimumPriceCents),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _SellerInformationSection(
+                          sellerContactId: item.sellerContactId,
+                        ),
+                        if (item.acquisitionType ==
+                                AcquisitionType.consignment &&
+                            item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _ConsignmentSection(item: item),
+                        ],
+                        if (item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _RepairHistorySection(
+                            inventoryItemId: item.id!,
+                            acquisitionValueCents: item.acquisitionValueCents,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                          const SizedBox(height: 10),
+                          _DisposalHistorySection(inventoryItemId: item.id!),
+                        ],
+                        if (item.status == InventoryStatus.sold &&
+                            item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _SaleInformationSection(
+                            inventoryItemId: item.id!,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                        ],
+                        if (item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _TradeHistorySection(
+                            inventoryItemId: item.id!,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                          const SizedBox(height: 10),
+                          _InventoryWarrantySection(inventoryItemId: item.id!),
+                          const SizedBox(height: 10),
+                          _InventoryDealSection(
+                            inventoryItemId: item.id!,
+                            status: item.status,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _SellerInformationSection(
-                    sellerContactId: item.sellerContactId,
-                  ),
-                  if (item.acquisitionType == AcquisitionType.consignment &&
-                      item.id != null) ...[
-                    const SizedBox(height: 10),
-                    _ConsignmentSection(item: item),
-                  ],
-                  if (item.id != null) ...[
-                    const SizedBox(height: 10),
-                    _RepairHistorySection(
-                      inventoryItemId: item.id!,
-                      acquisitionValueCents: item.acquisitionValueCents,
-                      canViewFinancialData: permissions.canViewFinancialData,
-                    ),
-                    const SizedBox(height: 10),
-                    _DisposalHistorySection(inventoryItemId: item.id!),
-                  ],
-                  if (item.status == InventoryStatus.sold &&
-                      item.id != null) ...[
-                    const SizedBox(height: 10),
-                    _SaleInformationSection(
-                      inventoryItemId: item.id!,
-                      canViewFinancialData: permissions.canViewFinancialData,
-                    ),
-                  ],
-                  if (item.id != null) ...[
-                    const SizedBox(height: 10),
-                    _TradeHistorySection(
-                      inventoryItemId: item.id!,
-                      canViewFinancialData: permissions.canViewFinancialData,
-                    ),
-                    const SizedBox(height: 10),
-                    _InventoryWarrantySection(inventoryItemId: item.id!),
-                    const SizedBox(height: 10),
-                    _InventoryDealSection(
-                      inventoryItemId: item.id!,
-                      status: item.status,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -266,7 +280,7 @@ class _InventoryQuickInfoGrid extends StatelessWidget {
         const _QuickInfoData('Cost', 'Restricted', Icons.lock_outline),
       _QuickInfoData('Location', locationLabel, Icons.location_on_outlined),
       _QuickInfoData(
-        'Acquired By',
+        'Acquired',
         item.acquisitionType.label,
         Icons.shopping_cart_outlined,
       ),
@@ -584,12 +598,129 @@ class _InventoryPrimaryActions extends ConsumerWidget {
   final bool canDisposeInventory;
   final bool isUpdatingStatus;
 
+  Future<void> _showStatusSheet(BuildContext context, WidgetRef ref) async {
+    final selectedStatus = await showModalBottomSheet<InventoryStatus>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final statuses = [
+          InventoryStatus.available,
+          InventoryStatus.inactive,
+          InventoryStatus.broken,
+          if (canDisposeInventory &&
+              item.status != InventoryStatus.sold &&
+              item.status != InventoryStatus.disposed)
+            InventoryStatus.disposed,
+        ];
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Change Status',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current status: ${item.status.label}',
+                  key: const Key('inventoryStatusCurrentLabel'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inventoryStatusForeground(item.status),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final status in statuses)
+                  ListTile(
+                    key: ValueKey('inventoryStatusOption-${status.name}'),
+                    enabled: status != item.status,
+                    leading: Icon(
+                      status == item.status
+                          ? Icons.check_circle
+                          : Icons.circle_outlined,
+                      color: _inventoryStatusForeground(status),
+                    ),
+                    title: Text(status.label),
+                    onTap: status == item.status
+                        ? null
+                        : () => Navigator.of(context).pop(status),
+                  ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  key: const Key('inventoryStatusCancelButton'),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selectedStatus == null || !context.mounted) {
+      return;
+    }
+
+    if (selectedStatus == InventoryStatus.disposed) {
+      if (item.id != null) {
+        context.goNamed(
+          AppRouteNames.disposeInventory,
+          pathParameters: {'itemId': item.id!},
+        );
+      }
+      return;
+    }
+
+    try {
+      final updatedItem = await ref
+          .read(inventoryControllerProvider.notifier)
+          .updateStatus(item: item, status: selectedStatus);
+
+      ref.invalidate(inventoryItemProvider(updatedItem.id!));
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Inventory status changed to ${updatedItem.status.label}.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to change inventory status: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
       key: const Key('inventoryItemPrimaryActions'),
       elevation: 10,
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       child: SafeArea(
         top: false,
         child: Padding(
@@ -639,101 +770,26 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                 const SizedBox(width: 8),
               if (item.id != null)
                 Expanded(
-                  child: PopupMenuButton<InventoryStatus>(
+                  child: OutlinedButton.icon(
                     key: const Key('inventoryItemStatusButton'),
-                    enabled: !isUpdatingStatus,
-                    tooltip: 'Change inventory status',
-                    onSelected: (status) async {
-                      if (status == InventoryStatus.disposed) {
-                        if (item.id != null && context.mounted) {
-                          context.goNamed(
-                            AppRouteNames.disposeInventory,
-                            pathParameters: {'itemId': item.id!},
-                          );
-                        }
-                        return;
-                      }
-
-                      try {
-                        final updatedItem = await ref
-                            .read(inventoryControllerProvider.notifier)
-                            .updateStatus(item: item, status: status);
-
-                        ref.invalidate(inventoryItemProvider(updatedItem.id!));
-
-                        if (!context.mounted) {
-                          return;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Inventory status changed to ${updatedItem.status.label}.',
-                            ),
-                          ),
-                        );
-                      } catch (error) {
-                        if (!context.mounted) {
-                          return;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Unable to change inventory status: $error',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    itemBuilder: (context) {
-                      return [
-                        for (final status in [
-                          InventoryStatus.available,
-                          InventoryStatus.inactive,
-                          InventoryStatus.broken,
-                          if (canDisposeInventory &&
-                              item.status != InventoryStatus.sold &&
-                              item.status != InventoryStatus.disposed)
-                            InventoryStatus.disposed,
-                        ])
-                          PopupMenuItem<InventoryStatus>(
-                            value: status,
-                            enabled: status != item.status,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  status == item.status
-                                      ? Icons.check
-                                      : Icons.circle_outlined,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(status.label),
-                              ],
-                            ),
-                          ),
-                      ];
-                    },
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: null,
-                        icon: isUpdatingStatus
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.swap_horiz, size: 18),
-                        label: Text(
-                          isUpdatingStatus ? 'Updating...' : 'Status',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                    onPressed: isUpdatingStatus
+                        ? null
+                        : () => _showStatusSheet(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                      side: BorderSide(color: colorScheme.primary),
+                    ),
+                    icon: isUpdatingStatus
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.swap_horiz, size: 18),
+                    label: Text(
+                      isUpdatingStatus ? 'Updating...' : 'Status',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
@@ -954,15 +1010,18 @@ class _InventoryPhotosSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final photoUrls = item.photoUrls;
+    final screenWidth = MediaQuery.sizeOf(context).width;
 
-    return _DetailSection(
-      title: 'Photos',
+    return Column(
+      key: const Key('inventoryPhotosSection'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
+        SizedBox(
+          key: const Key('inventoryPrimaryPhotoFullBleed'),
+          width: screenWidth,
+          child: Stack(
+            children: [
+              AspectRatio(
                 aspectRatio: 16 / 9,
                 child: photoUrls.isEmpty
                     ? ColoredBox(
@@ -1002,45 +1061,45 @@ class _InventoryPhotosSection extends StatelessWidget {
                         ),
                       ),
               ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: _InventoryStatusBadge(status: item.status),
-            ),
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+              Positioned(
+                top: 12,
+                left: 12,
+                child: _InventoryStatusBadge(status: item.status),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.photo_camera_outlined,
-                        size: 17,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        photoUrls.length.toString(),
-                        key: const Key('inventoryPhotoCountLabel'),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.photo_camera_outlined,
+                          size: 17,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          photoUrls.length.toString(),
+                          key: const Key('inventoryPhotoCountLabel'),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         if (photoUrls.length > 1) ...[
           const SizedBox(height: 12),
@@ -1201,6 +1260,26 @@ class _InventoryPhotoViewerState extends State<_InventoryPhotoViewer> {
   }
 }
 
+Color _inventoryStatusBackground(InventoryStatus status) {
+  return switch (status) {
+    InventoryStatus.available => const Color(0xFFDFF3E4),
+    InventoryStatus.sold => const Color(0xFFDDEBFF),
+    InventoryStatus.inactive => const Color(0xFFFFE9B8),
+    InventoryStatus.broken => const Color(0xFFFFDAD6),
+    InventoryStatus.disposed => const Color(0xFFE6E8EC),
+  };
+}
+
+Color _inventoryStatusForeground(InventoryStatus status) {
+  return switch (status) {
+    InventoryStatus.available => const Color(0xFF146C2E),
+    InventoryStatus.sold => const Color(0xFF174EA6),
+    InventoryStatus.inactive => const Color(0xFF8A5A00),
+    InventoryStatus.broken => const Color(0xFFB3261E),
+    InventoryStatus.disposed => const Color(0xFF4B5563),
+  };
+}
+
 class _InventoryStatusBadge extends StatelessWidget {
   const _InventoryStatusBadge({required this.status});
 
@@ -1208,34 +1287,10 @@ class _InventoryStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final (background, foreground) = switch (status) {
-      InventoryStatus.available => (
-        colorScheme.primaryContainer,
-        colorScheme.onPrimaryContainer,
-      ),
-      InventoryStatus.sold => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
-      ),
-      InventoryStatus.inactive => (
-        colorScheme.surfaceContainerHighest,
-        colorScheme.onSurfaceVariant,
-      ),
-      InventoryStatus.broken => (
-        colorScheme.errorContainer,
-        colorScheme.onErrorContainer,
-      ),
-      InventoryStatus.disposed => (
-        colorScheme.surfaceContainerHigh,
-        colorScheme.onSurface,
-      ),
-    };
-
     return DecoratedBox(
       key: const Key('inventoryItemStatusBadge'),
       decoration: BoxDecoration(
-        color: background,
+        color: _inventoryStatusBackground(status),
         borderRadius: BorderRadius.circular(999),
         boxShadow: const [
           BoxShadow(color: Colors.black26, blurRadius: 5, offset: Offset(0, 2)),
@@ -1246,8 +1301,8 @@ class _InventoryStatusBadge extends StatelessWidget {
         child: Text(
           status.label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w700,
+            color: _inventoryStatusForeground(status),
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -1651,7 +1706,8 @@ class _TradeHistorySection extends ConsumerWidget {
               key: const Key('inventoryTradeHistorySection'),
               icon: Icons.swap_horiz,
               title: 'Trade History',
-              summary: ' -  related ',
+              summary:
+                  '${trades.length} ${trades.length == 1 ? 'trade' : 'trades'}',
               children: [
                 for (var index = 0; index < trades.length; index++) ...[
                   if (index > 0) const Divider(height: 32),
@@ -1698,9 +1754,7 @@ class _TradeHistoryEntry extends StatelessWidget {
       children: [
         _DetailRow(
           label: 'Relationship',
-          value: isOutgoing
-              ? 'Sold item in a trade-in sale'
-              : 'Inventory received as a trade-in',
+          value: isOutgoing ? 'Sold in a Trade Sale' : 'Received as Trade-In',
         ),
         _DetailRow(label: 'Trade Date', value: _formatDate(trade.tradeDate)),
         _DetailRow(
@@ -1714,6 +1768,7 @@ class _TradeHistoryEntry extends StatelessWidget {
             inventoryItemId: relatedIds[index],
             item: inventoryById[relatedIds[index]],
             canViewFinancialData: canViewFinancialData,
+            roleLabel: isOutgoing ? 'Trade-In Item' : 'Item Sold',
             showViewButton:
                 relatedIds.length != 1 ||
                 trade.saleTransactionId == null ||
@@ -1785,12 +1840,14 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
     required this.inventoryItemId,
     required this.item,
     required this.canViewFinancialData,
+    required this.roleLabel,
     this.showViewButton = true,
   });
 
   final String inventoryItemId;
   final InventoryItem? item;
   final bool canViewFinancialData;
+  final String roleLabel;
   final bool showViewButton;
 
   @override
@@ -1814,7 +1871,7 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _DetailRow(
-          label: 'Inventory Item',
+          label: roleLabel,
           value:
               '${relatedItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
@@ -2199,20 +2256,12 @@ class _SellerInformationSection extends ConsumerWidget {
           icon: Icons.person_outline,
           title: 'Seller',
           summary: seller.name,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const Key('inventoryItemViewSellerButton'),
-              onPressed: () {
-                context.goNamed(
-                  AppRouteNames.contactDetail,
-                  pathParameters: {'contactId': contactId},
-                );
-              },
-              icon: const Icon(Icons.person_outline),
-              label: const Text('View Contact'),
-            ),
-          ),
+          onSummaryTap: () {
+            context.goNamed(
+              AppRouteNames.contactDetail,
+              pathParameters: {'contactId': contactId},
+            );
+          },
         );
       },
     );
@@ -2459,23 +2508,25 @@ class _SellerSummarySection extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.summary,
-    required this.child,
+    required this.onSummaryTap,
     super.key,
   });
 
   final IconData icon;
   final String title;
   final String summary;
-  final Widget child;
+  final VoidCallback onSummaryTap;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+            Icon(icon, size: 19, color: colorScheme.primary),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -2488,12 +2539,27 @@ class _SellerSummarySection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  InkWell(
+                    key: const Key('inventorySellerContactLink'),
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: onSummaryTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            child,
           ],
         ),
       ),

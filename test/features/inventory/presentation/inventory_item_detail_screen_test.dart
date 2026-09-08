@@ -96,6 +96,10 @@ void main() {
     );
     expect(find.text('Bat'), findsOneWidget);
     expect(find.text('Purchased'), findsAtLeastNWidgets(1));
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Acquired')),
+      findsOneWidget,
+    );
     expect(find.text('Like New'), findsAtLeastNWidgets(1));
     expect(find.text('Available'), findsAtLeastNWidgets(1));
     expect(find.text('08/02/2026'), findsOneWidget);
@@ -421,13 +425,18 @@ void main() {
 
     await tester.pump();
 
-    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('Photos'), findsNothing);
     expect(find.byKey(const Key('inventoryPrimaryPhoto')), findsOneWidget);
     expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
     expect(find.byKey(const Key('inventoryPhotoCountLabel')), findsOneWidget);
     expect(find.text('2'), findsAtLeastNWidgets(1));
     expect(find.byKey(const Key('inventoryItemStatusBadge')), findsOneWidget);
     expect(find.byKey(const Key('inventoryPhotoViewer')), findsNothing);
+    final fullBleed = find.byKey(const Key('inventoryPrimaryPhotoFullBleed'));
+    expect(fullBleed, findsOneWidget);
+    final screenWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getSize(fullBleed).width, closeTo(screenWidth, 0.5));
 
     await tester.tap(
       find.byKey(const Key('inventoryPrimaryPhotoTapTarget')),
@@ -885,7 +894,24 @@ void main() {
     expect(find.text('Broken'), findsOneWidget);
     expect(find.text('Sold'), findsNothing);
     expect(find.text('Disposed'), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryStatusCancelButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryStatusCurrentLabel')),
+      findsOneWidget,
+    );
 
+    final cancelButton = find.byKey(const Key('inventoryStatusCancelButton'));
+    await tester.ensureVisible(cancelButton);
+    await tester.pumpAndSettle();
+    await tester.tap(cancelButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Change Status'), findsNothing);
+
+    await tester.tap(statusButton);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Inactive'));
     await tester.pumpAndSettle();
 
@@ -1273,12 +1299,7 @@ void main() {
     final sellerSection = find.byKey(const Key('inventorySellerSection'));
     await tester.ensureVisible(sellerSection);
     await tester.pumpAndSettle();
-    await tester.tap(sellerSection);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('inventoryItemViewSellerButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('inventorySellerContactLink')), findsOneWidget);
   });
   testWidgets('missing linked seller displays warning', (
     WidgetTester tester,
@@ -1330,7 +1351,7 @@ void main() {
       findsNothing,
     );
   });
-  testWidgets('View Seller opens the linked contact detail screen', (
+  testWidgets('Seller name opens the linked contact detail screen', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -1406,22 +1427,13 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final sellerSection = find.byKey(const Key('inventorySellerSection'));
-    await tester.ensureVisible(sellerSection);
-    await tester.pumpAndSettle();
-    await tester.tap(sellerSection);
-    await tester.pumpAndSettle();
+    final sellerLink = find.byKey(const Key('inventorySellerContactLink'));
+    expect(sellerLink, findsOneWidget);
 
-    final viewSellerButton = find.byKey(
-      const Key('inventoryItemViewSellerButton'),
-    );
-
-    expect(viewSellerButton, findsOneWidget);
-
-    await tester.ensureVisible(viewSellerButton);
+    await tester.ensureVisible(sellerLink);
     await tester.pumpAndSettle();
 
-    await tester.tap(viewSellerButton);
+    await tester.tap(sellerLink);
     await tester.pumpAndSettle();
 
     expect(find.text('Contact Details'), findsOneWidget);
