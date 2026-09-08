@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,8 +9,10 @@ import 'package:hit_the_deck_manager/core/theme/app_theme.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_location.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/inventory_item_detail_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/inventory_screen.dart';
+import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_location_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
@@ -23,6 +27,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -77,6 +84,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -94,6 +104,65 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory scanner destination'), findsOneWidget);
+  });
+
+  testWidgets('Inventory filter preloads locations before first open', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'preload-item',
+      inventoryNumber: 'BAT-2608-0201',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+    final locationsController = StreamController<List<InventoryLocation>>();
+
+    addTearDown(repository.dispose);
+    addTearDown(locationsController.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => locationsController.stream,
+          ),
+          repairTransactionsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+      ),
+    );
+    // The loading state intentionally contains an indeterminate progress
+    // indicator, so pumpAndSettle would never complete here.
+    await tester.pump();
+
+    final loadingButton = tester.widget<IconButton>(
+      find.byKey(const Key('inventoryFilterButton')),
+    );
+    expect(loadingButton.onPressed, isNull);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    locationsController.add(const [
+      InventoryLocation(id: 'showroom', name: 'Showroom'),
+    ]);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final readyButton = tester.widget<IconButton>(
+      find.byKey(const Key('inventoryFilterButton')),
+    );
+    expect(readyButton.onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('inventoryFilterButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryFilterDialog')), findsOneWidget);
+    expect(find.text('Filter Inventory'), findsOneWidget);
   });
 
   testWidgets('InventoryScreen displays photo-forward inventory cards', (
@@ -122,6 +191,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -196,6 +268,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -236,6 +311,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value([
               RepairTransaction(
@@ -276,6 +354,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -307,6 +388,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -324,7 +408,7 @@ void main() {
   });
 
   testWidgets(
-    'Inventory card final polish uses compact repair and glove labels',
+    'Inventory card final polish uses compact broken and glove labels',
     (WidgetTester tester) async {
       const item = InventoryItem(
         id: 'polish-glove',
@@ -345,6 +429,9 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(repository),
+            inventoryLocationsProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
             repairTransactionsProvider.overrideWith(
               (ref) => Stream.value(const []),
             ),
@@ -354,8 +441,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Repair'), findsAtLeastNWidgets(1));
-      expect(find.text('Needs Repair'), findsNothing);
+      expect(find.text('Broken'), findsAtLeastNWidgets(1));
+      expect(find.text('Repair'), findsNothing);
       expect(find.text('11.75" • Right Hander'), findsOneWidget);
       expect(find.text(r'$---'), findsOneWidget);
       expect(
@@ -403,6 +490,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -435,6 +525,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -482,6 +575,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -534,6 +630,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),
@@ -606,6 +705,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           repairTransactionsProvider.overrideWith(
             (ref) => Stream.value(const []),
           ),

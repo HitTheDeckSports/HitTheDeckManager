@@ -69,7 +69,7 @@ void main() {
     });
 
     test('matches category and status', () {
-      final results = InventorySearch.filter(items, 'glove inactive');
+      final results = InventorySearch.filter(items, 'glove on hold');
       expect(results, hasLength(1));
       expect(results.single.id, 'item-2');
     });

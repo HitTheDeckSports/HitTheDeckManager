@@ -13,7 +13,9 @@ import '../application/filters/inventory_filter.dart';
 import '../application/search/inventory_search.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
+import '../domain/models/inventory_location.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
+import 'providers/inventory_location_providers.dart';
 import 'providers/inventory_providers.dart';
 import 'widgets/inventory_filter_dialog.dart';
 
@@ -59,6 +61,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
     final repairsAsync = ref.watch(repairTransactionsProvider);
+    final locationsAsync = ref.watch(inventoryLocationsProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -174,15 +177,31 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       height: 48,
                       child: IconButton.filledTonal(
                         key: const Key('inventoryFilterButton'),
-                        tooltip: _filters.isActive
+                        tooltip: locationsAsync.isLoading
+                            ? 'Loading filter options'
+                            : _filters.isActive
                             ? '${_filters.activeCount} filters active'
                             : 'Filter inventory',
-                        onPressed: () => _openFilters(context, items),
-                        icon: Badge(
-                          isLabelVisible: _filters.isActive,
-                          label: Text('${_filters.activeCount}'),
-                          child: const Icon(Icons.filter_list),
-                        ),
+                        onPressed: locationsAsync.value == null
+                            ? null
+                            : () => _openFilters(
+                                context,
+                                items,
+                                locationsAsync.value!,
+                              ),
+                        icon: locationsAsync.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Badge(
+                                isLabelVisible: _filters.isActive,
+                                label: Text('${_filters.activeCount}'),
+                                child: const Icon(Icons.filter_list),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -212,41 +231,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         selected: _quickStatus == null,
                         onSelected: () => _selectQuickStatus(null),
                       ),
-                      _QuickFilterChip(
-                        label: 'Available',
-                        count: statusCounts[InventoryStatus.available] ?? 0,
-                        selected: _quickStatus == InventoryStatus.available,
-                        onSelected: () =>
-                            _selectQuickStatus(InventoryStatus.available),
-                      ),
-                      _QuickFilterChip(
-                        label: 'Sold',
-                        count: statusCounts[InventoryStatus.sold] ?? 0,
-                        selected: _quickStatus == InventoryStatus.sold,
-                        onSelected: () =>
-                            _selectQuickStatus(InventoryStatus.sold),
-                      ),
-                      _QuickFilterChip(
-                        label: 'Repair',
-                        count: statusCounts[InventoryStatus.broken] ?? 0,
-                        selected: _quickStatus == InventoryStatus.broken,
-                        onSelected: () =>
-                            _selectQuickStatus(InventoryStatus.broken),
-                      ),
-                      _QuickFilterChip(
-                        label: 'Inactive',
-                        count: statusCounts[InventoryStatus.inactive] ?? 0,
-                        selected: _quickStatus == InventoryStatus.inactive,
-                        onSelected: () =>
-                            _selectQuickStatus(InventoryStatus.inactive),
-                      ),
-                      _QuickFilterChip(
-                        label: 'Disposed',
-                        count: statusCounts[InventoryStatus.disposed] ?? 0,
-                        selected: _quickStatus == InventoryStatus.disposed,
-                        onSelected: () =>
-                            _selectQuickStatus(InventoryStatus.disposed),
-                      ),
+                      for (final status in InventoryStatus.values)
+                        _QuickFilterChip(
+                          label: status.label,
+                          count: statusCounts[status] ?? 0,
+                          selected: _quickStatus == status,
+                          onSelected: () => _selectQuickStatus(status),
+                        ),
                     ],
                   ),
                 ),
@@ -330,6 +321,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Future<void> _openFilters(
     BuildContext context,
     List<dynamic> rawItems,
+    List<InventoryLocation> locations,
   ) async {
     final brands =
         rawItems
@@ -340,12 +332,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             .toList()
           ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
+    final sortedLocations = [...locations]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
     final selected = await showDialog<InventoryFilterCriteria>(
       context: context,
       builder: (context) {
         return InventoryFilterDialog(
           initialCriteria: _filters,
           availableBrands: brands,
+          availableLocations: sortedLocations,
         );
       },
     );
@@ -673,31 +669,26 @@ class _InventoryStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (background, foreground, label) = switch (status) {
+    final (background, foreground) = switch (status) {
       InventoryStatus.available => (
         const Color(0xFFE2F4E8),
         const Color(0xFF137A37),
-        'Available',
       ),
       InventoryStatus.sold => (
         const Color(0xFFE4EEFC),
         const Color(0xFF1768C5),
-        'Sold',
       ),
       InventoryStatus.broken => (
         const Color(0xFFFFEED8),
         const Color(0xFFC46A00),
-        'Repair',
       ),
       InventoryStatus.inactive => (
         const Color(0xFFECEFF3),
         const Color(0xFF596573),
-        'Inactive',
       ),
       InventoryStatus.disposed => (
         const Color(0xFFFFE4E6),
         AppTheme.primaryRed,
-        'Disposed',
       ),
     };
 
@@ -709,7 +700,7 @@ class _InventoryStatusChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          label,
+          status.label,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
             color: foreground,
             fontWeight: FontWeight.w800,

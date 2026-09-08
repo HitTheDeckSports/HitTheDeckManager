@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -899,7 +899,7 @@ void main() {
     await tester.tap(statusButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Inactive'), findsOneWidget);
+    expect(find.text('On Hold'), findsOneWidget);
     expect(find.text('Broken'), findsOneWidget);
     expect(find.text('Sold'), findsNothing);
     expect(find.text('Disposed'), findsOneWidget);
@@ -921,10 +921,10 @@ void main() {
 
     await tester.tap(statusButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Inactive'));
+    await tester.tap(find.text('On Hold'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Inventory status changed to Inactive.'), findsOneWidget);
+    expect(find.text('Inventory status changed to On Hold.'), findsOneWidget);
 
     final storedItem = await repository.getInventoryItem('item-1');
 
