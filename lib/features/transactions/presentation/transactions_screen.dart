@@ -30,13 +30,27 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  _LedgerType _typeFilter = _LedgerType.all;
-  _LedgerDateFilter _dateFilter = _LedgerDateFilter.all;
+  Set<_LedgerType> _selectedTypes = <_LedgerType>{};
+  int? _minimumAmountCents;
+  int? _maximumAmountCents;
 
-  bool get _hasActiveFilters =>
-      _query.trim().isNotEmpty ||
-      _typeFilter != _LedgerType.all ||
-      _dateFilter != _LedgerDateFilter.all;
+  bool get _hasAdvancedFilters =>
+      _selectedTypes.isNotEmpty ||
+      _minimumAmountCents != null ||
+      _maximumAmountCents != null;
+
+  bool get _hasActiveFilters => _query.trim().isNotEmpty || _hasAdvancedFilters;
+
+  int get _advancedFilterCount {
+    var count = 0;
+    if (_selectedTypes.isNotEmpty) {
+      count++;
+    }
+    if (_minimumAmountCents != null || _maximumAmountCents != null) {
+      count++;
+    }
+    return count;
+  }
 
   @override
   void dispose() {
@@ -44,12 +58,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     super.dispose();
   }
 
-  void _clearFilters() {
+  void _clearAllFilters() {
     _searchController.clear();
     setState(() {
       _query = '';
-      _typeFilter = _LedgerType.all;
-      _dateFilter = _LedgerDateFilter.all;
+      _selectedTypes = <_LedgerType>{};
+      _minimumAmountCents = null;
+      _maximumAmountCents = null;
     });
   }
 
@@ -139,126 +154,99 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            key: const Key('transactionsSearchField'),
-            controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _query = value;
-              });
-            },
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              labelText: 'Search Transactions',
-              hintText: 'Inventory number, item, type, description, reason...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _query.trim().isEmpty
-                  ? null
-                  : IconButton(
-                      key: const Key('transactionsSearchClearButton'),
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _query = '';
-                        });
-                      },
-                      icon: const Icon(Icons.clear),
-                    ),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
             children: [
-              SizedBox(
-                key: const Key('transactionsTypeFilter'),
-                width: 220,
-                child: DropdownButtonFormField<_LedgerType>(
-                  key: ValueKey(_typeFilter),
-                  isExpanded: true,
-                  initialValue: _typeFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Transaction Type',
-                    border: OutlineInputBorder(),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextField(
+                    key: const Key('transactionsSearchField'),
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: 'Search transactions',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _query.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('transactionsSearchClearButton'),
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
-                  items: [
-                    for (final type in _LedgerType.values)
-                      DropdownMenuItem(value: type, child: Text(type.label)),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    setState(() {
-                      _typeFilter = value;
-                    });
-                  },
                 ),
               ),
+              const SizedBox(width: 8),
               SizedBox(
-                key: const Key('transactionsDateFilter'),
-                width: 220,
-                child: DropdownButtonFormField<_LedgerDateFilter>(
-                  key: ValueKey(_dateFilter),
-                  isExpanded: true,
-                  initialValue: _dateFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Date',
-                    border: OutlineInputBorder(),
+                width: 48,
+                height: 48,
+                child: IconButton.filledTonal(
+                  key: const Key('transactionsFilterButton'),
+                  tooltip: _hasAdvancedFilters
+                      ? '$_advancedFilterCount filters active'
+                      : 'Filter transactions',
+                  onPressed: () => _openFilters(context),
+                  icon: Badge(
+                    isLabelVisible: _hasAdvancedFilters,
+                    label: Text('$_advancedFilterCount'),
+                    child: const Icon(Icons.tune_rounded),
                   ),
-                  items: [
-                    for (final filter in _LedgerDateFilter.values)
-                      DropdownMenuItem(
-                        value: filter,
-                        child: Text(filter.label),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    setState(() {
-                      _dateFilter = value;
-                    });
-                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _hasActiveFilters
+                      ? '${filteredEntries.length} of ${entries.length} transactions'
+                      : '${entries.length} transaction${entries.length == 1 ? '' : 's'}',
+                  key: const Key('transactionsResultCount'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF082A4A),
+                  ),
                 ),
               ),
               if (_hasActiveFilters)
-                TextButton.icon(
+                TextButton(
                   key: const Key('transactionsClearFiltersButton'),
-                  onPressed: _clearFilters,
-                  icon: const Icon(Icons.filter_alt_off_outlined),
-                  label: const Text('Clear Filters'),
+                  onPressed: _clearAllFilters,
+                  child: const Text('Clear'),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            _hasActiveFilters
-                ? '${filteredEntries.length} of ${entries.length} transactions'
-                : '${entries.length} transaction${entries.length == 1 ? '' : 's'}',
-            key: const Key('transactionsResultCount'),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           if (filteredEntries.isEmpty)
             const AppEmptyState(
               icon: Icons.search_off,
               title: 'No transactions match your filters.',
-              message: 'Clear or adjust the search, type, or date filter.',
+              message: 'Clear or adjust the search or transaction filters.',
             )
           else
             for (final entry in filteredEntries) ...[
-              _buildLedgerCard(
-                entry,
-                inventoryById,
-                permissions.canViewFinancialData,
+              _TransactionLedgerCard(
+                entry: entry,
+                canViewFinancialData: permissions.canViewFinancialData,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
             ],
         ],
       ),
@@ -266,17 +254,42 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   bool _matchesFilters(_LedgerEntry entry) {
-    if (_typeFilter != _LedgerType.all && entry.type != _typeFilter) {
+    if (_selectedTypes.isNotEmpty && !_selectedTypes.contains(entry.type)) {
       return false;
     }
 
-    final cutoff = _dateFilter.cutoff(DateTime.now());
-    if (cutoff != null && entry.date.isBefore(cutoff)) {
-      return false;
+    if (_minimumAmountCents != null || _maximumAmountCents != null) {
+      final amount = entry.filterAmountCents;
+      if (amount == null) return false;
+      if (_minimumAmountCents != null && amount < _minimumAmountCents!) {
+        return false;
+      }
+      if (_maximumAmountCents != null && amount > _maximumAmountCents!) {
+        return false;
+      }
     }
 
     final query = _query.trim().toLowerCase();
     return query.isEmpty || entry.searchableText.contains(query);
+  }
+
+  Future<void> _openFilters(BuildContext context) async {
+    final result = await showDialog<_TransactionFilterResult>(
+      context: context,
+      builder: (dialogContext) => _TransactionFilterDialog(
+        initialTypes: _selectedTypes,
+        initialMinimumAmountCents: _minimumAmountCents,
+        initialMaximumAmountCents: _maximumAmountCents,
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _selectedTypes = result.types;
+      _minimumAmountCents = result.minimumAmountCents;
+      _maximumAmountCents = result.maximumAmountCents;
+    });
   }
 }
 
@@ -293,20 +306,45 @@ List<_LedgerEntry> _buildLedgerEntries({
       _LedgerEntry(
         type: _LedgerType.sale,
         date: sale.saleDate,
-        transaction: sale,
+        title: _inventoryDisplayName(inventoryById[sale.inventoryItemId]),
+        subtitle: '${_paymentMethodLabel(sale.paymentMethod)} sale',
+        displayAmountCents: sale.salePriceCents,
+        filterAmountCents: sale.salePriceCents.abs(),
+        amountDirection: _AmountDirection.positive,
+        routeName: sale.id == null ? null : AppRouteNames.transactionDetail,
+        routeId: sale.id,
+        routeParameterName: 'transactionId',
+        cardKey: ValueKey(
+          sale.id ?? 'sale-${sale.inventoryItemId}-${sale.saleDate}',
+        ),
+        tapKey: ValueKey(
+          sale.id == null
+              ? 'transactionCardUnavailable'
+              : 'transactionCard-${sale.id}',
+        ),
         searchableText: _searchableText([
           'sale',
           _formatDate(sale.saleDate),
           _inventoryDisplayName(inventoryById[sale.inventoryItemId]),
-          sale.paymentMethod.label,
+          _paymentMethodLabel(sale.paymentMethod),
           sale.notes,
+          CurrencyFormatter.formatCents(sale.salePriceCents),
         ]),
       ),
     for (final trade in trades)
       _LedgerEntry(
         type: _LedgerType.trade,
         date: trade.tradeDate,
-        transaction: trade,
+        title: _tradeDisplayName(trade, inventoryById),
+        subtitle: _tradeSubtitle(trade),
+        displayAmountCents: trade.includesCash ? trade.netCashCents : null,
+        filterAmountCents: trade.includesCash ? trade.netCashCents.abs() : null,
+        amountDirection: trade.netCashCents < 0
+            ? _AmountDirection.negative
+            : _AmountDirection.positive,
+        cardKey: ValueKey(
+          'tradeTransactionCard-${trade.id ?? trade.tradeDate}',
+        ),
         searchableText: _searchableText([
           'trade trade-in',
           _formatDate(trade.tradeDate),
@@ -316,7 +354,9 @@ List<_LedgerEntry> _buildLedgerEntries({
           ...trade.incomingInventoryItemIds.map(
             (id) => _inventoryDisplayName(inventoryById[id]),
           ),
-          trade.paymentMethod?.label,
+          trade.paymentMethod == null
+              ? null
+              : _paymentMethodLabel(trade.paymentMethod!),
           trade.notes,
         ]),
       ),
@@ -324,20 +364,40 @@ List<_LedgerEntry> _buildLedgerEntries({
       _LedgerEntry(
         type: _LedgerType.repair,
         date: repair.repairDate,
-        transaction: repair,
+        title: _inventoryDisplayName(inventoryById[repair.inventoryItemId]),
+        subtitle: repair.description,
+        displayAmountCents: repair.costCents,
+        filterAmountCents: repair.costCents.abs(),
+        amountDirection: _AmountDirection.negative,
+        routeName: repair.id == null ? null : AppRouteNames.repairDetail,
+        routeId: repair.id,
+        routeParameterName: 'repairId',
+        cardKey: ValueKey(
+          'repairTransactionCard-${repair.id ?? repair.repairDate}',
+        ),
         searchableText: _searchableText([
           'repair',
           _formatDate(repair.repairDate),
           _inventoryDisplayName(inventoryById[repair.inventoryItemId]),
           repair.description,
           repair.notes,
+          CurrencyFormatter.formatCents(repair.costCents),
         ]),
       ),
     for (final disposal in disposals)
       _LedgerEntry(
         type: _LedgerType.disposal,
         date: disposal.disposalDate,
-        transaction: disposal,
+        title: _inventoryDisplayName(inventoryById[disposal.inventoryItemId]),
+        subtitle: disposal.replacementInventoryItemId == null
+            ? disposal.reason.label
+            : '${disposal.reason.label} • Warranty replacement',
+        displayAmountCents: null,
+        filterAmountCents: null,
+        amountDirection: _AmountDirection.neutral,
+        cardKey: ValueKey(
+          'disposalTransactionCard-${disposal.id ?? disposal.disposalDate}',
+        ),
         searchableText: _searchableText([
           'disposal',
           _formatDate(disposal.disposalDate),
@@ -352,13 +412,25 @@ List<_LedgerEntry> _buildLedgerEntries({
       _LedgerEntry(
         type: _LedgerType.consignment,
         date: consignment.consignmentDate,
-        transaction: consignment,
+        title: _inventoryDisplayName(
+          inventoryById[consignment.inventoryItemId],
+        ),
+        subtitle: consignment.isCompleted
+            ? 'Sold / Completed'
+            : 'Awaiting Sale',
+        displayAmountCents: consignment.commissionCents,
+        filterAmountCents: consignment.commissionCents.abs(),
+        amountDirection: _AmountDirection.positive,
+        cardKey: ValueKey(
+          'consignmentTransactionCard-${consignment.id ?? consignment.consignmentDate}',
+        ),
         searchableText: _searchableText([
           'consignment',
           _formatDate(consignment.consignmentDate),
           _inventoryDisplayName(inventoryById[consignment.inventoryItemId]),
           consignment.isCompleted ? 'sold completed' : 'awaiting sale',
           consignment.notes,
+          CurrencyFormatter.formatCents(consignment.commissionCents),
         ]),
       ),
   ]..sort((a, b) => b.date.compareTo(a.date));
@@ -366,464 +438,499 @@ List<_LedgerEntry> _buildLedgerEntries({
   return entries;
 }
 
-Widget _buildLedgerCard(
-  _LedgerEntry entry,
-  Map<String, InventoryItem> inventoryById,
-  bool canViewFinancialData,
-) {
-  final transaction = entry.transaction;
-
-  if (transaction is SaleTransaction) {
-    return _SaleTransactionCard(
-      sale: transaction,
-      inventoryItem: inventoryById[transaction.inventoryItemId],
-      canViewFinancialData: canViewFinancialData,
-    );
-  }
-  if (transaction is TradeTransaction) {
-    return _TradeTransactionCard(
-      trade: transaction,
-      inventoryById: inventoryById,
-    );
-  }
-  if (transaction is RepairTransaction) {
-    return _RepairTransactionCard(
-      repair: transaction,
-      inventoryItem: inventoryById[transaction.inventoryItemId],
-      canViewFinancialData: canViewFinancialData,
-    );
-  }
-  if (transaction is DisposalTransaction) {
-    return _DisposalTransactionCard(
-      disposal: transaction,
-      inventoryItem: inventoryById[transaction.inventoryItemId],
-    );
-  }
-  if (transaction is ConsignmentTransaction) {
-    return _ConsignmentTransactionCard(
-      consignment: transaction,
-      inventoryItem: inventoryById[transaction.inventoryItemId],
-      canViewFinancialData: canViewFinancialData,
-    );
-  }
-
-  throw StateError('Unsupported transaction ledger entry.');
-}
-
 enum _LedgerType {
-  all('All types'),
-  sale('Sale'),
-  trade('Trade-In'),
-  repair('Repair'),
-  disposal('Disposal'),
-  consignment('Consignment');
+  sale('Sale', Icons.point_of_sale_outlined),
+  trade('Trade-In', Icons.swap_horiz_rounded),
+  repair('Repair', Icons.build_outlined),
+  disposal('Disposal', Icons.delete_outline_rounded),
+  consignment('Consignment', Icons.assignment_outlined);
 
-  const _LedgerType(this.label);
+  const _LedgerType(this.label, this.icon);
+
   final String label;
+  final IconData icon;
+
+  Color get accentColor => switch (this) {
+    _LedgerType.sale => const Color(0xFF18834B),
+    _LedgerType.trade => const Color(0xFF1769AA),
+    _LedgerType.repair => const Color(0xFFC66B00),
+    _LedgerType.disposal => const Color(0xFFC43B46),
+    _LedgerType.consignment => const Color(0xFF6D4AA5),
+  };
+
+  Color get softColor => switch (this) {
+    _LedgerType.sale => const Color(0xFFE4F5EA),
+    _LedgerType.trade => const Color(0xFFE5F0FA),
+    _LedgerType.repair => const Color(0xFFFFEED9),
+    _LedgerType.disposal => const Color(0xFFFFE8EA),
+    _LedgerType.consignment => const Color(0xFFF0E9FA),
+  };
 }
 
-enum _LedgerDateFilter {
-  all('All dates', null),
-  last7Days('Last 7 days', 7),
-  last30Days('Last 30 days', 30),
-  last90Days('Last 90 days', 90);
-
-  const _LedgerDateFilter(this.label, this.days);
-  final String label;
-  final int? days;
-
-  DateTime? cutoff(DateTime now) {
-    if (days == null) {
-      return null;
-    }
-
-    final today = DateTime(now.year, now.month, now.day);
-    return today.subtract(Duration(days: days! - 1));
-  }
-}
+enum _AmountDirection { positive, negative, neutral }
 
 class _LedgerEntry {
   const _LedgerEntry({
     required this.type,
     required this.date,
-    required this.transaction,
+    required this.title,
+    required this.subtitle,
+    required this.displayAmountCents,
+    required this.filterAmountCents,
+    required this.amountDirection,
+    required this.cardKey,
     required this.searchableText,
+    this.routeName,
+    this.routeId,
+    this.routeParameterName,
+    this.tapKey,
   });
 
   final _LedgerType type;
   final DateTime date;
-  final Object transaction;
-  final String searchableText;
-}
-
-class _SaleTransactionCard extends StatelessWidget {
-  const _SaleTransactionCard({
-    required this.sale,
-    required this.inventoryItem,
-    required this.canViewFinancialData,
-  });
-
-  final SaleTransaction sale;
-  final InventoryItem? inventoryItem;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    final acquisitionValue = sale.acquisitionValueCents;
-    final profit = sale.profitCents;
-
-    return Card(
-      key: ValueKey(sale.id ?? 'sale-${sale.inventoryItemId}-${sale.saleDate}'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: ValueKey(
-          sale.id == null
-              ? 'transactionCardUnavailable'
-              : 'transactionCard-${sale.id}',
-        ),
-        onTap: sale.id == null
-            ? null
-            : () {
-                context.goNamed(
-                  AppRouteNames.transactionDetail,
-                  pathParameters: {'transactionId': sale.id!},
-                );
-              },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TransactionHeader(
-                icon: Icons.point_of_sale_outlined,
-                title: TransactionType.sale.label,
-                subtitle: _formatDate(sale.saleDate),
-                trailing: CurrencyFormatter.formatCents(sale.salePriceCents),
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              _TransactionDetailRow(
-                label: 'Inventory Item',
-                value: _inventoryDisplayName(inventoryItem),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Payment Method',
-                value: sale.paymentMethod.label,
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Revenue',
-                value: CurrencyFormatter.formatCents(sale.salePriceCents),
-              ),
-              if (canViewFinancialData) ...[
-                const SizedBox(height: 8),
-                _TransactionDetailRow(
-                  label: 'Cost',
-                  value: acquisitionValue == null
-                      ? 'Not available'
-                      : CurrencyFormatter.formatCents(acquisitionValue),
-                ),
-                const SizedBox(height: 8),
-                _TransactionDetailRow(
-                  label: 'Profit',
-                  value: profit == null
-                      ? 'Not available'
-                      : CurrencyFormatter.formatCents(profit),
-                ),
-                const SizedBox(height: 8),
-                _TransactionDetailRow(
-                  label: 'Gross Margin',
-                  value: _formatMargin(sale.grossMargin),
-                ),
-              ],
-              if (sale.notes != null && sale.notes!.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(sale.notes!),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TradeTransactionCard extends StatelessWidget {
-  const _TradeTransactionCard({
-    required this.trade,
-    required this.inventoryById,
-  });
-
-  final TradeTransaction trade;
-  final Map<String, InventoryItem> inventoryById;
-
-  @override
-  Widget build(BuildContext context) {
-    final incomingNames = trade.incomingInventoryItemIds
-        .map((id) => _inventoryDisplayName(inventoryById[id]))
-        .join(', ');
-
-    return Card(
-      key: ValueKey('tradeTransactionCard-${trade.id ?? trade.tradeDate}'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TransactionHeader(
-              icon: Icons.swap_horiz_outlined,
-              title: 'Trade-In',
-              subtitle: _formatDate(trade.tradeDate),
-            ),
-            const SizedBox(height: 12),
-            _TransactionDetailRow(
-              label: 'Incoming Inventory',
-              value: incomingNames.isEmpty ? 'None' : incomingNames,
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Incoming Items',
-              value: trade.incomingInventoryItemIds.length.toString(),
-            ),
-            if (trade.saleTransactionId != null) ...[
-              const SizedBox(height: 8),
-              const _TransactionDetailRow(
-                label: 'Source',
-                value: 'Recorded with sale',
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RepairTransactionCard extends StatelessWidget {
-  const _RepairTransactionCard({
-    required this.repair,
-    required this.inventoryItem,
-    required this.canViewFinancialData,
-  });
-
-  final RepairTransaction repair;
-  final InventoryItem? inventoryItem;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      key: ValueKey('repairTransactionCard-${repair.id ?? repair.repairDate}'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: repair.id == null
-            ? null
-            : () {
-                context.goNamed(
-                  AppRouteNames.repairDetail,
-                  pathParameters: {'repairId': repair.id!},
-                );
-              },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TransactionHeader(
-                icon: Icons.build_outlined,
-                title: 'Repair',
-                subtitle: _formatDate(repair.repairDate),
-                trailing: canViewFinancialData
-                    ? CurrencyFormatter.formatCents(repair.costCents)
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              _TransactionDetailRow(
-                label: 'Inventory Item',
-                value: _inventoryDisplayName(inventoryItem),
-              ),
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Description',
-                value: repair.description,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DisposalTransactionCard extends StatelessWidget {
-  const _DisposalTransactionCard({
-    required this.disposal,
-    required this.inventoryItem,
-  });
-
-  final DisposalTransaction disposal;
-  final InventoryItem? inventoryItem;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      key: ValueKey(
-        'disposalTransactionCard-${disposal.id ?? disposal.disposalDate}',
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TransactionHeader(
-              icon: Icons.delete_outline,
-              title: 'Disposal',
-              subtitle: _formatDate(disposal.disposalDate),
-            ),
-            const SizedBox(height: 12),
-            _TransactionDetailRow(
-              label: 'Inventory Item',
-              value: _inventoryDisplayName(inventoryItem),
-            ),
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Reason',
-              value: disposal.reason.label,
-            ),
-            if (disposal.replacementInventoryItemId != null) ...[
-              const SizedBox(height: 8),
-              const _TransactionDetailRow(
-                label: 'Warranty Replacement',
-                value: 'Replacement inventory created',
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConsignmentTransactionCard extends StatelessWidget {
-  const _ConsignmentTransactionCard({
-    required this.consignment,
-    required this.inventoryItem,
-    required this.canViewFinancialData,
-  });
-
-  final ConsignmentTransaction consignment;
-  final InventoryItem? inventoryItem;
-  final bool canViewFinancialData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      key: ValueKey(
-        'consignmentTransactionCard-${consignment.id ?? consignment.consignmentDate}',
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TransactionHeader(
-              icon: Icons.assignment_outlined,
-              title: 'Consignment',
-              subtitle: _formatDate(consignment.consignmentDate),
-              trailing: canViewFinancialData
-                  ? CurrencyFormatter.formatCents(consignment.commissionCents)
-                  : null,
-            ),
-            const SizedBox(height: 12),
-            _TransactionDetailRow(
-              label: 'Inventory Item',
-              value: _inventoryDisplayName(inventoryItem),
-            ),
-            if (canViewFinancialData) ...[
-              const SizedBox(height: 8),
-              _TransactionDetailRow(
-                label: 'Hit the Deck Commission',
-                value: CurrencyFormatter.formatCents(
-                  consignment.commissionCents,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            _TransactionDetailRow(
-              label: 'Status',
-              value: consignment.isCompleted
-                  ? 'Sold / Completed'
-                  : 'Awaiting Sale',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TransactionHeader extends StatelessWidget {
-  const _TransactionHeader({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-  });
-
-  final IconData icon;
   final String title;
   final String subtitle;
-  final String? trailing;
+  final int? displayAmountCents;
+  final int? filterAmountCents;
+  final _AmountDirection amountDirection;
+  final Key cardKey;
+  final String searchableText;
+  final String? routeName;
+  final String? routeId;
+  final String? routeParameterName;
+  final Key? tapKey;
+}
+
+class _TransactionLedgerCard extends StatelessWidget {
+  const _TransactionLedgerCard({
+    required this.entry,
+    required this.canViewFinancialData,
+  });
+
+  final _LedgerEntry entry;
+  final bool canViewFinancialData;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 28),
-        const SizedBox(width: 12),
-        Expanded(
+    final card = Container(
+      key: entry.cardKey,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFDCE3EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              decoration: BoxDecoration(
+                color: entry.type.accentColor,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: entry.type.softColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        entry.type.icon,
+                        color: entry.type.accentColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              _TypePill(type: entry.type),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatDate(entry.date),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(color: const Color(0xFF687586)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            entry.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: const Color(0xFF082A4A),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            entry.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: const Color(0xFF667383)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _displayAmount(entry, canViewFinancialData),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: _amountColor(
+                                  entry,
+                                  canViewFinancialData,
+                                ),
+                              ),
+                        ),
+                        if (entry.routeName != null) ...[
+                          const SizedBox(height: 5),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: Color(0xFF8B96A3),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (entry.routeName == null ||
+        entry.routeId == null ||
+        entry.routeParameterName == null) {
+      return card;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: entry.tapKey,
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          context.goNamed(
+            entry.routeName!,
+            pathParameters: {entry.routeParameterName!: entry.routeId!},
+          );
+        },
+        child: card,
+      ),
+    );
+  }
+}
+
+class _TypePill extends StatelessWidget {
+  const _TypePill({required this.type});
+
+  final _LedgerType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey('transactionTypePill-${type.name}'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: type.softColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        type.label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: type.accentColor,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _TransactionFilterDialog extends StatefulWidget {
+  const _TransactionFilterDialog({
+    required this.initialTypes,
+    required this.initialMinimumAmountCents,
+    required this.initialMaximumAmountCents,
+  });
+
+  final Set<_LedgerType> initialTypes;
+  final int? initialMinimumAmountCents;
+  final int? initialMaximumAmountCents;
+
+  @override
+  State<_TransactionFilterDialog> createState() =>
+      _TransactionFilterDialogState();
+}
+
+class _TransactionFilterDialogState extends State<_TransactionFilterDialog> {
+  late Set<_LedgerType> _types;
+  late final TextEditingController _minimumController;
+  late final TextEditingController _maximumController;
+
+  @override
+  void initState() {
+    super.initState();
+    _types = Set<_LedgerType>.from(widget.initialTypes);
+    _minimumController = TextEditingController(
+      text: _dollars(widget.initialMinimumAmountCents),
+    );
+    _maximumController = TextEditingController(
+      text: _dollars(widget.initialMaximumAmountCents),
+    );
+  }
+
+  @override
+  void dispose() {
+    _minimumController.dispose();
+    _maximumController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key('transactionsFilterDialog'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      title: const Row(
+        children: [
+          Icon(Icons.tune_rounded),
+          SizedBox(width: 10),
+          Text('Filter Transactions'),
+        ],
+      ),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(subtitle),
+              Text(
+                'Transaction Type',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final type in _LedgerType.values)
+                    FilterChip(
+                      key: ValueKey('transactionsTypeFilter-${type.name}'),
+                      label: Text(type.label),
+                      selected: _types.contains(type),
+                      avatar: Icon(
+                        type.icon,
+                        size: 18,
+                        color: _types.contains(type)
+                            ? type.accentColor
+                            : const Color(0xFF687586),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _types.add(type);
+                          } else {
+                            _types.remove(type);
+                          }
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Transaction Amount',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Uses the transaction value regardless of positive or negative direction.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: const Color(0xFF687586)),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('transactionsMinimumAmountField'),
+                      controller: _minimumController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Min Amount',
+                        prefixText: r'$',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      key: const Key('transactionsMaximumAmountField'),
+                      controller: _maximumController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Max Amount',
+                        prefixText: r'$',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        if (trailing != null)
-          Text(trailing!, style: Theme.of(context).textTheme.titleLarge),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('transactionsFilterClearButton'),
+          onPressed: () {
+            Navigator.of(context).pop(
+              const _TransactionFilterResult(
+                types: <_LedgerType>{},
+                minimumAmountCents: null,
+                maximumAmountCents: null,
+              ),
+            );
+          },
+          child: const Text('Clear Filters'),
+        ),
+        TextButton(
+          key: const Key('transactionsFilterCancelButton'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('transactionsFilterApplyButton'),
+          onPressed: () {
+            Navigator.of(context).pop(
+              _TransactionFilterResult(
+                types: Set<_LedgerType>.unmodifiable(_types),
+                minimumAmountCents: _parseDollars(_minimumController.text),
+                maximumAmountCents: _parseDollars(_maximumController.text),
+              ),
+            );
+          },
+          child: const Text('Apply'),
+        ),
       ],
     );
   }
 }
 
-class _TransactionDetailRow extends StatelessWidget {
-  const _TransactionDetailRow({required this.label, required this.value});
+class _TransactionFilterResult {
+  const _TransactionFilterResult({
+    required this.types,
+    required this.minimumAmountCents,
+    required this.maximumAmountCents,
+  });
 
-  final String label;
-  final String value;
+  final Set<_LedgerType> types;
+  final int? minimumAmountCents;
+  final int? maximumAmountCents;
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(label)),
-        const SizedBox(width: 16),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-        ),
-      ],
-    );
+String _displayAmount(_LedgerEntry entry, bool canViewFinancialData) {
+  if (!canViewFinancialData || entry.displayAmountCents == null) {
+    return '—';
   }
+
+  final formatted = CurrencyFormatter.formatCents(
+    entry.displayAmountCents!.abs(),
+  );
+
+  return switch (entry.amountDirection) {
+    _AmountDirection.positive => '+$formatted',
+    _AmountDirection.negative => '-$formatted',
+    _AmountDirection.neutral => formatted,
+  };
+}
+
+Color _amountColor(_LedgerEntry entry, bool canViewFinancialData) {
+  if (!canViewFinancialData || entry.displayAmountCents == null) {
+    return const Color(0xFF7B8794);
+  }
+
+  return switch (entry.amountDirection) {
+    _AmountDirection.positive => const Color(0xFF18834B),
+    _AmountDirection.negative => const Color(0xFFC43B46),
+    _AmountDirection.neutral => const Color(0xFF082A4A),
+  };
+}
+
+String _tradeDisplayName(
+  TradeTransaction trade,
+  Map<String, InventoryItem> inventoryById,
+) {
+  final ids = trade.incomingInventoryItemIds.isNotEmpty
+      ? trade.incomingInventoryItemIds
+      : trade.outgoingInventoryItemIds;
+
+  if (ids.isEmpty) return 'Trade transaction';
+  if (ids.length == 1) return _inventoryDisplayName(inventoryById[ids.single]);
+  return '${ids.length} inventory items';
+}
+
+String _tradeSubtitle(TradeTransaction trade) {
+  if (!trade.includesCash) {
+    final count = trade.incomingInventoryItemIds.length;
+    return '$count incoming item${count == 1 ? '' : 's'}';
+  }
+  return trade.netCashCents > 0
+      ? 'Cash received with trade'
+      : 'Cash paid with trade';
+}
+
+String _paymentMethodLabel(PaymentMethod method) {
+  return switch (method) {
+    PaymentMethod.cash => 'Cash',
+    PaymentMethod.card => 'Card',
+    PaymentMethod.venmo => 'Venmo',
+    PaymentMethod.paypal => 'PayPal',
+    PaymentMethod.zelle => 'Zelle',
+  };
 }
 
 String _searchableText(Iterable<String?> values) {
@@ -838,22 +945,11 @@ String _searchableText(Iterable<String?> values) {
 String _formatDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
-
   return '$month/$day/${date.year}';
 }
 
-String _formatMargin(double? margin) {
-  if (margin == null) {
-    return 'Not available';
-  }
-
-  return '${(margin * 100).toStringAsFixed(1)}%';
-}
-
 String _inventoryDisplayName(InventoryItem? item) {
-  if (item == null) {
-    return 'Inventory record unavailable';
-  }
+  if (item == null) return 'Inventory record unavailable';
 
   final model = item.model?.trim();
   final equipmentName = model == null || model.isEmpty
@@ -863,4 +959,15 @@ String _inventoryDisplayName(InventoryItem? item) {
       item.inventoryNumber ?? 'Inventory number not assigned';
 
   return '$inventoryNumber — $equipmentName';
+}
+
+String _dollars(int? cents) {
+  if (cents == null) return '';
+  return (cents / 100).toStringAsFixed(2);
+}
+
+int? _parseDollars(String value) {
+  final number = double.tryParse(value.trim());
+  if (number == null || number < 0) return null;
+  return (number * 100).round();
 }

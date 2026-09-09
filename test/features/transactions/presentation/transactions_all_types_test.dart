@@ -101,7 +101,7 @@ void main() {
     );
     expect(find.text('Grip replacement'), findsOneWidget);
     expect(find.text('Other'), findsOneWidget);
-    expect(find.text(r'$50.00'), findsWidgets);
+    expect(find.text(r'+$50.00'), findsOneWidget);
 
     final repairCard = find.byKey(
       const ValueKey('repairTransactionCard-repair-a'),

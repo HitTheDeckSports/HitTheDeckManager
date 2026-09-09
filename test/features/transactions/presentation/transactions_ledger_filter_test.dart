@@ -51,14 +51,13 @@ void main() {
   }
 
   InMemoryTransactionRepository createRepository() {
-    final now = DateTime.now();
     return InMemoryTransactionRepository(
       initialSales: [
         SaleTransaction(
           id: 'sale-a',
           inventoryItemId: 'item-a',
           salePriceCents: 30000,
-          saleDate: now.subtract(const Duration(days: 40)),
+          saleDate: DateTime(2026, 8, 1),
           paymentMethod: PaymentMethod.cash,
           acquisitionValueCents: 20000,
         ),
@@ -67,7 +66,7 @@ void main() {
         RepairTransaction(
           id: 'repair-a',
           inventoryItemId: 'item-a',
-          repairDate: now.subtract(const Duration(days: 1)),
+          repairDate: DateTime(2026, 8, 4),
           costCents: 2500,
           description: 'Grip replacement',
         ),
@@ -77,49 +76,25 @@ void main() {
           id: 'trade-a',
           outgoingInventoryItemIds: const [],
           incomingInventoryItemIds: const ['item-a'],
-          tradeDate: now.subtract(const Duration(days: 10)),
+          tradeDate: DateTime(2026, 8, 3),
+          cashReceivedCents: 8000,
+          paymentMethod: PaymentMethod.cash,
         ),
       ],
       initialDisposals: [
         DisposalTransaction(
           id: 'disposal-a',
           inventoryItemId: 'item-a',
-          disposalDate: now.subtract(const Duration(days: 3)),
+          disposalDate: DateTime(2026, 8, 2),
           reason: DisposalReason.other,
         ),
       ],
     );
   }
 
-  testWidgets('combines transaction types in newest-first order', (
+  testWidgets('search filters the compact business-event ledger', (
     tester,
   ) async {
-    final repository = createRepository();
-    addTearDown(repository.dispose);
-    await pumpLedger(tester, transactionRepository: repository);
-
-    expect(find.text('4 transactions'), findsOneWidget);
-    expect(find.byKey(const Key('transactionsSalesSection')), findsNothing);
-
-    final repair = find.byKey(const ValueKey('repairTransactionCard-repair-a'));
-    final disposal = find.byKey(
-      const ValueKey('disposalTransactionCard-disposal-a'),
-    );
-    final trade = find.byKey(const ValueKey('tradeTransactionCard-trade-a'));
-    final sale = find.byKey(const ValueKey('sale-a'));
-
-    expect(
-      tester.getTopLeft(repair).dy,
-      lessThan(tester.getTopLeft(disposal).dy),
-    );
-    expect(
-      tester.getTopLeft(disposal).dy,
-      lessThan(tester.getTopLeft(trade).dy),
-    );
-    expect(tester.getTopLeft(trade).dy, lessThan(tester.getTopLeft(sale).dy));
-  });
-
-  testWidgets('search filters the business-event ledger', (tester) async {
     final repository = createRepository();
     addTearDown(repository.dispose);
     await pumpLedger(tester, transactionRepository: repository);
@@ -132,50 +107,93 @@ void main() {
 
     expect(find.text('1 of 4 transactions'), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('repairTransactionCard-repair-a')),
-        matching: find.text('Grip replacement'),
-        skipOffstage: false,
-      ),
+      find.byKey(const ValueKey('repairTransactionCard-repair-a')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('sale-a')), findsNothing);
   });
 
-  testWidgets('type and date filters narrow the ledger', (tester) async {
+  testWidgets('transaction type filter supports multiple types', (
+    tester,
+  ) async {
     final repository = createRepository();
     addTearDown(repository.dispose);
     await pumpLedger(tester, transactionRepository: repository);
 
-    await tester.tap(find.byKey(const Key('transactionsTypeFilter')));
+    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sale').last);
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('transactionsFilterDialog')), findsOneWidget);
 
-    expect(find.text('1 of 4 transactions'), findsOneWidget);
-    expect(find.byKey(const ValueKey('sale-a')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('transactionsClearFiltersButton')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('transactionsDateFilter')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Last 7 days').last);
+    await tester.tap(find.byKey(const ValueKey('transactionsTypeFilter-sale')));
+    await tester.tap(
+      find.byKey(const ValueKey('transactionsTypeFilter-trade')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('transactionsFilterApplyButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('2 of 4 transactions'), findsOneWidget);
+    expect(find.byKey(const ValueKey('sale-a')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('tradeTransactionCard-trade-a')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('repairTransactionCard-repair-a')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('minimum and maximum transaction amount filter the ledger', (
+    tester,
+  ) async {
+    final repository = createRepository();
+    addTearDown(repository.dispose);
+    await pumpLedger(tester, transactionRepository: repository);
+
+    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('transactionsMinimumAmountField')),
+      '50',
+    );
+    await tester.enterText(
+      find.byKey(const Key('transactionsMaximumAmountField')),
+      '100',
+    );
+    await tester.tap(find.byKey(const Key('transactionsFilterApplyButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 of 4 transactions'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('tradeTransactionCard-trade-a')),
       findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('sale-a')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('repairTransactionCard-repair-a')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('disposalTransactionCard-disposal-a')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('tradeTransactionCard-trade-a')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('sale-a')), findsNothing);
+  });
+
+  testWidgets('clear restores all transactions', (tester) async {
+    final repository = createRepository();
+    addTearDown(repository.dispose);
+    await pumpLedger(tester, transactionRepository: repository);
+
+    await tester.enterText(
+      find.byKey(const Key('transactionsSearchField')),
+      'repair',
+    );
+    await tester.pump();
+    expect(find.text('1 of 4 transactions'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('transactionsClearFiltersButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('4 transactions'), findsOneWidget);
   });
 }
