@@ -9,7 +9,6 @@ import 'app_routes.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.child, super.key});
-
   final Widget child;
 
   @override
@@ -17,11 +16,9 @@ class AppShell extends ConsumerWidget {
     final currentLocation = GoRouterState.of(context).uri.path;
     final permissions = ref.watch(currentAppPermissionsProvider);
     final canAccessReports = permissions.canAccessReports;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final useNavigationRail = constraints.maxWidth >= 900;
-
         if (useNavigationRail) {
           return Scaffold(
             appBar: _buildAppBar(context, currentLocation),
@@ -32,13 +29,11 @@ class AppShell extends ConsumerWidget {
                     currentLocation,
                     canAccessReports: canAccessReports,
                   ),
-                  onDestinationSelected: (index) {
-                    _navigateToIndex(
-                      context,
-                      index,
-                      canAccessReports: canAccessReports,
-                    );
-                  },
+                  onDestinationSelected: (index) => _navigateToIndex(
+                    context,
+                    index,
+                    canAccessReports: canAccessReports,
+                  ),
                   labelType: NavigationRailLabelType.all,
                   leading: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
@@ -63,7 +58,6 @@ class AppShell extends ConsumerWidget {
             ),
           );
         }
-
         return Scaffold(
           appBar: _buildAppBar(context, currentLocation),
           body: child,
@@ -86,13 +80,11 @@ class AppShell extends ConsumerWidget {
                   currentLocation,
                   canAccessReports: canAccessReports,
                 ),
-                onDestinationSelected: (index) {
-                  _navigateToIndex(
-                    context,
-                    index,
-                    canAccessReports: canAccessReports,
-                  );
-                },
+                onDestinationSelected: (index) => _navigateToIndex(
+                  context,
+                  index,
+                  canAccessReports: canAccessReports,
+                ),
                 destinations: _navigationDestinations(
                   canAccessReports: canAccessReports,
                 ),
@@ -108,22 +100,43 @@ class AppShell extends ConsumerWidget {
     BuildContext context,
     String currentLocation,
   ) {
-    final inventoryDetailItemId = _inventoryDetailItemId(currentLocation);
-    final isInventoryDetail = inventoryDetailItemId != null;
-
+    final detailId = _inventoryDetailItemId(currentLocation);
+    final editId = _inventoryEditItemId(currentLocation);
+    final isBuy = currentLocation == AppRoutes.buyInventory;
+    final isSell = currentLocation == AppRoutes.sellInventory;
+    final contextual = detailId != null || editId != null || isBuy || isSell;
+    VoidCallback? backAction;
+    Key? backKey;
+    String? tooltip;
+    if (detailId != null) {
+      backAction = () => context.go(AppRoutes.inventory);
+      backKey = const Key('inventoryDetailHeaderBackButton');
+      tooltip = 'Back to Inventory';
+    } else if (editId != null) {
+      backAction = () => context.goNamed(
+        AppRouteNames.inventoryDetail,
+        pathParameters: {'itemId': editId},
+      );
+      backKey = const Key('inventoryEditHeaderBackButton');
+      tooltip = 'Back to Inventory Item';
+    } else if (isBuy || isSell) {
+      backAction = () => context.go(AppRoutes.inventory);
+      backKey = const Key('inventoryWorkflowHeaderBackButton');
+      tooltip = 'Back to Inventory';
+    }
     return AppBar(
       backgroundColor: AppTheme.navyDark,
       foregroundColor: Colors.white,
       toolbarHeight: 74,
-      centerTitle: isInventoryDetail,
-      titleSpacing: isInventoryDetail ? 0 : 16,
-      leadingWidth: isInventoryDetail ? 64 : null,
-      leading: isInventoryDetail
+      centerTitle: contextual,
+      titleSpacing: contextual ? 0 : 16,
+      leadingWidth: contextual ? 64 : null,
+      leading: contextual
           ? IconButton(
-              key: const Key('inventoryDetailHeaderBackButton'),
-              tooltip: 'Back to Inventory',
+              key: backKey,
+              tooltip: tooltip,
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.goNamed(AppRouteNames.inventory),
+              onPressed: backAction,
             )
           : null,
       title: const _BrandMark(),
@@ -134,21 +147,21 @@ class AppShell extends ConsumerWidget {
           child: ColoredBox(color: AppTheme.primaryRed),
         ),
       ),
-      actions: isInventoryDetail
+      actions: detailId != null
           ? [
               IconButton(
                 key: const Key('inventoryDetailHeaderEditButton'),
                 tooltip: 'Edit inventory item',
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () {
-                  context.goNamed(
-                    AppRouteNames.inventoryEdit,
-                    pathParameters: {'itemId': inventoryDetailItemId},
-                  );
-                },
+                onPressed: () => context.goNamed(
+                  AppRouteNames.inventoryEdit,
+                  pathParameters: {'itemId': detailId},
+                ),
               ),
               const SizedBox(width: 6),
             ]
+          : contextual
+          ? const [SizedBox(width: 54)]
           : [
               IconButton(
                 key: const Key('globalSearchHeaderButton'),
@@ -168,90 +181,83 @@ class AppShell extends ConsumerWidget {
   }
 
   String? _inventoryDetailItemId(String location) {
-    final segments = Uri.parse(location).pathSegments;
-    if (segments.length != 2 || segments.first != 'inventory') {
-      return null;
-    }
-
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2 || s.first != 'inventory') return null;
     const reserved = {'buy', 'sell', 'scan'};
-    final candidate = segments[1];
-    return reserved.contains(candidate) ? null : candidate;
+    return reserved.contains(s[1]) ? null : s[1];
+  }
+
+  String? _inventoryEditItemId(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 3 || s.first != 'inventory' || s[2] != 'edit') return null;
+    return s[1];
   }
 
   List<NavigationDestination> _navigationDestinations({
     required bool canAccessReports,
-  }) {
-    return [
+  }) => [
+    const NavigationDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: 'Dashboard',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: 'Inventory',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: 'Transactions',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.people_outline),
+      selectedIcon: Icon(Icons.people),
+      label: 'Contacts',
+    ),
+    if (canAccessReports)
       const NavigationDestination(
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: 'Dashboard',
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: 'Reports',
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.inventory_2_outlined),
-        selectedIcon: Icon(Icons.inventory_2),
-        label: 'Inventory',
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.receipt_long_outlined),
-        selectedIcon: Icon(Icons.receipt_long),
-        label: 'Transactions',
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.people_outline),
-        selectedIcon: Icon(Icons.people),
-        label: 'Contacts',
-      ),
-      if (canAccessReports)
-        const NavigationDestination(
-          icon: Icon(Icons.analytics_outlined),
-          selectedIcon: Icon(Icons.analytics),
-          label: 'Reports',
-        ),
-    ];
-  }
-
+  ];
   List<NavigationRailDestination> _railDestinations({
     required bool canAccessReports,
-  }) {
-    return [
+  }) => [
+    const NavigationRailDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: Text('Dashboard'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: Text('Inventory'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: Text('Transactions'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.people_outline),
+      selectedIcon: Icon(Icons.people),
+      label: Text('Contacts'),
+    ),
+    if (canAccessReports)
       const NavigationRailDestination(
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: Text('Dashboard'),
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: Text('Reports'),
       ),
-      const NavigationRailDestination(
-        icon: Icon(Icons.inventory_2_outlined),
-        selectedIcon: Icon(Icons.inventory_2),
-        label: Text('Inventory'),
-      ),
-      const NavigationRailDestination(
-        icon: Icon(Icons.receipt_long_outlined),
-        selectedIcon: Icon(Icons.receipt_long),
-        label: Text('Transactions'),
-      ),
-      const NavigationRailDestination(
-        icon: Icon(Icons.people_outline),
-        selectedIcon: Icon(Icons.people),
-        label: Text('Contacts'),
-      ),
-      if (canAccessReports)
-        const NavigationRailDestination(
-          icon: Icon(Icons.analytics_outlined),
-          selectedIcon: Icon(Icons.analytics),
-          label: Text('Reports'),
-        ),
-    ];
-  }
-
+  ];
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
       await ref.read(authenticationControllerProvider.notifier).signOut();
     } catch (_) {
-      if (!context.mounted) {
-        return;
-      }
-
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to sign out. Please try again.')),
       );
@@ -259,22 +265,10 @@ class AppShell extends ConsumerWidget {
   }
 
   int _selectedIndex(String location, {required bool canAccessReports}) {
-    if (location.startsWith(AppRoutes.inventory)) {
-      return 1;
-    }
-
-    if (location.startsWith(AppRoutes.transactions)) {
-      return 2;
-    }
-
-    if (location.startsWith(AppRoutes.contacts)) {
-      return 3;
-    }
-
-    if (canAccessReports && location.startsWith(AppRoutes.reports)) {
-      return 4;
-    }
-
+    if (location.startsWith(AppRoutes.inventory)) return 1;
+    if (location.startsWith(AppRoutes.transactions)) return 2;
+    if (location.startsWith(AppRoutes.contacts)) return 3;
+    if (canAccessReports && location.startsWith(AppRoutes.reports)) return 4;
     return 0;
   }
 
@@ -291,16 +285,13 @@ class AppShell extends ConsumerWidget {
       4 when canAccessReports => AppRoutes.reports,
       _ => AppRoutes.dashboard,
     };
-
     context.go(route);
   }
 }
 
 class _BrandMark extends StatelessWidget {
   const _BrandMark({this.compact = false});
-
   final bool compact;
-
   @override
   Widget build(BuildContext context) {
     if (compact) {
@@ -310,7 +301,6 @@ class _BrandMark extends StatelessWidget {
         size: 34,
       );
     }
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

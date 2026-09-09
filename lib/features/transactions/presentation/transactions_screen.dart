@@ -9,6 +9,7 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../authentication/presentation/providers/app_permissions_provider.dart';
+import '../../inventory/domain/models/inventory_enums.dart';
 import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/consignment_transaction.dart';
@@ -29,6 +30,10 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _minimumAmountController =
+      TextEditingController();
+  final TextEditingController _maximumAmountController =
+      TextEditingController();
   String _query = '';
   Set<_LedgerType> _selectedTypes = <_LedgerType>{};
   int? _minimumAmountCents;
@@ -41,25 +46,18 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
   bool get _hasActiveFilters => _query.trim().isNotEmpty || _hasAdvancedFilters;
 
-  int get _advancedFilterCount {
-    var count = 0;
-    if (_selectedTypes.isNotEmpty) {
-      count++;
-    }
-    if (_minimumAmountCents != null || _maximumAmountCents != null) {
-      count++;
-    }
-    return count;
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
+    _minimumAmountController.dispose();
+    _maximumAmountController.dispose();
     super.dispose();
   }
 
   void _clearAllFilters() {
     _searchController.clear();
+    _minimumAmountController.clear();
+    _maximumAmountController.clear();
     setState(() {
       _query = '';
       _selectedTypes = <_LedgerType>{};
@@ -90,7 +88,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     if (asyncValues.any((value) => value.isLoading)) {
       return const AppPage(
         title: 'Transactions',
-        subtitle: 'Review the complete business-event ledger.',
+        showHeader: false,
+        compact: true,
         child: AppLoadingState(message: 'Loading transactions...'),
       );
     }
@@ -103,7 +102,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     if (firstError != null) {
       return AppPage(
         title: 'Transactions',
-        subtitle: 'Review the complete business-event ledger.',
+        showHeader: false,
+        compact: true,
         child: AppErrorState(
           message: 'Unable to load transaction history.',
           details: firstError.toString(),
@@ -130,13 +130,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       trades: tradesAsync.requireValue,
       disposals: disposalsAsync.requireValue,
       consignments: consignmentsAsync.requireValue,
+      inventoryItems: inventoryAsync.requireValue,
       inventoryById: inventoryById,
     );
 
     if (entries.isEmpty) {
       return const AppPage(
         title: 'Transactions',
-        subtitle: 'Review the complete business-event ledger.',
+        showHeader: false,
+        compact: true,
         child: AppEmptyState(
           icon: Icons.receipt_long_outlined,
           title: 'No transactions yet.',
@@ -150,65 +152,54 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
     return AppPage(
       title: 'Transactions',
-      subtitle: 'Review the complete business-event ledger.',
+      showHeader: false,
+      compact: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: TextField(
-                    key: const Key('transactionsSearchField'),
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: 'Search transactions',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _query.trim().isEmpty
-                          ? null
-                          : IconButton(
-                              key: const Key('transactionsSearchClearButton'),
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+          SizedBox(
+            height: 48,
+            child: TextField(
+              key: const Key('transactionsSearchField'),
+              controller: _searchController,
+              onChanged: (value) => setState(() => _query = value),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Search transactions',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _query.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        key: const Key('transactionsSearchClearButton'),
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                        icon: const Icon(Icons.close_rounded),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: IconButton.filledTonal(
-                  key: const Key('transactionsFilterButton'),
-                  tooltip: _hasAdvancedFilters
-                      ? '$_advancedFilterCount filters active'
-                      : 'Filter transactions',
-                  onPressed: () => _openFilters(context),
-                  icon: Badge(
-                    isLabelVisible: _hasAdvancedFilters,
-                    label: Text('$_advancedFilterCount'),
-                    child: const Icon(Icons.tune_rounded),
-                  ),
-                ),
-              ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          _InlineTransactionFilters(
+            selectedTypes: _selectedTypes,
+            minimumController: _minimumAmountController,
+            maximumController: _maximumAmountController,
+            onTypesChanged: (types) => setState(() => _selectedTypes = types),
+            onMinimumChanged: (value) =>
+                setState(() => _minimumAmountCents = _parseDollars(value)),
+            onMaximumChanged: (value) =>
+                setState(() => _maximumAmountCents = _parseDollars(value)),
           ),
           const SizedBox(height: 14),
           Row(
@@ -272,25 +263,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final query = _query.trim().toLowerCase();
     return query.isEmpty || entry.searchableText.contains(query);
   }
-
-  Future<void> _openFilters(BuildContext context) async {
-    final result = await showDialog<_TransactionFilterResult>(
-      context: context,
-      builder: (dialogContext) => _TransactionFilterDialog(
-        initialTypes: _selectedTypes,
-        initialMinimumAmountCents: _minimumAmountCents,
-        initialMaximumAmountCents: _maximumAmountCents,
-      ),
-    );
-
-    if (result == null || !mounted) return;
-
-    setState(() {
-      _selectedTypes = result.types;
-      _minimumAmountCents = result.minimumAmountCents;
-      _maximumAmountCents = result.maximumAmountCents;
-    });
-  }
 }
 
 List<_LedgerEntry> _buildLedgerEntries({
@@ -299,9 +271,40 @@ List<_LedgerEntry> _buildLedgerEntries({
   required List<TradeTransaction> trades,
   required List<DisposalTransaction> disposals,
   required List<ConsignmentTransaction> consignments,
+  required List<InventoryItem> inventoryItems,
   required Map<String, InventoryItem> inventoryById,
 }) {
   final entries = <_LedgerEntry>[
+    for (final item in inventoryItems)
+      if (item.acquisitionType == AcquisitionType.purchased &&
+          item.purchaseDate != null)
+        _LedgerEntry(
+          type: _LedgerType.purchase,
+          date: item.purchaseDate!,
+          title: _inventoryDisplayName(item),
+          subtitle: 'Inventory purchase',
+          displayAmountCents: item.acquisitionValueCents,
+          filterAmountCents: item.acquisitionValueCents.abs(),
+          amountDirection: _AmountDirection.negative,
+          routeName: item.id == null ? null : AppRouteNames.inventoryDetail,
+          routeId: item.id,
+          routeParameterName: 'itemId',
+          cardKey: ValueKey(
+            'purchaseInventoryCard-${item.id ?? item.inventoryNumber ?? item.hashCode}',
+          ),
+          tapKey: ValueKey(
+            item.id == null
+                ? 'purchaseInventoryTapUnavailable'
+                : 'purchaseInventoryTap-${item.id}',
+          ),
+          searchableText: _searchableText([
+            'purchase purchased inventory acquisition',
+            _formatDate(item.purchaseDate!),
+            _inventoryDisplayName(item),
+            item.notes,
+            CurrencyFormatter.formatCents(item.acquisitionValueCents),
+          ]),
+        ),
     for (final sale in sales)
       _LedgerEntry(
         type: _LedgerType.sale,
@@ -440,6 +443,7 @@ List<_LedgerEntry> _buildLedgerEntries({
 
 enum _LedgerType {
   sale('Sale', Icons.point_of_sale_outlined),
+  purchase('Purchase', Icons.shopping_cart_outlined),
   trade('Trade-In', Icons.swap_horiz_rounded),
   repair('Repair', Icons.build_outlined),
   disposal('Disposal', Icons.delete_outline_rounded),
@@ -452,6 +456,7 @@ enum _LedgerType {
 
   Color get accentColor => switch (this) {
     _LedgerType.sale => const Color(0xFF18834B),
+    _LedgerType.purchase => const Color(0xFFED1C24),
     _LedgerType.trade => const Color(0xFF1769AA),
     _LedgerType.repair => const Color(0xFFC66B00),
     _LedgerType.disposal => const Color(0xFFC43B46),
@@ -460,6 +465,7 @@ enum _LedgerType {
 
   Color get softColor => switch (this) {
     _LedgerType.sale => const Color(0xFFE4F5EA),
+    _LedgerType.purchase => const Color(0xFFFFE7E9),
     _LedgerType.trade => const Color(0xFFE5F0FA),
     _LedgerType.repair => const Color(0xFFFFEED9),
     _LedgerType.disposal => const Color(0xFFFFE8EA),
@@ -512,6 +518,18 @@ class _TransactionLedgerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleParts = entry.title.split(' — ');
+    final hasInventoryIdentity = titleParts.length >= 2;
+    final primaryLine = hasInventoryIdentity ? titleParts.first : entry.title;
+    final makeModelLine = hasInventoryIdentity
+        ? titleParts.skip(1).join(' — ')
+        : null;
+    final secondaryLine = makeModelLine == null
+        ? entry.subtitle
+        : entry.subtitle.trim().isEmpty
+        ? makeModelLine
+        : '$makeModelLine • ${entry.subtitle}';
+
     final card = Container(
       key: entry.cardKey,
       decoration: BoxDecoration(
@@ -575,7 +593,7 @@ class _TransactionLedgerCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            entry.title,
+                            primaryLine,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleSmall
@@ -586,7 +604,7 @@ class _TransactionLedgerCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            entry.subtitle,
+                            secondaryLine,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
@@ -678,198 +696,246 @@ class _TypePill extends StatelessWidget {
   }
 }
 
-class _TransactionFilterDialog extends StatefulWidget {
-  const _TransactionFilterDialog({
-    required this.initialTypes,
-    required this.initialMinimumAmountCents,
-    required this.initialMaximumAmountCents,
+class _InlineTransactionFilters extends StatelessWidget {
+  const _InlineTransactionFilters({
+    required this.selectedTypes,
+    required this.minimumController,
+    required this.maximumController,
+    required this.onTypesChanged,
+    required this.onMinimumChanged,
+    required this.onMaximumChanged,
   });
 
-  final Set<_LedgerType> initialTypes;
-  final int? initialMinimumAmountCents;
-  final int? initialMaximumAmountCents;
+  final Set<_LedgerType> selectedTypes;
+  final TextEditingController minimumController;
+  final TextEditingController maximumController;
+  final ValueChanged<Set<_LedgerType>> onTypesChanged;
+  final ValueChanged<String> onMinimumChanged;
+  final ValueChanged<String> onMaximumChanged;
 
-  @override
-  State<_TransactionFilterDialog> createState() =>
-      _TransactionFilterDialogState();
-}
+  String get _typeSummary {
+    if (selectedTypes.isEmpty) {
+      return 'Any';
+    }
 
-class _TransactionFilterDialogState extends State<_TransactionFilterDialog> {
-  late Set<_LedgerType> _types;
-  late final TextEditingController _minimumController;
-  late final TextEditingController _maximumController;
+    if (selectedTypes.length == 1) {
+      return selectedTypes.single.label;
+    }
 
-  @override
-  void initState() {
-    super.initState();
-    _types = Set<_LedgerType>.from(widget.initialTypes);
-    _minimumController = TextEditingController(
-      text: _dollars(widget.initialMinimumAmountCents),
-    );
-    _maximumController = TextEditingController(
-      text: _dollars(widget.initialMaximumAmountCents),
-    );
+    return '${selectedTypes.length} selected';
   }
 
-  @override
-  void dispose() {
-    _minimumController.dispose();
-    _maximumController.dispose();
-    super.dispose();
+  Future<void> _showTypeSelector(BuildContext context) async {
+    final result = await showModalBottomSheet<Set<_LedgerType>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        var tempValues = Set<_LedgerType>.from(selectedTypes);
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Transaction Type',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('transactionsTypeSheetClearButton'),
+                          onPressed: () {
+                            setModalState(tempValues.clear);
+                          },
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 360),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            for (final type in _LedgerType.values)
+                              CheckboxListTile(
+                                key: ValueKey(
+                                  'transactionsTypeFilter-${type.name}',
+                                ),
+                                value: tempValues.contains(type),
+                                contentPadding: EdgeInsets.zero,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                secondary: Icon(
+                                  type.icon,
+                                  color: type.accentColor,
+                                ),
+                                title: Text(type.label),
+                                onChanged: (selected) {
+                                  setModalState(() {
+                                    if (selected ?? false) {
+                                      tempValues.add(type);
+                                    } else {
+                                      tempValues.remove(type);
+                                    }
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            key: const Key('transactionsTypeSheetCancelButton'),
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            key: const Key('transactionsTypeSheetDoneButton'),
+                            onPressed: () => Navigator.of(
+                              sheetContext,
+                            ).pop(Set<_LedgerType>.unmodifiable(tempValues)),
+                            child: const Text('Done'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      onTypesChanged(result);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      key: const Key('transactionsFilterDialog'),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-      title: const Row(
-        children: [
-          Icon(Icons.tune_rounded),
-          SizedBox(width: 10),
-          Text('Filter Transactions'),
-        ],
-      ),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Transaction Type',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+    return Column(
+      key: const Key('transactionsInlineFilters'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            key: const Key('transactionsFilterButton'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _showTypeSelector(context),
+            child: Container(
+              height: 46,
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFDCE3EB)),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
                 children: [
-                  for (final type in _LedgerType.values)
-                    FilterChip(
-                      key: ValueKey('transactionsTypeFilter-${type.name}'),
-                      label: Text(type.label),
-                      selected: _types.contains(type),
-                      avatar: Icon(
-                        type.icon,
-                        size: 18,
-                        color: _types.contains(type)
-                            ? type.accentColor
-                            : const Color(0xFF687586),
-                      ),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _types.add(type);
-                          } else {
-                            _types.remove(type);
-                          }
-                        });
-                      },
+                  const Icon(
+                    Icons.receipt_long_outlined,
+                    size: 19,
+                    color: Color(0xFF082A4A),
+                  ),
+                  const SizedBox(width: 9),
+                  Text(
+                    'Transaction Type',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF082A4A),
+                      fontWeight: FontWeight.w700,
                     ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'Transaction Amount',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Uses the transaction value regardless of positive or negative direction.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: const Color(0xFF687586)),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('transactionsMinimumAmountField'),
-                      controller: _minimumController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Min Amount',
-                        prefixText: r'$',
-                        border: OutlineInputBorder(),
+                  ),
+                  const Spacer(),
+                  Flexible(
+                    child: Text(
+                      _typeSummary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF667383),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('transactionsMaximumAmountField'),
-                      controller: _maximumController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Max Amount',
-                        prefixText: r'$',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.arrow_drop_down_rounded,
+                    color: Color(0xFF667383),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          key: const Key('transactionsFilterClearButton'),
-          onPressed: () {
-            Navigator.of(context).pop(
-              const _TransactionFilterResult(
-                types: <_LedgerType>{},
-                minimumAmountCents: null,
-                maximumAmountCents: null,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 46,
+                child: TextField(
+                  key: const Key('transactionsMinimumAmountField'),
+                  controller: minimumController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: onMinimumChanged,
+                  decoration: const InputDecoration(
+                    labelText: 'Min Amount',
+                    prefixText: r'$',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
               ),
-            );
-          },
-          child: const Text('Clear Filters'),
-        ),
-        TextButton(
-          key: const Key('transactionsFilterCancelButton'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          key: const Key('transactionsFilterApplyButton'),
-          onPressed: () {
-            Navigator.of(context).pop(
-              _TransactionFilterResult(
-                types: Set<_LedgerType>.unmodifiable(_types),
-                minimumAmountCents: _parseDollars(_minimumController.text),
-                maximumAmountCents: _parseDollars(_maximumController.text),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 46,
+                child: TextField(
+                  key: const Key('transactionsMaximumAmountField'),
+                  controller: maximumController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: onMaximumChanged,
+                  decoration: const InputDecoration(
+                    labelText: 'Max Amount',
+                    prefixText: r'$',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
               ),
-            );
-          },
-          child: const Text('Apply'),
+            ),
+          ],
         ),
       ],
     );
   }
-}
-
-class _TransactionFilterResult {
-  const _TransactionFilterResult({
-    required this.types,
-    required this.minimumAmountCents,
-    required this.maximumAmountCents,
-  });
-
-  final Set<_LedgerType> types;
-  final int? minimumAmountCents;
-  final int? maximumAmountCents;
 }
 
 String _displayAmount(_LedgerEntry entry, bool canViewFinancialData) {
@@ -959,11 +1025,6 @@ String _inventoryDisplayName(InventoryItem? item) {
       item.inventoryNumber ?? 'Inventory number not assigned';
 
   return '$inventoryNumber — $equipmentName';
-}
-
-String _dollars(int? cents) {
-  if (cents == null) return '';
-  return (cents / 100).toStringAsFixed(2);
 }
 
 int? _parseDollars(String value) {

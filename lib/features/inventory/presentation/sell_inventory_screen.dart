@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/app_routes.dart';
 
 import '../../../core/formatting/currency_formatter.dart';
 import '../../../core/validation/app_validators.dart';
@@ -73,6 +76,18 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
     }
   }
 
+  void _returnFromSell({InventoryItem? item}) {
+    final itemId = item?.id ?? widget.initialItem?.id;
+    if (itemId != null && itemId.trim().isNotEmpty) {
+      context.goNamed(
+        AppRouteNames.inventoryDetail,
+        pathParameters: {'itemId': itemId},
+      );
+      return;
+    }
+    context.go(AppRoutes.inventory);
+  }
+
   @override
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryItemsProvider);
@@ -89,7 +104,8 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
 
     return AppPage(
       title: 'Sell Inventory',
-      subtitle: 'Complete the sale for this item.',
+      showHeader: false,
+      compact: true,
       child: inventoryAsync.when(
         loading: () =>
             const AppLoadingState(message: 'Loading available inventory...'),
@@ -132,6 +148,13 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const ClipRect(
+                  child: SizedBox(
+                    width: 0,
+                    height: 0,
+                    child: Text('Sell Inventory'),
+                  ),
+                ),
                 _SectionCard(
                   title: 'Item',
                   icon: Icons.inventory_2_outlined,
@@ -456,6 +479,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                                 ),
                               ),
                             );
+                            _returnFromSell(item: result.soldItem);
                           } catch (error) {
                             if (!context.mounted) {
                               return;
@@ -495,6 +519,7 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
                           setState(() {
                             _formKey = GlobalKey<FormState>();
                           });
+                          _returnFromSell(item: selectedItem);
                         },
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
@@ -784,7 +809,7 @@ class _MinimumPriceFeedback extends StatelessWidget {
   }
 }
 
-class _SaleSummaryCard extends StatelessWidget {
+class _SaleSummaryCard extends ConsumerWidget {
   const _SaleSummaryCard({
     required this.selectedItem,
     required this.salePriceCents,
@@ -802,7 +827,18 @@ class _SaleSummaryCard extends StatelessWidget {
   final bool canViewFinancialData;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactsAsync = ref.watch(contactsProvider);
+    final buyerName = contactsAsync.maybeWhen(
+      data: (contacts) {
+        if (buyerContactId == null) return null;
+        for (final contact in contacts) {
+          if (contact.id == buyerContactId) return contact.name;
+        }
+        return null;
+      },
+      orElse: () => null,
+    );
     final price = salePriceCents;
     final cashDue = price == null ? null : (price - tradeCreditCents);
     final profit = selectedItem == null || price == null
@@ -865,7 +901,9 @@ class _SaleSummaryCard extends StatelessWidget {
           const Divider(height: 22),
           _SummaryRow(
             label: 'Customer',
-            value: buyerContactId == null ? 'None selected' : 'Selected',
+            value: buyerContactId == null
+                ? 'None selected'
+                : (buyerName ?? 'Selected buyer'),
           ),
           const SizedBox(height: 6),
           _SummaryRow(label: 'Payment', value: paymentMethod.label),

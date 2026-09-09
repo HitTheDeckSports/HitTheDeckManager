@@ -46,7 +46,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('buyInventoryBackButton')), findsOneWidget);
+    expect(find.byKey(const Key('buyInventoryBackButton')), findsNothing);
     expect(find.byKey(const Key('buyInventoryCancelButton')), findsOneWidget);
     expect(find.byKey(const Key('buyInventoryBasicSection')), findsOneWidget);
     expect(find.byKey(const Key('buyInventorySellerSection')), findsOneWidget);

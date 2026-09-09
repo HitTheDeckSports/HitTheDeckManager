@@ -17,6 +17,62 @@ import 'package:hit_the_deck_manager/features/transactions/presentation/transact
 import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
 
 void main() {
+  testWidgets('Transactions keeps type choices off page until selector opens', (
+    tester,
+  ) async {
+    final sale = SaleTransaction(
+      id: 'sale-filter-test',
+      inventoryItemId: 'item-filter-test',
+      salePriceCents: 25000,
+      saleDate: DateTime(2026, 9, 9),
+      paymentMethod: PaymentMethod.cash,
+      acquisitionValueCents: 10000,
+    );
+    const item = InventoryItem(
+      id: 'item-filter-test',
+      inventoryNumber: 'BAT-2609-0099',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.sold,
+    );
+
+    final repository = InMemoryTransactionRepository(initialSales: [sale]);
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
+    addTearDown(repository.dispose);
+    addTearDown(inventoryRepository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(repository),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('transactionsFilterButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('transactionsMinimumAmountField')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('transactionsMaximumAmountField')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-sale')),
+      findsNothing,
+    );
+  });
+
   testWidgets('displays the empty transactions state', (tester) async {
     final repository = InMemoryTransactionRepository();
     final inventoryRepository = InMemoryInventoryRepository();
@@ -35,7 +91,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('Transactions'), findsNothing);
     expect(find.text('No transactions yet.'), findsOneWidget);
   });
 
@@ -136,10 +192,10 @@ void main() {
     expect(find.byKey(const Key('transactionsFilterButton')), findsOneWidget);
     expect(find.text(r'+$350.00'), findsOneWidget);
     expect(find.text(r'+$325.00'), findsOneWidget);
-    expect(find.text('GLV-2608-0001 — Wilson A2000'), findsOneWidget);
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
-    expect(find.text('PayPal sale'), findsOneWidget);
-    expect(find.text('Cash sale'), findsOneWidget);
+    expect(find.text('GLV-2608-0001'), findsOneWidget);
+    expect(find.text('Wilson A2000 • PayPal sale'), findsOneWidget);
+    expect(find.text('BAT-2608-0001'), findsOneWidget);
+    expect(find.text('Combat Spec H1 • Cash sale'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('transactionTypePill-sale')),
       findsNWidgets(2),
@@ -151,6 +207,47 @@ void main() {
       tester.getTopLeft(newerCard).dy,
       lessThan(tester.getTopLeft(olderCard).dy),
     );
+  });
+
+  testWidgets('purchased inventory appears as a purchase ledger event', (
+    tester,
+  ) async {
+    final repository = InMemoryTransactionRepository();
+    final purchasedItem = InventoryItem(
+      id: 'purchase-item',
+      inventoryNumber: 'BAT-2609-0042',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 17500,
+      purchaseDate: DateTime(2026, 9, 8),
+    );
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: [purchasedItem],
+    );
+    addTearDown(repository.dispose);
+    addTearDown(inventoryRepository.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(repository),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('purchaseInventoryCard-purchase-item')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionTypePill-purchase')),
+      findsOneWidget,
+    );
+    expect(find.text(r'-$175.00'), findsOneWidget);
   });
 
   testWidgets('tapping a sale opens its detail screen', (tester) async {

@@ -418,20 +418,22 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     );
   }
 
-  Future<void> _cancel(BuyInventoryFormController formController) async {
+  void _cancel(BuyInventoryFormController formController) {
     formController.reset();
     _lengthController.clear();
     _weightController.clear();
     _dropController.clear();
 
-    if (mounted) {
-      setState(() {
-        _pendingPhotos.clear();
-        _savedItemForPhotoRetry = null;
-      });
+    if (!mounted) {
+      return;
     }
 
-    await Navigator.of(context).maybePop();
+    setState(() {
+      _pendingPhotos.clear();
+      _savedItemForPhotoRetry = null;
+    });
+
+    context.go(AppRoutes.inventory);
   }
 
   @override
@@ -526,18 +528,6 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                 ),
               ),
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                key: const Key('buyInventoryBackButton'),
-                onPressed: isSaving
-                    ? null
-                    : () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Back'),
-              ),
-            ),
-            const SizedBox(height: 12),
             _SectionCard(
               key: const Key('buyInventoryBasicSection'),
               title: 'Basic Information',
@@ -1249,34 +1239,37 @@ class _SectionCard extends StatelessWidget {
     required this.child,
     super.key,
   });
-
   final String title;
   final IconData icon;
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
-    return _BodyCard(
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 22, color: const Color(0xFF082A4A)),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF082A4A),
-                    fontWeight: FontWeight.w900,
+          Container(
+            color: const Color(0xFF082A4A),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          child,
+          Padding(padding: const EdgeInsets.all(14), child: child),
         ],
       ),
     );

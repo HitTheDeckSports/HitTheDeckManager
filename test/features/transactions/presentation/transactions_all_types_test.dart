@@ -99,8 +99,8 @@ void main() {
       find.byKey(const Key('transactionsConsignmentsSection')),
       findsNothing,
     );
-    expect(find.text('Grip replacement'), findsOneWidget);
-    expect(find.text('Other'), findsOneWidget);
+    expect(find.text('Combat • Grip replacement'), findsOneWidget);
+    expect(find.text('Combat • Other'), findsOneWidget);
     expect(find.text(r'+$50.00'), findsOneWidget);
 
     final repairCard = find.byKey(

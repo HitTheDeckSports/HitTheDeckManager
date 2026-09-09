@@ -122,17 +122,23 @@ void main() {
 
     await tester.tap(find.byKey(const Key('transactionsFilterButton')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('transactionsFilterDialog')), findsOneWidget);
+
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-sale')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-trade')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('transactionsTypeFilter-sale')));
     await tester.tap(
       find.byKey(const ValueKey('transactionsTypeFilter-trade')),
     );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('transactionsFilterApplyButton')));
+    await tester.tap(find.byKey(const Key('transactionsTypeSheetDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 of 4 transactions'), findsOneWidget);
     expect(find.byKey(const ValueKey('sale-a')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('tradeTransactionCard-trade-a')),
@@ -151,8 +157,6 @@ void main() {
     addTearDown(repository.dispose);
     await pumpLedger(tester, transactionRepository: repository);
 
-    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
-    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('transactionsMinimumAmountField')),
       '50',
@@ -161,7 +165,6 @@ void main() {
       find.byKey(const Key('transactionsMaximumAmountField')),
       '100',
     );
-    await tester.tap(find.byKey(const Key('transactionsFilterApplyButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('1 of 4 transactions'), findsOneWidget);
