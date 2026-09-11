@@ -39,6 +39,7 @@ abstract final class FirestoreDealMapper {
       childInventoryItemIds: childInventoryItemIds,
       lineageInventoryItemIds: lineageInventoryItemIds,
       notes: _stringOrNull(data['notes']),
+      createdAt: _dateTimeOrNull(data['createdAt']),
     );
   }
 
@@ -113,6 +114,18 @@ abstract final class FirestoreDealMapper {
 
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static DateTime? _dateTimeOrNull(Object? value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return null;
   }
 
   static String? _emptyToNull(String? value) {

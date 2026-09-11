@@ -16,6 +16,7 @@ class AppShell extends ConsumerWidget {
     final currentLocation = GoRouterState.of(context).uri.path;
     final permissions = ref.watch(currentAppPermissionsProvider);
     final canAccessReports = permissions.canAccessReports;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final useNavigationRail = constraints.maxWidth >= 900;
@@ -58,6 +59,7 @@ class AppShell extends ConsumerWidget {
             ),
           );
         }
+
         return Scaffold(
           appBar: _buildAppBar(context, currentLocation),
           body: child,
@@ -102,12 +104,20 @@ class AppShell extends ConsumerWidget {
   ) {
     final detailId = _inventoryDetailItemId(currentLocation);
     final editId = _inventoryEditItemId(currentLocation);
+    final transactionDetailId = _transactionDetailId(currentLocation);
     final isBuy = currentLocation == AppRoutes.buyInventory;
     final isSell = currentLocation == AppRoutes.sellInventory;
-    final contextual = detailId != null || editId != null || isBuy || isSell;
+    final contextual =
+        detailId != null ||
+        editId != null ||
+        transactionDetailId != null ||
+        isBuy ||
+        isSell;
+
     VoidCallback? backAction;
     Key? backKey;
     String? tooltip;
+
     if (detailId != null) {
       backAction = () => context.go(AppRoutes.inventory);
       backKey = const Key('inventoryDetailHeaderBackButton');
@@ -119,11 +129,16 @@ class AppShell extends ConsumerWidget {
       );
       backKey = const Key('inventoryEditHeaderBackButton');
       tooltip = 'Back to Inventory Item';
+    } else if (transactionDetailId != null) {
+      backAction = () => context.go(AppRoutes.transactions);
+      backKey = const Key('transactionDetailHeaderBackButton');
+      tooltip = 'Back to Transactions';
     } else if (isBuy || isSell) {
       backAction = () => context.go(AppRoutes.inventory);
       backKey = const Key('inventoryWorkflowHeaderBackButton');
       tooltip = 'Back to Inventory';
     }
+
     return AppBar(
       backgroundColor: AppTheme.navyDark,
       foregroundColor: Colors.white,
@@ -182,14 +197,26 @@ class AppShell extends ConsumerWidget {
 
   String? _inventoryDetailItemId(String location) {
     final s = Uri.parse(location).pathSegments;
-    if (s.length != 2 || s.first != 'inventory') return null;
+    if (s.length != 2 || s.first != 'inventory') {
+      return null;
+    }
     const reserved = {'buy', 'sell', 'scan'};
     return reserved.contains(s[1]) ? null : s[1];
   }
 
   String? _inventoryEditItemId(String location) {
     final s = Uri.parse(location).pathSegments;
-    if (s.length != 3 || s.first != 'inventory' || s[2] != 'edit') return null;
+    if (s.length != 3 || s.first != 'inventory' || s[2] != 'edit') {
+      return null;
+    }
+    return s[1];
+  }
+
+  String? _transactionDetailId(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2 || s.first != 'transactions') {
+      return null;
+    }
     return s[1];
   }
 
@@ -223,6 +250,7 @@ class AppShell extends ConsumerWidget {
         label: 'Reports',
       ),
   ];
+
   List<NavigationRailDestination> _railDestinations({
     required bool canAccessReports,
   }) => [
@@ -253,11 +281,14 @@ class AppShell extends ConsumerWidget {
         label: Text('Reports'),
       ),
   ];
+
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
       await ref.read(authenticationControllerProvider.notifier).signOut();
     } catch (_) {
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to sign out. Please try again.')),
       );
@@ -265,10 +296,18 @@ class AppShell extends ConsumerWidget {
   }
 
   int _selectedIndex(String location, {required bool canAccessReports}) {
-    if (location.startsWith(AppRoutes.inventory)) return 1;
-    if (location.startsWith(AppRoutes.transactions)) return 2;
-    if (location.startsWith(AppRoutes.contacts)) return 3;
-    if (canAccessReports && location.startsWith(AppRoutes.reports)) return 4;
+    if (location.startsWith(AppRoutes.inventory)) {
+      return 1;
+    }
+    if (location.startsWith(AppRoutes.transactions)) {
+      return 2;
+    }
+    if (location.startsWith(AppRoutes.contacts)) {
+      return 3;
+    }
+    if (canAccessReports && location.startsWith(AppRoutes.reports)) {
+      return 4;
+    }
     return 0;
   }
 
@@ -292,6 +331,7 @@ class AppShell extends ConsumerWidget {
 class _BrandMark extends StatelessWidget {
   const _BrandMark({this.compact = false});
   final bool compact;
+
   @override
   Widget build(BuildContext context) {
     if (compact) {
@@ -301,6 +341,7 @@ class _BrandMark extends StatelessWidget {
         size: 34,
       );
     }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

@@ -318,7 +318,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('transactionCard-sale-1')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sale Transaction'), findsOneWidget);
+    expect(find.text('Sale Transaction'), findsNothing);
+    expect(
+      find.byKey(const Key('saleTransactionDetailsSection')),
+      findsOneWidget,
+    );
     expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
   });
 }

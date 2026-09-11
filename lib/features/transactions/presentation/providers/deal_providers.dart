@@ -47,6 +47,63 @@ final dealForLineageInventoryItemProvider =
           .getDealForLineageInventoryItem(inventoryItemId);
     });
 
+/// Returns the business-facing Deal number in YYYY-NNN form.
+///
+/// Firestore document IDs remain internal routing/storage identifiers and are
+/// never presented to the user. The sequence is based on immutable Deal
+/// creation timestamps; permanent Deal deletion is disabled, so the ordinal
+/// remains stable for normal Version 1.0 usage.
+final dealDisplayNumberProvider = FutureProvider.family<String?, String>((
+  ref,
+  dealId,
+) async {
+  final normalizedId = dealId.trim();
+
+  if (normalizedId.isEmpty) {
+    return null;
+  }
+
+  final deals = await ref.watch(dealRepositoryProvider).getDeals();
+
+  Deal? target;
+  for (final deal in deals) {
+    if (deal.id == normalizedId) {
+      target = deal;
+      break;
+    }
+  }
+
+  final createdAt = target?.createdAt;
+  if (target == null || createdAt == null) {
+    return null;
+  }
+
+  final sameYear =
+      deals
+          .where((deal) => deal.createdAt?.year == createdAt.year)
+          .toList(growable: false)
+        ..sort((first, second) {
+          final firstCreatedAt = first.createdAt!;
+          final secondCreatedAt = second.createdAt!;
+          final timeComparison = firstCreatedAt.compareTo(secondCreatedAt);
+
+          if (timeComparison != 0) {
+            return timeComparison;
+          }
+
+          return (first.id ?? '').compareTo(second.id ?? '');
+        });
+
+  final sequenceIndex = sameYear.indexWhere((deal) => deal.id == normalizedId);
+
+  if (sequenceIndex < 0) {
+    return null;
+  }
+
+  final sequence = (sequenceIndex + 1).toString().padLeft(3, '0');
+  return '${createdAt.year}-$sequence';
+});
+
 final dealSummaryProvider = FutureProvider.family<DealSummary?, String>((
   ref,
   dealId,

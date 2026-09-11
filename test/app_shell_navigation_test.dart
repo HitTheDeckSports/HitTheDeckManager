@@ -12,24 +12,30 @@ void main() {
     tester,
   ) async {
     final router = await _pump(tester);
+
     router.go(AppRoutes.buyInventory);
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('inventoryWorkflowHeaderBackButton')),
       findsOneWidget,
     );
-    await tester.tap(
-      find.byKey(const Key('inventoryWorkflowHeaderBackButton')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Inventory destination'), findsOneWidget);
-    router.go('/inventory/item-1/edit');
+
+    router.go('/transactions/sale-1');
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('inventoryEditHeaderBackButton')),
+      find.byKey(const Key('transactionDetailHeaderBackButton')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('globalSearchHeaderButton')), findsNothing);
+    expect(find.byKey(const Key('globalSettingsHeaderButton')), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('transactionDetailHeaderBackButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Transactions destination'), findsOneWidget);
   });
+
   testWidgets('standard shell retains core navigation', (tester) async {
     await _pump(tester);
     expect(find.byType(NavigationBar), findsOneWidget);
@@ -59,6 +65,12 @@ Future<GoRouter> _pump(WidgetTester tester) async {
             name: AppRouteNames.inventoryEdit,
             builder: (c, s) => const Center(child: Text('Edit destination')),
           ),
+          GoRoute(
+            path: AppRoutes.transactionDetail,
+            name: AppRouteNames.transactionDetail,
+            builder: (c, s) =>
+                const Center(child: Text('Transaction detail destination')),
+          ),
           _r(AppRoutes.transactions, 'Transactions destination'),
           _r(AppRoutes.contacts, 'Contacts destination'),
           _r(AppRoutes.reports, 'Reports destination'),
@@ -69,6 +81,7 @@ Future<GoRouter> _pump(WidgetTester tester) async {
     ],
   );
   addTearDown(router.dispose);
+
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

@@ -5,6 +5,7 @@ class Deal {
     this.lineageInventoryItemIds = const [],
     this.id,
     this.notes,
+    this.createdAt,
   });
 
   final String? id;
@@ -36,6 +37,12 @@ class Deal {
 
   final String? notes;
 
+  /// Firestore creation timestamp.
+  ///
+  /// Used to derive the business-facing Deal number (YYYY-NNN) without ever
+  /// exposing the Firebase document ID in the UI.
+  final DateTime? createdAt;
+
   bool get isValid {
     final parentId = parentSaleTransactionId.trim();
     final childIds = _normalizedIds(childInventoryItemIds);
@@ -55,6 +62,7 @@ class Deal {
     List<String>? childInventoryItemIds,
     List<String>? lineageInventoryItemIds,
     Object? notes = _unset,
+    Object? createdAt = _unset,
   }) {
     return Deal(
       id: identical(id, _unset) ? this.id : id as String?,
@@ -65,6 +73,9 @@ class Deal {
       lineageInventoryItemIds:
           lineageInventoryItemIds ?? this.lineageInventoryItemIds,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
+      createdAt: identical(createdAt, _unset)
+          ? this.createdAt
+          : createdAt as DateTime?,
     );
   }
 
@@ -79,7 +90,8 @@ class Deal {
               other.lineageInventoryItemIds,
               lineageInventoryItemIds,
             ) &&
-            other.notes == notes;
+            other.notes == notes &&
+            other.createdAt == createdAt;
   }
 
   @override
@@ -90,6 +102,7 @@ class Deal {
       Object.hashAll(childInventoryItemIds),
       Object.hashAll(lineageInventoryItemIds),
       notes,
+      createdAt,
     );
   }
 }
