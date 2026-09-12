@@ -64,7 +64,7 @@ void main() {
 
     expect(find.text('Repair Details'), findsOneWidget);
     expect(find.text('Repair Information'), findsNothing);
-    expect(find.text('08/05/2026'), findsOneWidget);
+    expect(find.text('08/05/2026'), findsNWidgets(2));
     expect(find.text(r'$45.00'), findsOneWidget);
     expect(find.text('Replaced damaged grip.'), findsOneWidget);
     expect(find.text('Completed in-house.'), findsOneWidget);

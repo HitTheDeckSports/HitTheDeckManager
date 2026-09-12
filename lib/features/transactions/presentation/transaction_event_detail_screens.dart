@@ -17,6 +17,7 @@ import '../domain/models/disposal_transaction.dart';
 import '../domain/models/trade_transaction.dart';
 import 'providers/deal_providers.dart';
 import 'providers/transaction_providers.dart';
+import 'widgets/inventory_summary_card.dart';
 
 class TradeDetailScreen extends ConsumerWidget {
   const TradeDetailScreen({required this.tradeId, super.key});
@@ -76,26 +77,7 @@ class _TradeBody extends ConsumerWidget {
                 title: 'Trade Details',
                 children: [
                   _Row(label: 'Trade Date', value: _date(trade.tradeDate)),
-                  if (trade.includesCash) ...[
-                    const Divider(),
-                    _Row(
-                      label: trade.cashReceivedCents > 0
-                          ? 'Cash Received'
-                          : 'Cash Paid',
-                      value: CurrencyFormatter.formatCents(
-                        trade.cashReceivedCents > 0
-                            ? trade.cashReceivedCents
-                            : trade.cashPaidCents,
-                      ),
-                    ),
-                  ],
-                  if (trade.paymentMethod != null) ...[
-                    const Divider(),
-                    _Row(
-                      label: 'Payment Method',
-                      value: _paymentMethod(trade.paymentMethod!.name),
-                    ),
-                  ],
+                  _TradeCashRows(trade: trade),
                   if ((trade.notes ?? '').trim().isNotEmpty) ...[
                     const Divider(),
                     _Row(label: 'Notes', value: trade.notes!.trim()),
@@ -128,6 +110,68 @@ class _TradeBody extends ConsumerWidget {
               ],
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _TradeCashRows extends ConsumerWidget {
+  const _TradeCashRows({required this.trade});
+  final TradeTransaction trade;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (trade.includesCash) {
+      return Column(
+        children: [
+          const Divider(),
+          _Row(
+            label: trade.cashReceivedCents > 0 ? 'Cash Received' : 'Cash Paid',
+            value: CurrencyFormatter.formatCents(
+              trade.cashReceivedCents > 0
+                  ? trade.cashReceivedCents
+                  : trade.cashPaidCents,
+            ),
+          ),
+          if (trade.paymentMethod != null) ...[
+            const Divider(),
+            _Row(
+              label: 'Payment Method',
+              value: _paymentMethod(trade.paymentMethod!.name),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final saleId = trade.saleTransactionId?.trim() ?? '';
+    if (saleId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final saleAsync = ref.watch(saleTransactionProvider(saleId));
+    return saleAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (sale) {
+        if (sale == null || sale.cashReceivedCents <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          children: [
+            const Divider(),
+            _Row(
+              label: 'Cash Received',
+              value: CurrencyFormatter.formatCents(sale.cashReceivedCents),
+            ),
+            const Divider(),
+            _Row(
+              label: 'Payment Method',
+              value: _paymentMethod(sale.paymentMethod.name),
+            ),
+          ],
         );
       },
     );
@@ -181,7 +225,12 @@ class _DisposalBody extends ConsumerWidget {
             error: (e, st) => const SizedBox.shrink(),
             data: (item) => item == null
                 ? const SizedBox.shrink()
-                : _ItemHero(item: item, label: 'Disposed'),
+                : _ItemHero(
+                    item: item,
+                    label: 'Disposal',
+                    date: _date(disposal.disposalDate),
+                    statusLabel: 'Disposed',
+                  ),
           ),
           const SizedBox(height: 12),
           _Section(
@@ -259,7 +308,9 @@ class _ConsignmentBody extends ConsumerWidget {
                 ? const SizedBox.shrink()
                 : _ItemHero(
                     item: item,
-                    label: consignment.isCompleted
+                    label: 'Consignment',
+                    date: _date(consignment.consignmentDate),
+                    statusLabel: consignment.isCompleted
                         ? 'Completed'
                         : 'Consignment',
                   ),
@@ -305,7 +356,7 @@ class _ConsignmentBody extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('View Sale Transaction'),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.goNamed(
+                  onTap: () => context.pushNamed(
                     AppRouteNames.transactionDetail,
                     pathParameters: {
                       'transactionId': consignment.saleTransactionId!,
@@ -412,7 +463,7 @@ class _DealLink extends ConsumerWidget {
               Icons.chevron_right_rounded,
               color: Color(0xFF6E23B6),
             ),
-            onTap: () => context.goNamed(
+            onTap: () => context.pushNamed(
               AppRouteNames.dealDetail,
               pathParameters: {'dealId': dealId},
             ),
@@ -460,25 +511,14 @@ class _InventoryLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final model = item.model?.trim() ?? '';
-    final name = model.isEmpty ? item.brand : '${item.brand} $model';
-    final subtitle = showValue
-        ? '$name\nValue: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}'
-        : name;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        item.inventoryNumber ?? 'Inventory number not assigned',
-        style: const TextStyle(
-          color: Color(0xFF1174C2),
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right_rounded),
+    return InventorySummaryCard.compact(
+      item: item,
+      valueLabel: showValue
+          ? 'Value: ${CurrencyFormatter.formatCents(item.acquisitionValueCents)}'
+          : null,
       onTap: item.id == null
           ? null
-          : () => context.goNamed(
+          : () => context.pushNamed(
               AppRouteNames.inventoryDetail,
               pathParameters: {'itemId': item.id!},
             ),
@@ -487,73 +527,31 @@ class _InventoryLink extends StatelessWidget {
 }
 
 class _ItemHero extends StatelessWidget {
-  const _ItemHero({required this.item, required this.label});
+  const _ItemHero({
+    required this.item,
+    required this.label,
+    required this.date,
+    required this.statusLabel,
+  });
+
   final InventoryItem item;
   final String label;
+  final String date;
+  final String statusLabel;
 
   @override
   Widget build(BuildContext context) {
-    final model = item.model?.trim() ?? '';
-    final name = model.isEmpty ? item.brand : '${item.brand} $model';
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: item.id == null
-            ? null
-            : () => context.goNamed(
-                AppRouteNames.inventoryDetail,
-                pathParameters: {'itemId': item.id!},
-              ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.inventory_2_outlined,
-                size: 34,
-                color: Color(0xFF082A4A),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.inventoryNumber ?? 'Inventory number not assigned',
-                      style: const TextStyle(
-                        color: Color(0xFF1174C2),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF082A4A),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F3F6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return InventorySummaryCard.full(
+      item: item,
+      contextLabel: label,
+      contextDate: date,
+      statusLabel: statusLabel,
+      onTap: item.id == null
+          ? null
+          : () => context.pushNamed(
+              AppRouteNames.inventoryDetail,
+              pathParameters: {'itemId': item.id!},
+            ),
     );
   }
 }

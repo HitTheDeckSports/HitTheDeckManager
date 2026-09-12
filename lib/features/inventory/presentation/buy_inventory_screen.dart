@@ -592,7 +592,14 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: [
-                      for (final acquisitionType in AcquisitionType.values)
+                      for (final acquisitionType
+                          in AcquisitionType.values.where(
+                            (type) =>
+                                type != AcquisitionType.traded ||
+                                (widget.isEditing &&
+                                    widget.existingItem?.acquisitionType ==
+                                        AcquisitionType.traded),
+                          ))
                         DropdownMenuItem(
                           value: acquisitionType,
                           child: Text(acquisitionType.label),

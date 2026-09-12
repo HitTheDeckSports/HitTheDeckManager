@@ -300,7 +300,7 @@ class _SoldItemHero extends StatelessWidget {
         onTap: itemId == null
             ? null
             : () {
-                context.goNamed(
+                context.pushNamed(
                   AppRouteNames.inventoryDetail,
                   pathParameters: {'itemId': itemId},
                 );
@@ -457,7 +457,7 @@ class _InventoryLinkRow extends StatelessWidget {
       onTap: item == null || itemId.isEmpty
           ? null
           : () {
-              context.goNamed(
+              context.pushNamed(
                 AppRouteNames.inventoryDetail,
                 pathParameters: {'itemId': itemId},
               );
@@ -559,7 +559,7 @@ class _BuyerInformationSection extends ConsumerWidget {
           child: InkWell(
             key: const Key('transactionDetailViewBuyerButton'),
             onTap: () {
-              context.goNamed(
+              context.pushNamed(
                 AppRouteNames.contactDetail,
                 pathParameters: {'contactId': contactId},
               );
@@ -690,7 +690,7 @@ class _TradeInInventoryEntry extends StatelessWidget {
     return InkWell(
       key: ValueKey('tradeInInventoryEntry-$inventoryItemId'),
       onTap: () {
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.inventoryDetail,
           pathParameters: {'itemId': inventoryItemId},
         );
@@ -824,7 +824,7 @@ class _SaleDealSection extends ConsumerWidget {
                 OutlinedButton(
                   key: const Key('saleViewDealButton'),
                   onPressed: () {
-                    context.goNamed(
+                    context.pushNamed(
                       AppRouteNames.dealDetail,
                       pathParameters: {'dealId': dealId},
                     );

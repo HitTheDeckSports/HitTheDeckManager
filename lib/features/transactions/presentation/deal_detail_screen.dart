@@ -179,7 +179,7 @@ class DealDetailScreen extends ConsumerWidget {
                     key: const Key('dealViewParentSaleButton'),
                     title: const Text('View Parent Sale'),
                     trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => context.goNamed(
+                    onTap: () => context.pushNamed(
                       AppRouteNames.transactionDetail,
                       pathParameters: {
                         'transactionId': summary.deal.parentSaleTransactionId,
@@ -266,7 +266,7 @@ class _ChildItem extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: item.id == null
           ? null
-          : () => context.goNamed(
+          : () => context.pushNamed(
               AppRouteNames.inventoryDetail,
               pathParameters: {'itemId': item.id!},
             ),

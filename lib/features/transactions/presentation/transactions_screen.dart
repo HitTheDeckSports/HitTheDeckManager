@@ -686,7 +686,7 @@ class _TransactionLedgerCard extends StatelessWidget {
         key: entry.tapKey,
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          context.goNamed(
+          context.pushNamed(
             entry.routeName!,
             pathParameters: {entry.routeParameterName!: entry.routeId!},
           );

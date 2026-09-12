@@ -123,22 +123,28 @@ class AppShell extends ConsumerWidget {
     String? tooltip;
 
     if (detailId != null) {
-      backAction = () => context.go(AppRoutes.inventory);
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.inventory));
       backKey = const Key('inventoryDetailHeaderBackButton');
       tooltip = 'Back to Inventory';
     } else if (editId != null) {
-      backAction = () => context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': editId},
+      backAction = () => _backOrFallback(
+        context,
+        () => context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': editId},
+        ),
       );
       backKey = const Key('inventoryEditHeaderBackButton');
       tooltip = 'Back to Inventory Item';
     } else if (transactionDetailId != null || isTransactionFamilyDetail) {
-      backAction = () => context.go(AppRoutes.transactions);
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.transactions));
       backKey = const Key('transactionDetailHeaderBackButton');
       tooltip = 'Back to Transactions';
     } else if (isBuy || isSell) {
-      backAction = () => context.go(AppRoutes.inventory);
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.inventory));
       backKey = const Key('inventoryWorkflowHeaderBackButton');
       tooltip = 'Back to Inventory';
     }
@@ -197,6 +203,15 @@ class AppShell extends ConsumerWidget {
               const SizedBox(width: 6),
             ],
     );
+  }
+
+  void _backOrFallback(BuildContext context, VoidCallback fallback) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    fallback();
   }
 
   String? _inventoryDetailItemId(String location) {

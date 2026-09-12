@@ -9,11 +9,12 @@ import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
 import '../../authentication/presentation/providers/app_permissions_provider.dart';
-import '../../inventory/domain/models/inventory_item.dart';
+import '../../inventory/domain/models/inventory_enums.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/repair_transaction.dart';
 import 'providers/repair_transaction_controller.dart';
 import 'providers/transaction_providers.dart';
+import 'widgets/inventory_summary_card.dart';
 
 class RepairDetailScreen extends ConsumerWidget {
   const RepairDetailScreen({required this.repairId, super.key});
@@ -125,7 +126,19 @@ class _RepairBody extends ConsumerWidget {
             error: (error, stackTrace) => const _MissingInventoryCard(),
             data: (item) => item == null
                 ? const _MissingInventoryCard()
-                : _RepairItemHero(item: item),
+                : InventorySummaryCard.full(
+                    key: const Key('repairViewInventoryItemButton'),
+                    item: item,
+                    contextLabel: 'Repair',
+                    contextDate: _date(repair.repairDate),
+                    statusLabel: item.status.label,
+                    onTap: item.id == null
+                        ? null
+                        : () => context.pushNamed(
+                            AppRouteNames.inventoryDetail,
+                            pathParameters: {'itemId': item.id!},
+                          ),
+                  ),
           ),
           const SizedBox(height: 12),
           _Section(
@@ -157,7 +170,7 @@ class _RepairBody extends ConsumerWidget {
                     key: const Key('repairEditButton'),
                     onPressed: deleting || repair.id == null
                         ? null
-                        : () => context.goNamed(
+                        : () => context.pushNamed(
                             AppRouteNames.editRepair,
                             pathParameters: {'repairId': repair.id!},
                           ),
@@ -184,65 +197,6 @@ class _RepairBody extends ConsumerWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _RepairItemHero extends StatelessWidget {
-  const _RepairItemHero({required this.item});
-  final InventoryItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final model = item.model?.trim() ?? '';
-    final name = model.isEmpty ? item.brand : '${item.brand} $model';
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        key: const Key('repairViewInventoryItemButton'),
-        onTap: item.id == null
-            ? null
-            : () => context.goNamed(
-                AppRouteNames.inventoryDetail,
-                pathParameters: {'itemId': item.id!},
-              ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.inventory_2_outlined,
-                size: 36,
-                color: Color(0xFF082A4A),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.inventoryNumber ?? 'Inventory number not assigned',
-                      style: const TextStyle(
-                        color: Color(0xFF1174C2),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF082A4A),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -336,6 +290,7 @@ class _MissingInventoryCard extends StatelessWidget {
 
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
+
   @override
   Widget build(BuildContext context) => const Card(
     margin: EdgeInsets.zero,
