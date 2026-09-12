@@ -105,12 +105,16 @@ class AppShell extends ConsumerWidget {
     final detailId = _inventoryDetailItemId(currentLocation);
     final editId = _inventoryEditItemId(currentLocation);
     final transactionDetailId = _transactionDetailId(currentLocation);
+    final isTransactionFamilyDetail = _isTransactionFamilyDetail(
+      currentLocation,
+    );
     final isBuy = currentLocation == AppRoutes.buyInventory;
     final isSell = currentLocation == AppRoutes.sellInventory;
     final contextual =
         detailId != null ||
         editId != null ||
         transactionDetailId != null ||
+        isTransactionFamilyDetail ||
         isBuy ||
         isSell;
 
@@ -129,7 +133,7 @@ class AppShell extends ConsumerWidget {
       );
       backKey = const Key('inventoryEditHeaderBackButton');
       tooltip = 'Back to Inventory Item';
-    } else if (transactionDetailId != null) {
+    } else if (transactionDetailId != null || isTransactionFamilyDetail) {
       backAction = () => context.go(AppRoutes.transactions);
       backKey = const Key('transactionDetailHeaderBackButton');
       tooltip = 'Back to Transactions';
@@ -218,6 +222,21 @@ class AppShell extends ConsumerWidget {
       return null;
     }
     return s[1];
+  }
+
+  bool _isTransactionFamilyDetail(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2) {
+      return false;
+    }
+
+    return const {
+      'repairs',
+      'trades',
+      'disposals',
+      'consignments',
+      'deals',
+    }.contains(s.first);
   }
 
   List<NavigationDestination> _navigationDestinations({

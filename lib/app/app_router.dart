@@ -25,6 +25,7 @@ import '../features/transactions/presentation/warranty_replacement_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/transactions/presentation/transaction_detail_screen.dart';
+import '../features/transactions/presentation/transaction_event_detail_screens.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
 import '../features/inventory/presentation/edit_inventory_screen.dart';
 import '../features/inventory/presentation/sell_inventory_screen.dart';
@@ -280,6 +281,49 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               }
 
               return TransactionDetailScreen(transactionId: transactionId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.tradeDetail,
+            name: AppRouteNames.tradeDetail,
+            builder: (context, state) {
+              final tradeId = state.pathParameters['tradeId'];
+
+              if (tradeId == null || tradeId.isEmpty) {
+                throw StateError('Trade detail route requires a trade ID.');
+              }
+
+              return TradeDetailScreen(tradeId: tradeId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.disposalDetail,
+            name: AppRouteNames.disposalDetail,
+            builder: (context, state) {
+              final disposalId = state.pathParameters['disposalId'];
+
+              if (disposalId == null || disposalId.isEmpty) {
+                throw StateError(
+                  'Disposal detail route requires a disposal ID.',
+                );
+              }
+
+              return DisposalDetailScreen(disposalId: disposalId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.consignmentDetail,
+            name: AppRouteNames.consignmentDetail,
+            builder: (context, state) {
+              final consignmentId = state.pathParameters['consignmentId'];
+
+              if (consignmentId == null || consignmentId.isEmpty) {
+                throw StateError(
+                  'Consignment detail route requires a consignment ID.',
+                );
+              }
+
+              return ConsignmentDetailScreen(consignmentId: consignmentId);
             },
           ),
           GoRoute(

@@ -14,7 +14,7 @@ import 'package:hit_the_deck_manager/features/transactions/presentation/provider
 import 'package:hit_the_deck_manager/features/transactions/presentation/repair_detail_screen.dart';
 
 void main() {
-  testWidgets('displays repair and linked inventory item details', (
+  testWidgets('displays redesigned repair and linked inventory details', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -39,7 +39,6 @@ void main() {
     final inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [item],
     );
-
     final transactionRepository = InMemoryTransactionRepository(
       initialRepairs: [repair],
     );
@@ -64,20 +63,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Repair Details'), findsOneWidget);
-    expect(find.text('Repair Information'), findsOneWidget);
-    expect(find.text('08/05/2026'), findsAtLeastNWidgets(1));
+    expect(find.text('Repair Information'), findsNothing);
+    expect(find.text('08/05/2026'), findsOneWidget);
     expect(find.text(r'$45.00'), findsOneWidget);
     expect(find.text('Replaced damaged grip.'), findsOneWidget);
     expect(find.text('Completed in-house.'), findsOneWidget);
-
-    expect(find.text('Inventory Item'), findsOneWidget);
     expect(find.text('BAT-2608-0001'), findsOneWidget);
     expect(find.text('Combat Spec H1'), findsOneWidget);
-
     expect(find.byKey(const Key('repairEditButton')), findsOneWidget);
-
     expect(find.byKey(const Key('repairDeleteButton')), findsOneWidget);
-
     expect(
       find.byKey(const Key('repairViewInventoryItemButton')),
       findsOneWidget,
@@ -88,7 +82,6 @@ void main() {
     WidgetTester tester,
   ) async {
     final inventoryRepository = InMemoryInventoryRepository();
-
     final transactionRepository = InMemoryTransactionRepository();
 
     addTearDown(inventoryRepository.dispose);
@@ -111,12 +104,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Repair not found.'), findsOneWidget);
-
     expect(
       find.text('The repair may have been removed or is no longer available.'),
       findsOneWidget,
     );
-
     expect(find.byKey(const Key('repairDeleteButton')), findsNothing);
   });
 
@@ -132,7 +123,6 @@ void main() {
     );
 
     final inventoryRepository = InMemoryInventoryRepository();
-
     final transactionRepository = InMemoryTransactionRepository(
       initialRepairs: [repair],
     );
@@ -160,12 +150,10 @@ void main() {
       find.text('The inventory item linked to this repair is unavailable.'),
       findsOneWidget,
     );
-
     expect(
       find.byKey(const Key('repairViewInventoryItemButton')),
       findsNothing,
     );
-
     expect(find.text(r'$45.00'), findsOneWidget);
   });
 
@@ -193,7 +181,6 @@ void main() {
     final inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [item],
     );
-
     final transactionRepository = InMemoryTransactionRepository(
       initialRepairs: [repair],
     );
@@ -207,28 +194,23 @@ void main() {
         GoRoute(
           path: AppRoutes.repairDetail,
           name: AppRouteNames.repairDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: RepairDetailScreen(
-                repairId: state.pathParameters['repairId']!,
-              ),
-            );
-          },
+          builder: (context, state) => Scaffold(
+            body: RepairDetailScreen(
+              repairId: state.pathParameters['repairId']!,
+            ),
+          ),
         ),
         GoRoute(
           path: AppRoutes.inventoryDetail,
           name: AppRouteNames.inventoryDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: InventoryItemDetailScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
+          builder: (context, state) => Scaffold(
+            body: InventoryItemDetailScreen(
+              itemId: state.pathParameters['itemId']!,
+            ),
+          ),
         ),
       ],
     );
-
     addTearDown(router.dispose);
 
     await tester.pumpWidget(
@@ -248,7 +230,6 @@ void main() {
     final viewItemButton = find.byKey(
       const Key('repairViewInventoryItemButton'),
     );
-
     await tester.ensureVisible(viewItemButton);
     await tester.tap(viewItemButton);
     await tester.pumpAndSettle();
@@ -271,7 +252,6 @@ void main() {
     );
 
     final inventoryRepository = InMemoryInventoryRepository();
-
     final transactionRepository = InMemoryTransactionRepository(
       initialRepairs: [repair],
     );
@@ -296,19 +276,15 @@ void main() {
     await tester.pumpAndSettle();
 
     final deleteButton = find.byKey(const Key('repairDeleteButton'));
-
     await tester.ensureVisible(deleteButton);
     await tester.tap(deleteButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Delete Repair?'), findsOneWidget);
-
     await tester.tap(find.byKey(const Key('repairDeleteCancelButton')));
-
     await tester.pumpAndSettle();
 
     expect(await transactionRepository.getRepair('repair-1'), repair);
-
     expect(find.text('Repair Details'), findsOneWidget);
   });
 
@@ -336,7 +312,6 @@ void main() {
     final inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [item],
     );
-
     final transactionRepository = InMemoryTransactionRepository(
       initialRepairs: [repair],
     );
@@ -350,28 +325,23 @@ void main() {
         GoRoute(
           path: AppRoutes.repairDetail,
           name: AppRouteNames.repairDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: RepairDetailScreen(
-                repairId: state.pathParameters['repairId']!,
-              ),
-            );
-          },
+          builder: (context, state) => Scaffold(
+            body: RepairDetailScreen(
+              repairId: state.pathParameters['repairId']!,
+            ),
+          ),
         ),
         GoRoute(
           path: AppRoutes.inventoryDetail,
           name: AppRouteNames.inventoryDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: InventoryItemDetailScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
+          builder: (context, state) => Scaffold(
+            body: InventoryItemDetailScreen(
+              itemId: state.pathParameters['itemId']!,
+            ),
+          ),
         ),
       ],
     );
-
     addTearDown(router.dispose);
 
     await tester.pumpWidget(
@@ -389,17 +359,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final deleteButton = find.byKey(const Key('repairDeleteButton'));
-
     await tester.ensureVisible(deleteButton);
     await tester.tap(deleteButton);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('repairDeleteConfirmButton')));
-
     await tester.pumpAndSettle();
 
     expect(await transactionRepository.getRepair('repair-1'), isNull);
-
     expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
     expect(
       find.byKey(const Key('inventoryRepairHistoryEmpty')),

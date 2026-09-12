@@ -345,6 +345,14 @@ List<_LedgerEntry> _buildLedgerEntries({
         amountDirection: trade.netCashCents < 0
             ? _AmountDirection.negative
             : _AmountDirection.positive,
+        routeName: trade.id == null ? null : AppRouteNames.tradeDetail,
+        routeId: trade.id,
+        routeParameterName: 'tradeId',
+        tapKey: ValueKey(
+          trade.id == null
+              ? 'tradeTransactionTapUnavailable'
+              : 'tradeTransactionTap-',
+        ),
         cardKey: ValueKey(
           'tradeTransactionCard-${trade.id ?? trade.tradeDate}',
         ),
@@ -398,6 +406,14 @@ List<_LedgerEntry> _buildLedgerEntries({
         displayAmountCents: null,
         filterAmountCents: null,
         amountDirection: _AmountDirection.neutral,
+        routeName: disposal.id == null ? null : AppRouteNames.disposalDetail,
+        routeId: disposal.id,
+        routeParameterName: 'disposalId',
+        tapKey: ValueKey(
+          disposal.id == null
+              ? 'disposalTransactionTapUnavailable'
+              : 'disposalTransactionTap-',
+        ),
         cardKey: ValueKey(
           'disposalTransactionCard-${disposal.id ?? disposal.disposalDate}',
         ),
@@ -424,6 +440,16 @@ List<_LedgerEntry> _buildLedgerEntries({
         displayAmountCents: consignment.commissionCents,
         filterAmountCents: consignment.commissionCents.abs(),
         amountDirection: _AmountDirection.positive,
+        routeName: consignment.id == null
+            ? null
+            : AppRouteNames.consignmentDetail,
+        routeId: consignment.id,
+        routeParameterName: 'consignmentId',
+        tapKey: ValueKey(
+          consignment.id == null
+              ? 'consignmentTransactionTapUnavailable'
+              : 'consignmentTransactionTap-',
+        ),
         cardKey: ValueKey(
           'consignmentTransactionCard-${consignment.id ?? consignment.consignmentDate}',
         ),
