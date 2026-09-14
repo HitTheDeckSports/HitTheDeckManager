@@ -330,23 +330,38 @@ class _EditRepairFormState extends ConsumerState<_EditRepairForm> {
               ),
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const Key('editRepairSubmitButton'),
-              onPressed: isSaving ? null : _submit,
-              icon: isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: Text(isSaving ? 'Saving Repair...' : 'Save Changes'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              key: const Key('editRepairCancelButton'),
-              onPressed: isSaving ? null : _cancel,
-              child: const Text('Cancel'),
+            Row(
+              key: const Key('editRepairActionRow'),
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const Key('editRepairCancelButton'),
+                    onPressed: isSaving ? null : _cancel,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('editRepairSubmitButton'),
+                    onPressed: isSaving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(isSaving ? 'Saving...' : 'Save Changes'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

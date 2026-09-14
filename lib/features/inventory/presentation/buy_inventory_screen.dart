@@ -1154,83 +1154,59 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final stackActions = constraints.maxWidth < 520;
-
-                final cancelButton = OutlinedButton(
-                  key: const Key('buyInventoryCancelButton'),
-                  onPressed: isSaving ? null : () => _cancel(formController),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
+            Row(
+              key: const Key('buyInventoryActionRow'),
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const Key('buyInventoryCancelButton'),
+                    onPressed: isSaving ? null : () => _cancel(formController),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: const Text('Cancel'),
                   ),
-                  child: Builder(
-                    builder: (context) {
-                      return RichText(
-                        text: TextSpan(
-                          text: 'Cancel',
-                          style: DefaultTextStyle.of(context).style,
-                        ),
-                      );
-                    },
-                  ),
-                );
-
-                final saveButton = FilledButton.icon(
-                  key: const Key('buyInventorySubmitButton'),
-                  onPressed: isSaving
-                      ? null
-                      : () => _saveInventoryWithPhotos(
-                          formController: formController,
-                        ),
-                  icon: _savedItemForPhotoRetry != null && hasFailedPhotoUploads
-                      ? const Icon(Icons.refresh)
-                      : isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(
-                    _savedItemForPhotoRetry != null && hasFailedPhotoUploads
-                        ? isSaving
-                              ? 'Retrying Photo Uploads...'
-                              : 'Retry Photo Uploads'
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('buyInventorySubmitButton'),
+                    onPressed: isSaving
+                        ? null
+                        : () => _saveInventoryWithPhotos(
+                            formController: formController,
+                          ),
+                    icon:
+                        _savedItemForPhotoRetry != null && hasFailedPhotoUploads
+                        ? const Icon(Icons.refresh)
                         : isSaving
-                        ? widget.isEditing
-                              ? 'Saving Changes...'
-                              : 'Saving Inventory...'
-                        : widget.isEditing
-                        ? 'Save Changes'
-                        : 'Save Inventory',
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(
+                      _savedItemForPhotoRetry != null && hasFailedPhotoUploads
+                          ? isSaving
+                                ? 'Retrying...'
+                                : 'Retry Uploads'
+                          : isSaving
+                          ? 'Saving...'
+                          : widget.isEditing
+                          ? 'Save Changes'
+                          : 'Save Inventory',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      backgroundColor: const Color(0xFFED1C24),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    backgroundColor: const Color(0xFFED1C24),
-                    foregroundColor: Colors.white,
-                  ),
-                );
-
-                if (stackActions) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      saveButton,
-                      const SizedBox(height: 8),
-                      cancelButton,
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: cancelButton),
-                    const SizedBox(width: 12),
-                    Expanded(child: saveButton),
-                  ],
-                );
-              },
+                ),
+              ],
             ),
           ],
         ),

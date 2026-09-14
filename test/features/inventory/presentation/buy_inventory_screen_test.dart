@@ -1221,7 +1221,11 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Cancel'));
+    final dialogCancel = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Cancel'),
+    );
+    await tester.tap(dialogCancel);
     await tester.pumpAndSettle();
 
     expect(find.text('Remove Photo?'), findsNothing);

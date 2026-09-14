@@ -63,11 +63,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Edit Repair'), findsAtLeastNWidgets(1));
-    expect(
-      find.text('BAT-2608-0001 — Combat Spec H1'),
-      findsAtLeastNWidgets(1),
-    );
+    expect(find.text('Edit Repair'), findsNothing);
+    expect(find.text('Repair Information'), findsOneWidget);
+    expect(find.text('BAT-2608-0001'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.byKey(const Key('editRepairActionRow')), findsOneWidget);
 
     final dateField = tester.widget<TextFormField>(
       find.byKey(const Key('editRepairDateField')),

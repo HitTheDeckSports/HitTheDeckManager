@@ -122,17 +122,32 @@ class _TradeCashRows extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (trade.includesCash) {
+    if (trade.cashPaidCents > 0) {
       return Column(
         children: [
           const Divider(),
           _Row(
-            label: trade.cashReceivedCents > 0 ? 'Cash Received' : 'Cash Paid',
-            value: CurrencyFormatter.formatCents(
-              trade.cashReceivedCents > 0
-                  ? trade.cashReceivedCents
-                  : trade.cashPaidCents,
+            label: 'Cash Paid',
+            value: CurrencyFormatter.formatCents(trade.cashPaidCents),
+          ),
+          if (trade.paymentMethod != null) ...[
+            const Divider(),
+            _Row(
+              label: 'Payment Method',
+              value: _paymentMethod(trade.paymentMethod!.name),
             ),
+          ],
+        ],
+      );
+    }
+
+    if (trade.cashReceivedCents > 0) {
+      return Column(
+        children: [
+          const Divider(),
+          _Row(
+            label: 'Cash Received',
+            value: CurrencyFormatter.formatCents(trade.cashReceivedCents),
           ),
           if (trade.paymentMethod != null) ...[
             const Divider(),
@@ -147,30 +162,45 @@ class _TradeCashRows extends ConsumerWidget {
 
     final saleId = trade.saleTransactionId?.trim() ?? '';
     if (saleId.isEmpty) {
-      return const SizedBox.shrink();
+      return const Column(
+        children: [
+          Divider(),
+          _Row(label: 'Cash Received', value: r'$0.00'),
+        ],
+      );
     }
 
     final saleAsync = ref.watch(saleTransactionProvider(saleId));
     return saleAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (error, stackTrace) => const SizedBox.shrink(),
+      loading: () => const Column(
+        children: [
+          Divider(),
+          _Row(label: 'Cash Received', value: r'$0.00'),
+        ],
+      ),
+      error: (error, stackTrace) => const Column(
+        children: [
+          Divider(),
+          _Row(label: 'Cash Received', value: r'$0.00'),
+        ],
+      ),
       data: (sale) {
-        if (sale == null || sale.cashReceivedCents <= 0) {
-          return const SizedBox.shrink();
-        }
+        final cashReceived = sale?.cashReceivedCents ?? 0;
 
         return Column(
           children: [
             const Divider(),
             _Row(
               label: 'Cash Received',
-              value: CurrencyFormatter.formatCents(sale.cashReceivedCents),
+              value: CurrencyFormatter.formatCents(cashReceived),
             ),
-            const Divider(),
-            _Row(
-              label: 'Payment Method',
-              value: _paymentMethod(sale.paymentMethod.name),
-            ),
+            if (sale != null && cashReceived > 0) ...[
+              const Divider(),
+              _Row(
+                label: 'Payment Method',
+                value: _paymentMethod(sale.paymentMethod.name),
+              ),
+            ],
           ],
         );
       },
