@@ -159,7 +159,7 @@ void main() {
       },
     );
     test(
-      'extends the same Deal when a lineage item is later sold with trade-ins',
+      'creates a nested Deal when a Deal child is later sold with trade-ins',
       () async {
         const item = InventoryItem(
           id: 'item-b',
@@ -230,43 +230,34 @@ void main() {
             );
 
         final deals = await dealRepository.getDeals();
-        expect(deals, hasLength(1));
+        expect(deals, hasLength(2));
 
-        final extendedDeal = deals.single;
-        expect(extendedDeal.id, 'deal-a');
-        expect(extendedDeal.parentSaleTransactionId, 'sale-a');
-        expect(extendedDeal.childInventoryItemIds, const ['item-b']);
+        final parentDeal = deals.firstWhere((deal) => deal.id == 'deal-a');
+        expect(parentDeal.effectiveLineageInventoryItemIds, const ['item-b']);
+
+        final descendantSale = await transactionRepository
+            .getSaleForInventoryItem('item-b');
+        expect(descendantSale, isNotNull);
+
+        final nestedDeal = deals.firstWhere((deal) => deal.id != 'deal-a');
+        expect(nestedDeal.parentSaleTransactionId, descendantSale!.id);
 
         final trades = await transactionRepository.getTrades();
         expect(trades, hasLength(1));
         final newTradeInIds = trades.single.incomingInventoryItemIds;
-        expect(newTradeInIds, hasLength(2));
-
-        expect(
-          extendedDeal.effectiveLineageInventoryItemIds,
-          containsAll(['item-b', ...newTradeInIds]),
-        );
-        expect(extendedDeal.effectiveLineageInventoryItemIds, hasLength(3));
+        expect(nestedDeal.childInventoryItemIds, newTradeInIds);
+        expect(nestedDeal.effectiveLineageInventoryItemIds, newTradeInIds);
 
         for (final newItemId in newTradeInIds) {
           expect(
             (await dealRepository.getDealForLineageInventoryItem(
               newItemId,
             ))?.id,
-            'deal-a',
+            nestedDeal.id,
           );
         }
-
-        final descendantSale = await transactionRepository
-            .getSaleForInventoryItem('item-b');
-        expect(descendantSale, isNotNull);
-        expect(
-          await dealRepository.getDealForParentSale(descendantSale!.id!),
-          isNull,
-        );
       },
     );
-
     test(
       'new trade Deal initializes direct children and lineage together',
       () async {

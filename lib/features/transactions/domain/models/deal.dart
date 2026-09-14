@@ -22,9 +22,12 @@ class Deal {
   /// evolve without changing existing Deal records.
   final List<String> childInventoryItemIds;
 
-  /// Every inventory item that belongs to this Deal lineage, including direct
-  /// children and later descendants produced by trades or warranty
-  /// replacements.
+  /// Inventory items that remain inside this Deal's visual/transaction scope.
+  ///
+  /// Direct trade-in children belong here, and warranty replacements may extend
+  /// the same Deal lineage. When one of these items is sold and receives a new
+  /// trade-in, that sale creates a nested Deal instead of extending this list.
+  /// Ancestor financial analysis follows nested Deals recursively.
   ///
   /// Legacy Deal records may not contain this field. An empty stored/model
   /// value therefore falls back to [childInventoryItemIds].
