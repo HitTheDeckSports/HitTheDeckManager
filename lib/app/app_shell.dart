@@ -110,13 +110,16 @@ class AppShell extends ConsumerWidget {
     );
     final isBuy = currentLocation == AppRoutes.buyInventory;
     final isSell = currentLocation == AppRoutes.sellInventory;
+    final secondary = _secondaryContext(currentLocation);
+
     final contextual =
         detailId != null ||
         editId != null ||
         transactionDetailId != null ||
         isTransactionFamilyDetail ||
         isBuy ||
-        isSell;
+        isSell ||
+        secondary != null;
 
     VoidCallback? backAction;
     Key? backKey;
@@ -126,7 +129,7 @@ class AppShell extends ConsumerWidget {
       backAction = () =>
           _backOrFallback(context, () => context.go(AppRoutes.inventory));
       backKey = const Key('inventoryDetailHeaderBackButton');
-      tooltip = 'Back to Inventory';
+      tooltip = 'Back';
     } else if (editId != null) {
       backAction = () => _backOrFallback(
         context,
@@ -136,17 +139,22 @@ class AppShell extends ConsumerWidget {
         ),
       );
       backKey = const Key('inventoryEditHeaderBackButton');
-      tooltip = 'Back to Inventory Item';
+      tooltip = 'Back';
     } else if (transactionDetailId != null || isTransactionFamilyDetail) {
       backAction = () =>
           _backOrFallback(context, () => context.go(AppRoutes.transactions));
       backKey = const Key('transactionDetailHeaderBackButton');
-      tooltip = 'Back to Transactions';
+      tooltip = 'Back';
     } else if (isBuy || isSell) {
       backAction = () =>
           _backOrFallback(context, () => context.go(AppRoutes.inventory));
       backKey = const Key('inventoryWorkflowHeaderBackButton');
-      tooltip = 'Back to Inventory';
+      tooltip = 'Back';
+    } else if (secondary != null) {
+      backAction = () =>
+          _backOrFallback(context, () => context.go(secondary.fallback));
+      backKey = const Key('contextualHeaderBackButton');
+      tooltip = 'Back';
     }
 
     return AppBar(
@@ -192,13 +200,13 @@ class AppShell extends ConsumerWidget {
                 key: const Key('globalSearchHeaderButton'),
                 tooltip: 'Search',
                 icon: const Icon(Icons.search),
-                onPressed: () => context.go(AppRoutes.search),
+                onPressed: () => context.push(AppRoutes.search),
               ),
               IconButton(
                 key: const Key('globalSettingsHeaderButton'),
                 tooltip: 'Settings',
                 icon: const Icon(Icons.settings_outlined),
-                onPressed: () => context.go(AppRoutes.settings),
+                onPressed: () => context.push(AppRoutes.settings),
               ),
               const SizedBox(width: 6),
             ],
@@ -210,7 +218,6 @@ class AppShell extends ConsumerWidget {
       context.pop();
       return;
     }
-
     fallback();
   }
 
@@ -252,6 +259,57 @@ class AppShell extends ConsumerWidget {
       'consignments',
       'deals',
     }.contains(s.first);
+  }
+
+  _SecondaryContext? _secondaryContext(String location) {
+    final s = Uri.parse(location).pathSegments;
+
+    if (location == AppRoutes.inventoryScanner) {
+      return const _SecondaryContext(AppRoutes.inventory);
+    }
+    if (location == AppRoutes.createContact) {
+      return const _SecondaryContext(AppRoutes.contacts);
+    }
+    if (location == AppRoutes.search) {
+      return const _SecondaryContext(AppRoutes.dashboard);
+    }
+    if (location == AppRoutes.inventoryLocations ||
+        location == AppRoutes.userAccess) {
+      return const _SecondaryContext(AppRoutes.settings);
+    }
+
+    if (s.length == 2 && s.first == 'contacts' && s[1] != 'new') {
+      return const _SecondaryContext(AppRoutes.contacts);
+    }
+    if (s.length == 3 && s.first == 'contacts' && s[2] == 'edit') {
+      return _SecondaryContext('/contacts/${s[1]}');
+    }
+
+    if (s.length == 4 &&
+        s.first == 'inventory' &&
+        s[2] == 'repairs' &&
+        s[3] == 'new') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 3 && s.first == 'inventory' && s[2] == 'dispose') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 4 &&
+        s.first == 'inventory' &&
+        s[2] == 'consignment' &&
+        s[3] == 'new') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 3 && s.first == 'repairs' && s[2] == 'edit') {
+      return _SecondaryContext('/repairs/${s[1]}');
+    }
+    if (s.length == 3 &&
+        s.first == 'disposals' &&
+        s[2] == 'warranty-replacement') {
+      return _SecondaryContext('/disposals/${s[1]}');
+    }
+
+    return null;
   }
 
   List<NavigationDestination> _navigationDestinations({
@@ -360,6 +418,11 @@ class AppShell extends ConsumerWidget {
     };
     context.go(route);
   }
+}
+
+class _SecondaryContext {
+  const _SecondaryContext(this.fallback);
+  final String fallback;
 }
 
 class _BrandMark extends StatelessWidget {

@@ -48,16 +48,16 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Add Repair'), findsAtLeastNWidgets(1));
-    expect(
-      find.text('BAT-2608-0001 — Combat Spec H1'),
-      findsAtLeastNWidgets(1),
-    );
+    expect(find.text('Add Repair'), findsOneWidget);
+    expect(find.text('BAT-2608-0001'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsOneWidget);
 
     expect(
       find.byKey(const Key('addRepairInventoryItemField')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('addRepairActionRow')), findsOneWidget);
+    expect(find.byKey(const Key('addRepairCancelButton')), findsOneWidget);
 
     expect(find.byKey(const Key('addRepairDateField')), findsOneWidget);
 

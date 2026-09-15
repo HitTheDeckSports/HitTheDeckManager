@@ -14,6 +14,7 @@ import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import 'providers/consignment_transaction_controller.dart';
 import 'providers/transaction_providers.dart';
+import 'widgets/inventory_summary_card.dart';
 
 class RecordConsignmentScreen extends ConsumerWidget {
   const RecordConsignmentScreen({required this.inventoryItemId, super.key});
@@ -151,15 +152,6 @@ class _RecordConsignmentFormState
     return '$month/$day/${date.year}';
   }
 
-  String _displayName() {
-    final model = widget.item.model?.trim();
-    final name = model == null || model.isEmpty
-        ? widget.item.brand
-        : '${widget.item.brand} $model';
-
-    return '${widget.item.inventoryNumber ?? 'Not assigned'} â€” $name';
-  }
-
   Future<void> _selectDate() async {
     final selected = await showDatePicker(
       context: context,
@@ -233,12 +225,24 @@ class _RecordConsignmentFormState
 
     return AppPage(
       title: 'Record Consignment Agreement',
-      subtitle: _displayName(),
+      showHeader: false,
+      compact: true,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            InventorySummaryCard.full(
+              key: const Key('consignmentInventoryItemCard'),
+              item: widget.item,
+              contextLabel: 'Consignment',
+              statusLabel: widget.item.status.label,
+              onTap: () => context.pushNamed(
+                AppRouteNames.inventoryDetail,
+                pathParameters: {'itemId': widget.item.id!},
+              ),
+            ),
+            const SizedBox(height: 12),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -302,20 +306,50 @@ class _RecordConsignmentFormState
                 hintText: 'Optional agreement, payout, or consignor details.',
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              key: const Key('saveConsignmentAgreementButton'),
-              onPressed: isSaving ? null : _submit,
-              icon: isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.assignment_turned_in_outlined),
-              label: Text(
-                isSaving ? 'Saving...' : 'Save Consignment Agreement',
-              ),
+            const SizedBox(height: 16),
+            Row(
+              key: const Key('consignmentActionRow'),
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const Key('cancelConsignmentAgreementButton'),
+                    onPressed: isSaving
+                        ? null
+                        : () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.goNamed(
+                                AppRouteNames.inventoryDetail,
+                                pathParameters: {'itemId': widget.item.id!},
+                              );
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('saveConsignmentAgreementButton'),
+                    onPressed: isSaving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.assignment_turned_in_outlined),
+                    label: Text(isSaving ? 'Saving...' : 'Save Agreement'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

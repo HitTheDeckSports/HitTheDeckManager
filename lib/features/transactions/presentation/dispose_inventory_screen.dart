@@ -12,6 +12,7 @@ import '../../inventory/domain/models/inventory_item.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/disposal_reason.dart';
 import 'providers/disposal_transaction_controller.dart';
+import 'widgets/inventory_summary_card.dart';
 
 class DisposeInventoryScreen extends ConsumerWidget {
   const DisposeInventoryScreen({required this.inventoryItemId, super.key});
@@ -199,17 +200,22 @@ class _DisposeInventoryFormState extends ConsumerState<_DisposeInventoryForm> {
     final isSaving = ref.watch(disposalTransactionControllerProvider).isLoading;
     return AppPage(
       title: 'Dispose Inventory',
-      subtitle: _inventoryDisplayName(),
+      showHeader: false,
+      compact: true,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
+            InventorySummaryCard.full(
               key: const Key('disposeInventoryItemField'),
-              initialValue: _inventoryDisplayName(),
-              enabled: false,
-              decoration: const InputDecoration(labelText: 'Inventory Item'),
+              item: widget.item,
+              contextLabel: 'Disposal',
+              statusLabel: widget.item.status.label,
+              onTap: () => context.pushNamed(
+                AppRouteNames.inventoryDetail,
+                pathParameters: {'itemId': widget.item.id!},
+              ),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -271,18 +277,50 @@ class _DisposeInventoryFormState extends ConsumerState<_DisposeInventoryForm> {
                     'Optional details about why this inventory was disposed.',
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              key: const Key('disposeInventorySaveButton'),
-              onPressed: isSaving ? null : _submit,
-              icon: isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.delete_outline),
-              label: Text(isSaving ? 'Disposing...' : 'Dispose Inventory'),
+            const SizedBox(height: 16),
+            Row(
+              key: const Key('disposeInventoryActionRow'),
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const Key('disposeInventoryCancelButton'),
+                    onPressed: isSaving
+                        ? null
+                        : () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.goNamed(
+                                AppRouteNames.inventoryDetail,
+                                pathParameters: {'itemId': widget.item.id!},
+                              );
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('disposeInventorySaveButton'),
+                    onPressed: isSaving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline),
+                    label: Text(isSaving ? 'Disposing...' : 'Dispose'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
