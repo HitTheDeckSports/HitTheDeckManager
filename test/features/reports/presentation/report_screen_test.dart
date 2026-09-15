@@ -173,44 +173,94 @@ final _snapshot = ReportsSnapshot(
 final _august2026 = DateTime(2026, 8);
 
 void main() {
-  testWidgets('Reports displays all four approved report areas', (
+  testWidgets('Reports displays redesigned summary and Quick Reports', (
+    WidgetTester tester,
+  ) async {
+    await _pumpReports(tester);
+    expect(find.byKey(const Key('reportsLandingSummary')), findsOneWidget);
+    expect(find.byKey(const Key('reportsRevenueCard')), findsOneWidget);
+    expect(find.byKey(const Key('reportsCostCard')), findsOneWidget);
+    expect(find.byKey(const Key('reportsProfitCard')), findsOneWidget);
+    expect(find.byKey(const Key('reportsMarginCard')), findsOneWidget);
+    expect(find.byKey(const Key('reportsUnitsSoldCard')), findsOneWidget);
+    expect(find.byKey(const Key('quickReportsSection')), findsOneWidget);
+    expect(find.byKey(const Key('quickReportSalesOverview')), findsOneWidget);
+    expect(find.byKey(const Key('quickReportItemsSold')), findsOneWidget);
+    expect(find.byKey(const Key('quickReportAgingInventory')), findsOneWidget);
+    expect(find.byKey(const Key('quickReportDeals')), findsOneWidget);
+  });
+
+  testWidgets('Quick Report opens focused report sheet', (
+    WidgetTester tester,
+  ) async {
+    await _pumpReports(tester);
+    final quickReport = find.byKey(const Key('quickReportSalesOverview'));
+    await tester.ensureVisible(quickReport);
+    await tester.tap(quickReport);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('closeQuickReportButton')), findsOneWidget);
+    expect(find.text('Sales Overview'), findsWidgets);
+    expect(find.byKey(const Key('financialPerformanceSection')), findsWidgets);
+  });
+
+  testWidgets(
+    'Reports landing shows Quick Reports without duplicate detail sections',
+    (WidgetTester tester) async {
+      await _pumpReports(tester);
+
+      expect(find.byKey(const Key('quickReportSalesOverview')), findsOneWidget);
+      expect(find.byKey(const Key('quickReportItemsSold')), findsOneWidget);
+      expect(
+        find.byKey(const Key('quickReportAgingInventory')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('quickReportDeals')), findsOneWidget);
+
+      expect(
+        find.byKey(const Key('financialPerformanceSection')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('salesAnalysisSection')), findsNothing);
+      expect(find.byKey(const Key('inventoryAgingSection')), findsNothing);
+      expect(find.byKey(const Key('dealsSection')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Sales Overview Quick Report shows financial performance and monthly trend',
+    (WidgetTester tester) async {
+      await _pumpReports(tester);
+
+      final card = find.byKey(const Key('quickReportSalesOverview'));
+      await tester.ensureVisible(card);
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('financialPerformanceSection')),
+        findsOneWidget,
+      );
+      expect(find.text(r'$750.00'), findsWidgets);
+      expect(find.text(r'$450.00'), findsWidgets);
+      expect(find.text(r'$300.00'), findsWidgets);
+      expect(find.text('40.0%'), findsWidgets);
+      expect(find.text('3'), findsWidgets);
+      expect(find.text('Monthly Trend'), findsOneWidget);
+      expect(find.text('Aug 2026'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Items Sold Quick Report shows sales analysis dimensions', (
     WidgetTester tester,
   ) async {
     await _pumpReports(tester);
 
-    expect(
-      find.byKey(const Key('financialPerformanceSection')),
-      findsOneWidget,
-    );
+    final card = find.byKey(const Key('quickReportItemsSold'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('salesAnalysisSection')), findsOneWidget);
-    expect(find.byKey(const Key('inventoryAgingSection')), findsOneWidget);
-    expect(find.byKey(const Key('dealsSection')), findsOneWidget);
-
-    expect(find.text('Financial Performance'), findsOneWidget);
-    expect(find.text('Sales Analysis'), findsOneWidget);
-    expect(find.text('Inventory Aging'), findsOneWidget);
-    expect(find.text('Deals'), findsOneWidget);
-  });
-
-  testWidgets('Reports displays financial performance and monthly trend', (
-    WidgetTester tester,
-  ) async {
-    await _pumpReports(tester);
-
-    expect(find.text(r'$750.00'), findsWidgets);
-    expect(find.text(r'$450.00'), findsWidgets);
-    expect(find.text(r'$300.00'), findsWidgets);
-    expect(find.text('40.0%'), findsOneWidget);
-    expect(find.text('3'), findsWidgets);
-    expect(find.text('Monthly Trend'), findsOneWidget);
-    expect(find.text('Aug 2026'), findsOneWidget);
-  });
-
-  testWidgets('Reports displays sales analysis dimensions', (
-    WidgetTester tester,
-  ) async {
-    await _pumpReports(tester);
-
     expect(find.text('By Category'), findsOneWidget);
     expect(find.text('By Brand'), findsOneWidget);
     expect(find.text('By Model'), findsOneWidget);
@@ -219,15 +269,33 @@ void main() {
     expect(find.text('Hype Fire'), findsOneWidget);
   });
 
-  testWidgets('Reports displays inventory aging buckets and Deal sections', (
+  testWidgets('Aging Inventory Quick Report shows aging buckets', (
     WidgetTester tester,
   ) async {
     await _pumpReports(tester);
 
+    final card = find.byKey(const Key('quickReportAgingInventory'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryAgingSection')), findsOneWidget);
     expect(find.text('0-30 days'), findsOneWidget);
     expect(find.text('31-60 days'), findsOneWidget);
     expect(find.text('181+ days'), findsOneWidget);
+  });
 
+  testWidgets('Deals Quick Report shows active and completed Deal sections', (
+    WidgetTester tester,
+  ) async {
+    await _pumpReports(tester);
+
+    final card = find.byKey(const Key('quickReportDeals'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dealsSection')), findsOneWidget);
     expect(find.text('Uncompleted Deals'), findsOneWidget);
     expect(find.text('Completed Deals'), findsOneWidget);
     expect(find.text('deal-open'), findsOneWidget);
@@ -270,10 +338,9 @@ void main() {
     await _pumpReports(tester);
 
     expect(
-      find.byKey(const Key('reportDateRangeNarrowLayout')),
+      find.byKey(const Key('reportDateRangeCompactLayout')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('reportDateRangeWideLayout')), findsNothing);
   });
 
   testWidgets('ordinary User is denied financial Reports', (

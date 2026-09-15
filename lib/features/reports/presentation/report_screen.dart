@@ -40,8 +40,8 @@ class ReportScreen extends ConsumerWidget {
 
     return AppPage(
       title: 'Reports',
-      subtitle:
-          'Analyze financial performance, sales, inventory aging, and Deals.',
+      showHeader: false,
+      compact: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -71,111 +71,89 @@ class _ReportDateRangeSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selector = DropdownButtonFormField<ReportDateRangePreset>(
-      key: const Key('reportDateRangeSelector'),
-      isExpanded: true,
-      initialValue: selection.preset,
-      decoration: const InputDecoration(
-        labelText: 'Date Range',
-        border: OutlineInputBorder(),
-        isDense: true,
-      ),
-      items: const [
-        DropdownMenuItem(
-          value: ReportDateRangePreset.today,
-          child: Text('Today'),
-        ),
-        DropdownMenuItem(
-          value: ReportDateRangePreset.last7Days,
-          child: Text('Last 7 Days'),
-        ),
-        DropdownMenuItem(
-          value: ReportDateRangePreset.monthToDate,
-          child: Text('Month to Date'),
-        ),
-        DropdownMenuItem(
-          value: ReportDateRangePreset.last30Days,
-          child: Text('Last 30 Days'),
-        ),
-        DropdownMenuItem(
-          value: ReportDateRangePreset.yearToDate,
-          child: Text('Year to Date'),
-        ),
-        DropdownMenuItem(
-          value: ReportDateRangePreset.custom,
-          child: Text('Custom'),
-        ),
-      ],
-      onChanged: (preset) async {
-        if (preset == null) {
-          return;
-        }
-
-        final controller = ref.read(reportDateRangeSelectionProvider.notifier);
-
-        if (preset != ReportDateRangePreset.custom) {
-          controller.selectPreset(preset);
-          return;
-        }
-
-        final now = ref.read(reportAsOfProvider);
-        final current = selection.resolve(asOf: now);
-
-        final selectedRange = await showDateRangePicker(
-          context: context,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(now.year + 1, 12, 31),
-          initialDateRange: DateTimeRange(
-            start: current.startInclusive,
-            end: current.endExclusive.subtract(const Duration(days: 1)),
-          ),
-          helpText: 'Select report date range',
-        );
-
-        if (selectedRange == null) {
-          return;
-        }
-
-        controller.selectCustom(
-          startDate: selectedRange.start,
-          endDate: selectedRange.end,
-        );
-      },
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 600;
-
-        if (isNarrow) {
-          return Column(
-            key: const Key('reportDateRangeNarrowLayout'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Report Period',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              selector,
-            ],
-          );
-        }
-
-        return Row(
-          key: const Key('reportDateRangeWideLayout'),
+    return Card(
+      key: const Key('reportDateRangeCompactLayout'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
           children: [
+            const Icon(Icons.calendar_month_outlined, size: 22),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                'Report Period',
-                style: Theme.of(context).textTheme.titleLarge,
+              child: DropdownButtonFormField<ReportDateRangePreset>(
+                key: const Key('reportDateRangeSelector'),
+                isExpanded: true,
+                initialValue: selection.preset,
+                decoration: const InputDecoration(
+                  labelText: 'Report Period',
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 5),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.today,
+                    child: Text('Today'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.last7Days,
+                    child: Text('Last 7 Days'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.monthToDate,
+                    child: Text('Month to Date'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.last30Days,
+                    child: Text('Last 30 Days'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.yearToDate,
+                    child: Text('Year to Date'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportDateRangePreset.custom,
+                    child: Text('Custom'),
+                  ),
+                ],
+                onChanged: (preset) async {
+                  if (preset == null) return;
+
+                  final controller = ref.read(
+                    reportDateRangeSelectionProvider.notifier,
+                  );
+                  if (preset != ReportDateRangePreset.custom) {
+                    controller.selectPreset(preset);
+                    return;
+                  }
+
+                  final now = ref.read(reportAsOfProvider);
+                  final current = selection.resolve(asOf: now);
+                  final selectedRange = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(now.year + 1, 12, 31),
+                    initialDateRange: DateTimeRange(
+                      start: current.startInclusive,
+                      end: current.endExclusive.subtract(
+                        const Duration(days: 1),
+                      ),
+                    ),
+                    helpText: 'Select report date range',
+                  );
+
+                  if (selectedRange == null) return;
+                  controller.selectCustom(
+                    startDate: selectedRange.start,
+                    endDate: selectedRange.end,
+                  );
+                },
               ),
             ),
-            const SizedBox(width: 12),
-            SizedBox(width: 260, child: selector),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -190,17 +168,438 @@ class _ReportsContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FinancialPerformanceSection(report: snapshot.financialPerformance),
-        const SizedBox(height: 28),
-        _SalesAnalysisSection(snapshot: snapshot),
-        const SizedBox(height: 28),
-        _InventoryAgingSection(report: snapshot.inventoryAging),
-        const SizedBox(height: 28),
-        _DealsSection(
-          report: snapshot.deals,
-          recursiveReport: snapshot.recursiveDeals,
+        _ReportsLandingSummary(snapshot: snapshot),
+        const SizedBox(height: 14),
+        _QuickReportsGrid(snapshot: snapshot),
+      ],
+    );
+  }
+}
+
+class _ReportsLandingSummary extends StatelessWidget {
+  const _ReportsLandingSummary({required this.snapshot});
+
+  final ReportsSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final report = snapshot.financialPerformance;
+
+    return Column(
+      key: const Key('reportsLandingSummary'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Performance Summary',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF082A4A),
+                ),
+              ),
+            ),
+            Text(
+              report.rangeLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF657080),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            final width = (constraints.maxWidth - spacing) / 2;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                _CompactSummaryCard(
+                  key: const Key('reportsRevenueCard'),
+                  width: width,
+                  label: 'Revenue',
+                  value: CurrencyFormatter.formatCents(report.revenueCents),
+                  icon: Icons.attach_money,
+                  accent: const Color(0xFF12853D),
+                ),
+                _CompactSummaryCard(
+                  key: const Key('reportsCostCard'),
+                  width: width,
+                  label: 'Cost',
+                  value: CurrencyFormatter.formatCents(report.costCents),
+                  icon: Icons.payments_outlined,
+                  accent: const Color(0xFFD6242F),
+                ),
+                _CompactSummaryCard(
+                  key: const Key('reportsProfitCard'),
+                  width: width,
+                  label: 'Profit',
+                  value: CurrencyFormatter.formatCents(report.profitCents),
+                  icon: Icons.trending_up,
+                  accent: const Color(0xFF125FB8),
+                ),
+                _CompactSummaryCard(
+                  key: const Key('reportsMarginCard'),
+                  width: width,
+                  label: 'Gross Margin',
+                  value: '${(report.grossMargin * 100).toStringAsFixed(1)}%',
+                  icon: Icons.percent,
+                  accent: const Color(0xFF6F42C1),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Card(
+          key: const Key('reportsUnitsSoldCard'),
+          margin: EdgeInsets.zero,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 82),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE07B18).withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 18,
+                      color: Color(0xFFE07B18),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Units Sold',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF657080),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    report.unitsSold.toString(),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF082A4A),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _CompactSummaryCard extends StatelessWidget {
+  const _CompactSummaryCard({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+    super.key,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF657080),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        value,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: const Color(0xFF082A4A),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: accent, size: 17),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickReportsGrid extends StatelessWidget {
+  const _QuickReportsGrid({required this.snapshot});
+
+  final ReportsSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('quickReportsSection'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Quick Reports',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF082A4A),
+          ),
+        ),
+        const SizedBox(height: 7),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            final width = (constraints.maxWidth - spacing) / 2;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                _QuickReportCard(
+                  key: const Key('quickReportSalesOverview'),
+                  width: width,
+                  icon: Icons.show_chart,
+                  title: 'Sales Overview',
+                  subtitle: 'Revenue, profit, margin and monthly trends',
+                  accent: const Color(0xFF12853D),
+                  onTap: () => _openReport(
+                    context,
+                    title: 'Sales Overview',
+                    child: _FinancialPerformanceSection(
+                      report: snapshot.financialPerformance,
+                    ),
+                  ),
+                ),
+                _QuickReportCard(
+                  key: const Key('quickReportItemsSold'),
+                  width: width,
+                  icon: Icons.shopping_cart_outlined,
+                  title: 'Items Sold',
+                  subtitle: 'Sales by category, brand and model',
+                  accent: const Color(0xFF125FB8),
+                  onTap: () => _openReport(
+                    context,
+                    title: 'Items Sold',
+                    child: _SalesAnalysisSection(snapshot: snapshot),
+                  ),
+                ),
+                _QuickReportCard(
+                  key: const Key('quickReportAgingInventory'),
+                  width: width,
+                  icon: Icons.schedule,
+                  title: 'Aging Inventory',
+                  subtitle: 'Open inventory grouped by age',
+                  accent: const Color(0xFFE07B18),
+                  onTap: () => _openReport(
+                    context,
+                    title: 'Aging Inventory',
+                    child: _InventoryAgingSection(
+                      report: snapshot.inventoryAging,
+                    ),
+                  ),
+                ),
+                _QuickReportCard(
+                  key: const Key('quickReportDeals'),
+                  width: width,
+                  icon: Icons.handshake_outlined,
+                  title: 'Deals',
+                  subtitle: 'Open and completed Deal economics',
+                  accent: const Color(0xFF6F42C1),
+                  onTap: () => _openReport(
+                    context,
+                    title: 'Deals',
+                    child: _DealsSection(
+                      report: snapshot.deals,
+                      recursiveReport: snapshot.recursiveDeals,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openReport(
+    BuildContext context, {
+    required String title,
+    required Widget child,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFFF6F8FB),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.90,
+          minChildSize: 0.55,
+          maxChildSize: 0.96,
+          builder: (context, controller) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('closeQuickReportButton'),
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: controller,
+                    padding: const EdgeInsets.all(16),
+                    child: child,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _QuickReportCard extends StatelessWidget {
+  const _QuickReportCard({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.onTap,
+    super.key,
+  });
+
+  final double width;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 94),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.10),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, color: accent, size: 18),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.chevron_right, size: 20),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF082A4A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF657080),
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
