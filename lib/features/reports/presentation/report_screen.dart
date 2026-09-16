@@ -11,7 +11,6 @@ import '../../transactions/domain/models/deal_lineage_edge_type.dart';
 import '../../transactions/domain/models/deal_status.dart';
 import '../application/deal_rollup_report.dart';
 import '../application/recursive_deal_report.dart';
-import '../application/financial_performance_report.dart';
 import '../application/inventory_aging_report.dart';
 import '../application/report_date_range.dart';
 import '../application/reports_snapshot.dart';
@@ -414,9 +413,7 @@ class _QuickReportsGrid extends StatelessWidget {
                   onTap: () => _openReport(
                     context,
                     title: 'Sales Overview',
-                    child: _FinancialPerformanceSection(
-                      report: snapshot.financialPerformance,
-                    ),
+                    child: _SalesOverviewSection(snapshot: snapshot),
                   ),
                 ),
                 _QuickReportCard(
@@ -444,6 +441,8 @@ class _QuickReportsGrid extends StatelessWidget {
                     title: 'Aging Inventory',
                     child: _InventoryAgingSection(
                       report: snapshot.inventoryAging,
+                      inventoryItems: snapshot.inventoryItems,
+                      asOf: snapshot.asOf,
                     ),
                   ),
                 ),
@@ -604,88 +603,289 @@ class _QuickReportCard extends StatelessWidget {
   }
 }
 
-class _FinancialPerformanceSection extends StatelessWidget {
-  const _FinancialPerformanceSection({required this.report});
+class _SalesOverviewSection extends StatefulWidget {
+  const _SalesOverviewSection({required this.snapshot});
 
-  final FinancialPerformanceReport report;
+  final ReportsSnapshot snapshot;
+
+  @override
+  State<_SalesOverviewSection> createState() => _SalesOverviewSectionState();
+}
+
+class _SalesOverviewSectionState extends State<_SalesOverviewSection> {
+  _TrendGrouping _grouping = _TrendGrouping.month;
 
   @override
   Widget build(BuildContext context) {
+    final report = widget.snapshot.financialPerformance;
+    final points = _salesTrendPoints(widget.snapshot.sales, _grouping);
+    final averageSale = report.unitsSold == 0
+        ? 0
+        : (report.revenueCents / report.unitsSold).round();
+    final averageProfit = report.unitsSold == 0
+        ? 0
+        : (report.profitCents / report.unitsSold).round();
+    final bestRevenue = _bestTrend(points, (point) => point.revenueCents);
+    final bestProfit = _bestTrend(points, (point) => point.profitCents);
+
     return _ReportSection(
       key: const Key('financialPerformanceSection'),
-      title: 'Financial Performance',
-      subtitle: report.rangeLabel,
+      title: 'Sales Trend',
+      subtitle: 'Revenue, profit, and units sold over time.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          DropdownButtonFormField<_TrendGrouping>(
+            key: const Key('salesOverviewGroupBy'),
+            initialValue: _grouping,
+            decoration: const InputDecoration(
+              labelText: 'Group By',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: const [
+              DropdownMenuItem(value: _TrendGrouping.day, child: Text('Day')),
+              DropdownMenuItem(value: _TrendGrouping.week, child: Text('Week')),
+              DropdownMenuItem(
+                value: _TrendGrouping.month,
+                child: Text('Month'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _grouping = value);
+              }
+            },
+          ),
+          const SizedBox(height: 14),
+          if (points.isEmpty)
+            const _EmptyReportState(message: 'No sales in this period.')
+          else
+            _SalesTrendChart(points: points, grouping: _grouping),
+          const SizedBox(height: 16),
+          Text(
+            'Key Metrics',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
           _ResponsiveMetricGrid(
             children: [
               _ReportMetricCard(
-                label: 'Revenue',
-                value: CurrencyFormatter.formatCents(report.revenueCents),
+                label: 'Average Sale Price',
+                value: CurrencyFormatter.formatCents(averageSale),
               ),
               _ReportMetricCard(
-                label: 'Cost',
-                value: CurrencyFormatter.formatCents(report.costCents),
+                label: 'Average Profit per Item',
+                value: CurrencyFormatter.formatCents(averageProfit),
               ),
               _ReportMetricCard(
-                label: 'Profit',
-                value: CurrencyFormatter.formatCents(report.profitCents),
+                label: 'Best Revenue Period',
+                value: bestRevenue == null
+                    ? '—'
+                    : '${_trendLabel(bestRevenue.period, _grouping)}\n${CurrencyFormatter.formatCents(bestRevenue.revenueCents)}',
               ),
               _ReportMetricCard(
-                label: 'Gross Margin',
-                value: '${(report.grossMargin * 100).toStringAsFixed(1)}%',
-              ),
-              _ReportMetricCard(
-                label: 'Units Sold',
-                value: report.unitsSold.toString(),
+                label: 'Best Profit Period',
+                value: bestProfit == null
+                    ? '—'
+                    : '${_trendLabel(bestProfit.period, _grouping)}\n${CurrencyFormatter.formatCents(bestProfit.profitCents)}',
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Text('Monthly Trend', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Performance',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 8),
-          if (report.monthlyTrend.isEmpty)
-            const _EmptyReportState(message: 'No sales in this period.')
-          else
-            for (final point in report.monthlyTrend)
-              _FinancialTrendRow(point: point),
+          for (final point in points)
+            _SalesTrendRow(point: point, grouping: _grouping),
         ],
       ),
     );
   }
 }
 
-class _FinancialTrendRow extends StatelessWidget {
-  const _FinancialTrendRow({required this.point});
+enum _TrendGrouping { day, week, month }
 
-  final FinancialTrendPoint point;
+class _TrendPoint {
+  const _TrendPoint({
+    required this.period,
+    required this.units,
+    required this.revenueCents,
+    required this.profitCents,
+  });
+  final DateTime period;
+  final int units;
+  final int revenueCents;
+  final int profitCents;
+}
 
+List<_TrendPoint> _salesTrendPoints(
+  List<dynamic> rawSales,
+  _TrendGrouping grouping,
+) {
+  final groups = <DateTime, List<dynamic>>{};
+  for (final sale in rawSales) {
+    final DateTime date = sale.saleDate as DateTime;
+    final DateTime key = switch (grouping) {
+      _TrendGrouping.day => DateTime(date.year, date.month, date.day),
+      _TrendGrouping.week => DateTime(
+        date.year,
+        date.month,
+        date.day,
+      ).subtract(Duration(days: date.weekday - DateTime.monday)),
+      _TrendGrouping.month => DateTime(date.year, date.month),
+    };
+    groups.putIfAbsent(key, () => <dynamic>[]).add(sale);
+  }
+  final points = <_TrendPoint>[];
+  for (final entry in groups.entries) {
+    var revenue = 0;
+    var profit = 0;
+    for (final sale in entry.value) {
+      revenue += sale.salePriceCents as int;
+      profit += (sale.profitCents as int?) ?? 0;
+    }
+    points.add(
+      _TrendPoint(
+        period: entry.key,
+        units: entry.value.length,
+        revenueCents: revenue,
+        profitCents: profit,
+      ),
+    );
+  }
+  points.sort((a, b) => a.period.compareTo(b.period));
+  return points;
+}
+
+_TrendPoint? _bestTrend(
+  List<_TrendPoint> points,
+  int Function(_TrendPoint) value,
+) {
+  if (points.isEmpty) {
+    return null;
+  }
+  var best = points.first;
+  for (final point in points.skip(1)) {
+    if (value(point) > value(best)) {
+      best = point;
+    }
+  }
+  return best;
+}
+
+class _SalesTrendChart extends StatelessWidget {
+  const _SalesTrendChart({required this.points, required this.grouping});
+  final List<_TrendPoint> points;
+  final _TrendGrouping grouping;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = points.length > 8
+        ? points.sublist(points.length - 8)
+        : points;
+    var maxRevenue = 1;
+    for (final point in visible) {
+      if (point.revenueCents > maxRevenue) {
+        maxRevenue = point.revenueCents;
+      }
+    }
+    return Card(
+      key: const Key('salesTrendChart'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+        child: SizedBox(
+          height: 190,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final point in visible)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Column(
+                      children: [
+                        Text(
+                          point.units.toString(),
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                        const SizedBox(height: 3),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: FractionallySizedBox(
+                              heightFactor: (point.revenueCents / maxRevenue)
+                                  .clamp(0.05, 1.0),
+                              widthFactor: 0.58,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF125FB8),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _trendShortLabel(point.period, grouping),
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SalesTrendRow extends StatelessWidget {
+  const _SalesTrendRow({required this.point, required this.grouping});
+  final _TrendPoint point;
+  final _TrendGrouping grouping;
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 18,
-          runSpacing: 8,
-          alignment: WrapAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _LabeledValue(label: 'Month', value: _monthLabel(point.month)),
-            _LabeledValue(
-              label: 'Revenue',
-              value: CurrencyFormatter.formatCents(point.revenueCents),
+            Text(
+              _trendLabel(point.period, grouping),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
-            _LabeledValue(
-              label: 'Cost',
-              value: CurrencyFormatter.formatCents(point.costCents),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 18,
+              runSpacing: 8,
+              children: [
+                _LabeledValue(label: 'Units', value: point.units.toString()),
+                _LabeledValue(
+                  label: 'Revenue',
+                  value: CurrencyFormatter.formatCents(point.revenueCents),
+                ),
+                _LabeledValue(
+                  label: 'Profit',
+                  value: CurrencyFormatter.formatCents(point.profitCents),
+                ),
+              ],
             ),
-            _LabeledValue(
-              label: 'Profit',
-              value: CurrencyFormatter.formatCents(point.profitCents),
-            ),
-            _LabeledValue(label: 'Units', value: point.unitsSold.toString()),
           ],
         ),
       ),
@@ -693,72 +893,112 @@ class _FinancialTrendRow extends StatelessWidget {
   }
 }
 
-class _SalesAnalysisSection extends StatelessWidget {
+class _SalesAnalysisSection extends StatefulWidget {
   const _SalesAnalysisSection({required this.snapshot});
-
   final ReportsSnapshot snapshot;
-
   @override
-  Widget build(BuildContext context) {
-    return _ReportSection(
-      key: const Key('salesAnalysisSection'),
-      title: 'Sales Analysis',
-      subtitle: 'Units, revenue, and profit by Category, Brand, and Model.',
-      child: Column(
-        children: [
-          _SalesDimensionCard(
-            title: 'By Category',
-            report: snapshot.salesByCategory,
-          ),
-          const SizedBox(height: 12),
-          _SalesDimensionCard(title: 'By Brand', report: snapshot.salesByBrand),
-          const SizedBox(height: 12),
-          _SalesDimensionCard(title: 'By Model', report: snapshot.salesByModel),
-        ],
-      ),
-    );
-  }
+  State<_SalesAnalysisSection> createState() => _SalesAnalysisSectionState();
 }
 
-class _SalesDimensionCard extends StatelessWidget {
-  const _SalesDimensionCard({required this.title, required this.report});
+class _SalesAnalysisSectionState extends State<_SalesAnalysisSection> {
+  SalesAnalysisDimension _dimension = SalesAnalysisDimension.category;
 
-  final String title;
-  final SalesAnalysisReport report;
+  SalesAnalysisReport get _report => switch (_dimension) {
+    SalesAnalysisDimension.category => widget.snapshot.salesByCategory,
+    SalesAnalysisDimension.brand => widget.snapshot.salesByBrand,
+    SalesAnalysisDimension.model => widget.snapshot.salesByModel,
+  };
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ExpansionTile(
-        title: Text(title),
-        initiallyExpanded: true,
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    final report = _report;
+    final inventoryById = {
+      for (final item in widget.snapshot.inventoryItems)
+        if (item.id != null) item.id!: item,
+    };
+    final salesByItem = {
+      for (final sale in widget.snapshot.sales) sale.inventoryItemId: sale,
+    };
+    return _ReportSection(
+      key: const Key('salesAnalysisSection'),
+      title: 'Items Sold Analysis',
+      subtitle:
+          'Units, revenue, and profit grouped by category, brand, or model.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          DropdownButtonFormField<SalesAnalysisDimension>(
+            key: const Key('itemsSoldGroupBy'),
+            initialValue: _dimension,
+            decoration: const InputDecoration(
+              labelText: 'Group By',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: SalesAnalysisDimension.category,
+                child: Text('Category'),
+              ),
+              DropdownMenuItem(
+                value: SalesAnalysisDimension.brand,
+                child: Text('Brand'),
+              ),
+              DropdownMenuItem(
+                value: SalesAnalysisDimension.model,
+                child: Text('Model'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _dimension = value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
           if (report.rows.isEmpty)
             const _EmptyReportState(message: 'No sales in this period.')
           else
-            for (final row in report.rows) _SalesAnalysisRowWidget(row: row),
+            for (final row in report.rows)
+              _ExpandableSalesGroupRow(
+                row: row,
+                inventoryById: inventoryById,
+                salesByItem: salesByItem,
+              ),
         ],
       ),
     );
   }
 }
 
-class _SalesAnalysisRowWidget extends StatelessWidget {
-  const _SalesAnalysisRowWidget({required this.row});
-
+class _ExpandableSalesGroupRow extends StatelessWidget {
+  const _ExpandableSalesGroupRow({
+    required this.row,
+    required this.inventoryById,
+    required this.salesByItem,
+  });
   final SalesAnalysisRow row;
-
+  final Map<String, dynamic> inventoryById;
+  final Map<String, dynamic> salesByItem;
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 520;
-
-          final values = Wrap(
-            spacing: 16,
+    return Card(
+      key: Key('itemsSoldGroup_${row.label}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        title: Text(
+          row.label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF082A4A),
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: 18,
             runSpacing: 6,
             children: [
               _LabeledValue(label: 'Units', value: row.units.toString()),
@@ -771,43 +1011,96 @@ class _SalesAnalysisRowWidget extends StatelessWidget {
                 value: CurrencyFormatter.formatCents(row.profitCents),
               ),
             ],
-          );
+          ),
+        ),
+        children: [
+          for (final id in row.inventoryItemIds)
+            _SoldInventoryItemRow(
+              item: inventoryById[id],
+              sale: salesByItem[id],
+              fallbackId: id,
+            ),
+        ],
+      ),
+    );
+  }
+}
 
-          if (narrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+class _SoldInventoryItemRow extends StatelessWidget {
+  const _SoldInventoryItemRow({
+    required this.item,
+    required this.sale,
+    required this.fallbackId,
+  });
+  final dynamic item;
+  final dynamic sale;
+  final String fallbackId;
+  @override
+  Widget build(BuildContext context) {
+    final inventoryNumber = item?.inventoryNumber ?? fallbackId;
+    final brand = (item?.brand as String?)?.trim();
+    final model = (item?.model as String?)?.trim();
+    final displayName = [
+      if (brand != null && brand.isNotEmpty) brand,
+      if (model != null && model.isNotEmpty) model,
+    ].join(' ');
+    return Padding(
+      key: Key('soldItem_$fallbackId'),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(row.label, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 6),
-                values,
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(
-                child: Text(
-                  row.label,
-                  style: Theme.of(context).textTheme.titleSmall,
+                Text(
+                  inventoryNumber,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF125FB8),
+                  ),
                 ),
-              ),
-              values,
-            ],
-          );
-        },
+                const SizedBox(height: 2),
+                Text(displayName.isEmpty ? 'Unknown item' : displayName),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (sale != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(CurrencyFormatter.formatCents(sale.salePriceCents as int)),
+                Text(
+                  '${CurrencyFormatter.formatCents((sale.profitCents as int?) ?? 0)} profit',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
 }
 
 class _InventoryAgingSection extends StatelessWidget {
-  const _InventoryAgingSection({required this.report});
-
+  const _InventoryAgingSection({
+    required this.report,
+    this.inventoryItems = const [],
+    this.asOf,
+  });
   final InventoryAgingReport report;
-
+  final List<dynamic> inventoryItems;
+  final DateTime? asOf;
   @override
   Widget build(BuildContext context) {
+    final inventoryById = {
+      for (final item in inventoryItems)
+        if (item.id != null) item.id as String: item,
+    };
     return _ReportSection(
       key: const Key('inventoryAgingSection'),
       title: 'Inventory Aging',
@@ -815,7 +1108,12 @@ class _InventoryAgingSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final row in report.rows) _InventoryAgingRowWidget(row: row),
+          for (final row in report.rows)
+            _InventoryAgingRowWidget(
+              row: row,
+              inventoryById: inventoryById,
+              asOf: asOf,
+            ),
           if (report.unclassifiedItemIds.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -830,68 +1128,145 @@ class _InventoryAgingSection extends StatelessWidget {
 }
 
 class _InventoryAgingRowWidget extends StatelessWidget {
-  const _InventoryAgingRowWidget({required this.row});
-
+  const _InventoryAgingRowWidget({
+    required this.row,
+    required this.inventoryById,
+    required this.asOf,
+  });
   final InventoryAgingRow row;
-
+  final Map<String, dynamic> inventoryById;
+  final DateTime? asOf;
   @override
   Widget build(BuildContext context) {
+    final ids = [...row.inventoryItemIds]
+      ..sort((a, b) {
+        final aDate = inventoryById[a]?.purchaseDate as DateTime?;
+        final bDate = inventoryById[b]?.purchaseDate as DateTime?;
+        if (aDate == null && bDate == null) {
+          return 0;
+        }
+        if (aDate == null) {
+          return 1;
+        }
+        if (bDate == null) {
+          return -1;
+        }
+        return aDate.compareTo(bDate);
+      });
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final values = Wrap(
-              spacing: 16,
-              runSpacing: 6,
-              children: [
-                _LabeledValue(label: 'Items', value: row.itemCount.toString()),
-                _LabeledValue(
-                  label: 'Cost',
-                  value: CurrencyFormatter.formatCents(row.inventoryCostCents),
-                ),
-                _LabeledValue(
-                  label: 'Asking Value',
-                  value: CurrencyFormatter.formatCents(row.askingValueCents),
-                ),
-                _LabeledValue(
-                  label: 'Potential Profit',
-                  value: CurrencyFormatter.formatCents(
-                    row.potentialProfitCents,
-                  ),
-                ),
-              ],
-            );
-
-            if (constraints.maxWidth < 620) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    row.bucket.label,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 6),
-                  values,
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                SizedBox(
-                  width: 120,
-                  child: Text(
-                    row.bucket.label,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                Expanded(child: values),
-              ],
-            );
-          },
+      key: Key('agingBucket_${row.bucket.name}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        initiallyExpanded: row.bucket == InventoryAgingBucket.days0To30,
+        title: Text(
+          row.bucket.label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF082A4A),
+          ),
         ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _LabeledValue(label: 'Items', value: row.itemCount.toString()),
+              _LabeledValue(
+                label: 'Cost',
+                value: CurrencyFormatter.formatCents(row.inventoryCostCents),
+              ),
+              _LabeledValue(
+                label: 'Asking',
+                value: CurrencyFormatter.formatCents(row.askingValueCents),
+              ),
+              _LabeledValue(
+                label: 'Potential Profit',
+                value: CurrencyFormatter.formatCents(row.potentialProfitCents),
+              ),
+            ],
+          ),
+        ),
+        children: [
+          if (ids.isEmpty)
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('No inventory items in this bucket.'),
+            )
+          else
+            for (final id in ids)
+              _AgingItemRow(
+                item: inventoryById[id],
+                fallbackId: id,
+                asOf: asOf,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgingItemRow extends StatelessWidget {
+  const _AgingItemRow({
+    required this.item,
+    required this.fallbackId,
+    required this.asOf,
+  });
+  final dynamic item;
+  final String fallbackId;
+  final DateTime? asOf;
+  @override
+  Widget build(BuildContext context) {
+    final inventoryNumber = item?.inventoryNumber ?? fallbackId;
+    final brand = (item?.brand as String?)?.trim();
+    final model = (item?.model as String?)?.trim();
+    final displayName = [
+      if (brand != null && brand.isNotEmpty) brand,
+      if (model != null && model.isNotEmpty) model,
+    ].join(' ');
+    final purchaseDate = item?.purchaseDate as DateTime?;
+    final reference = asOf ?? DateTime.now();
+    final days = purchaseDate == null
+        ? null
+        : DateTime(reference.year, reference.month, reference.day)
+              .difference(
+                DateTime(
+                  purchaseDate.year,
+                  purchaseDate.month,
+                  purchaseDate.day,
+                ),
+              )
+              .inDays
+              .clamp(0, 999999);
+    return Padding(
+      key: Key('agingItem_$fallbackId'),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  inventoryNumber,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF125FB8),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(displayName.isEmpty ? 'Unknown item' : displayName),
+              ],
+            ),
+          ),
+          if (days != null)
+            Text('$days days', style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }
@@ -899,69 +1274,69 @@ class _InventoryAgingRowWidget extends StatelessWidget {
 
 class _DealsSection extends StatelessWidget {
   const _DealsSection({required this.report, required this.recursiveReport});
-
   final DealRollupReport report;
   final RecursiveDealReport recursiveReport;
-
   @override
   Widget build(BuildContext context) {
     if (recursiveReport.rows.isNotEmpty) {
       return _RecursiveDealsSection(report: recursiveReport);
     }
+    return _LegacyDealsFilteredSection(report: report);
+  }
+}
 
-    final uncompleted = report.rows
-        .where((row) => row.status != DealStatus.completed)
-        .toList();
-    final completed = report.rows
-        .where((row) => row.status == DealStatus.completed)
-        .toList();
+class _LegacyDealsFilteredSection extends StatefulWidget {
+  const _LegacyDealsFilteredSection({required this.report});
+  final DealRollupReport report;
+  @override
+  State<_LegacyDealsFilteredSection> createState() =>
+      _LegacyDealsFilteredSectionState();
+}
 
+class _LegacyDealsFilteredSectionState
+    extends State<_LegacyDealsFilteredSection> {
+  DealStatus _status = DealStatus.open;
+  @override
+  Widget build(BuildContext context) {
+    final rows = widget.report.rows
+        .where((row) => row.status == _status)
+        .toList(growable: false);
     return _ReportSection(
       key: const Key('dealsSection'),
       title: 'Deals',
-      subtitle: 'Realized and projected economics for trade-related Deals.',
+      subtitle: 'Filter Deals by lifecycle status.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Uncompleted Deals',
-            style: Theme.of(context).textTheme.titleMedium,
+          _DealStatusSelector(
+            value: _status,
+            onChanged: (value) => setState(() => _status = value),
           ),
-          const SizedBox(height: 8),
-          if (uncompleted.isEmpty)
-            const _EmptyReportState(message: 'No uncompleted Deals.')
+          const SizedBox(height: 12),
+          if (rows.isEmpty)
+            _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
           else
-            for (final row in uncompleted) _DealReportCard(row: row),
-          const SizedBox(height: 16),
-          Text(
-            'Completed Deals',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (completed.isEmpty)
-            const _EmptyReportState(message: 'No completed Deals.')
-          else
-            for (final row in completed) _DealReportCard(row: row),
+            for (final row in rows) _DealReportCard(row: row),
         ],
       ),
     );
   }
 }
 
-class _RecursiveDealsSection extends StatelessWidget {
+class _RecursiveDealsSection extends StatefulWidget {
   const _RecursiveDealsSection({required this.report});
-
   final RecursiveDealReport report;
+  @override
+  State<_RecursiveDealsSection> createState() => _RecursiveDealsSectionState();
+}
 
+class _RecursiveDealsSectionState extends State<_RecursiveDealsSection> {
+  DealStatus _status = DealStatus.open;
   @override
   Widget build(BuildContext context) {
-    final active = report.rows
-        .where((row) => row.summary.status != DealStatus.completed)
+    final rows = widget.report.rows
+        .where((row) => row.summary.status == _status)
         .toList(growable: false);
-    final completed = report.rows
-        .where((row) => row.summary.status == DealStatus.completed)
-        .toList(growable: false);
-
     return _ReportSection(
       key: const Key('dealsSection'),
       title: 'Deals',
@@ -970,24 +1345,48 @@ class _RecursiveDealsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Active Deals', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          if (active.isEmpty)
-            const _EmptyReportState(message: 'No active Deals.')
-          else
-            for (final row in active) _RecursiveDealCard(row: row),
-          const SizedBox(height: 16),
-          Text(
-            'Completed Deals',
-            style: Theme.of(context).textTheme.titleMedium,
+          _DealStatusSelector(
+            value: _status,
+            onChanged: (value) => setState(() => _status = value),
           ),
-          const SizedBox(height: 8),
-          if (completed.isEmpty)
-            const _EmptyReportState(message: 'No completed Deals.')
+          const SizedBox(height: 12),
+          if (rows.isEmpty)
+            _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
           else
-            for (final row in completed) _RecursiveDealCard(row: row),
+            for (final row in rows) _RecursiveDealCard(row: row),
         ],
       ),
+    );
+  }
+}
+
+class _DealStatusSelector extends StatelessWidget {
+  const _DealStatusSelector({required this.value, required this.onChanged});
+  final DealStatus value;
+  final ValueChanged<DealStatus> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<DealStatus>(
+      key: const Key('dealStatusFilter'),
+      initialValue: value,
+      decoration: const InputDecoration(
+        labelText: 'Deal Status',
+        border: OutlineInputBorder(),
+        isDense: true,
+      ),
+      items: const [
+        DropdownMenuItem(value: DealStatus.open, child: Text('Active')),
+        DropdownMenuItem(
+          value: DealStatus.partiallyRealized,
+          child: Text('Partially Realized'),
+        ),
+        DropdownMenuItem(value: DealStatus.completed, child: Text('Completed')),
+      ],
+      onChanged: (value) {
+        if (value != null) {
+          onChanged(value);
+        }
+      },
     );
   }
 }
@@ -1041,13 +1440,13 @@ class _RecursiveDealCard extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _LabeledValue(
-                    label: 'Profit So Far',
+                    label: 'Current Profit',
                     value: CurrencyFormatter.formatCents(
                       summary.realizedDealProfitCents,
                     ),
                   ),
                   _LabeledValue(
-                    label: 'Estimated Final Profit',
+                    label: 'Projected Profit',
                     value: CurrencyFormatter.formatCents(
                       summary.projectedDealProfitCents,
                     ),
@@ -1166,13 +1565,13 @@ class _RecursiveDealBranchCard extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _LabeledValue(
-                    label: 'Path Profit So Far',
+                    label: 'Current Path Profit',
                     value: CurrencyFormatter.formatCents(
                       branch.realizedProfitCents,
                     ),
                   ),
                   _LabeledValue(
-                    label: 'Est. Final Path Profit',
+                    label: 'Projected Path Profit',
                     value: CurrencyFormatter.formatCents(
                       branch.projectedBranchProfitCents,
                     ),
@@ -1540,6 +1939,48 @@ class _EmptyReportState extends StatelessWidget {
       child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
     );
   }
+}
+
+String _dealFilterLabel(DealStatus status) {
+  return switch (status) {
+    DealStatus.open => 'Active',
+    DealStatus.partiallyRealized => 'Partially Realized',
+    DealStatus.completed => 'Completed',
+  };
+}
+
+String _trendLabel(DateTime date, _TrendGrouping grouping) {
+  return switch (grouping) {
+    _TrendGrouping.day => '${date.month}/${date.day}/${date.year}',
+    _TrendGrouping.week => 'Week of ${date.month}/${date.day}/${date.year}',
+    _TrendGrouping.month => _monthLabel(date),
+  };
+}
+
+String _trendShortLabel(DateTime date, _TrendGrouping grouping) {
+  return switch (grouping) {
+    _TrendGrouping.day => '${date.month}/${date.day}',
+    _TrendGrouping.week => '${date.month}/${date.day}',
+    _TrendGrouping.month => _monthShortLabel(date),
+  };
+}
+
+String _monthShortLabel(DateTime month) {
+  const names = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return names[month.month - 1];
 }
 
 String _monthLabel(DateTime month) {

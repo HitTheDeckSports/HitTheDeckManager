@@ -226,31 +226,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Sales Overview Quick Report shows financial performance and monthly trend',
-    (WidgetTester tester) async {
-      await _pumpReports(tester);
+  testWidgets('Sales Overview Quick Report shows trend-focused analysis', (
+    WidgetTester tester,
+  ) async {
+    await _pumpReports(tester);
 
-      final card = find.byKey(const Key('quickReportSalesOverview'));
-      await tester.ensureVisible(card);
-      await tester.tap(card);
-      await tester.pumpAndSettle();
+    final card = find.byKey(const Key('quickReportSalesOverview'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const Key('financialPerformanceSection')),
-        findsOneWidget,
-      );
-      expect(find.text(r'$750.00'), findsWidgets);
-      expect(find.text(r'$450.00'), findsWidgets);
-      expect(find.text(r'$300.00'), findsWidgets);
-      expect(find.text('40.0%'), findsWidgets);
-      expect(find.text('3'), findsWidgets);
-      expect(find.text('Monthly Trend'), findsOneWidget);
-      expect(find.text('Aug 2026'), findsOneWidget);
-    },
-  );
+    expect(
+      find.byKey(const Key('financialPerformanceSection')),
+      findsOneWidget,
+    );
+    expect(find.text('Sales Trend'), findsOneWidget);
+    expect(find.byKey(const Key('salesOverviewGroupBy')), findsOneWidget);
+    expect(find.text('Key Metrics'), findsOneWidget);
+    expect(find.text('Average Sale Price'), findsOneWidget);
+    expect(find.text('Average Profit per Item'), findsOneWidget);
+    expect(find.text('Best Revenue Period'), findsOneWidget);
+    expect(find.text('Best Profit Period'), findsOneWidget);
+    expect(find.text('Performance'), findsOneWidget);
+  });
 
-  testWidgets('Items Sold Quick Report shows sales analysis dimensions', (
+  testWidgets('Items Sold Quick Report uses one Group By selector', (
     WidgetTester tester,
   ) async {
     await _pumpReports(tester);
@@ -261,11 +261,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('salesAnalysisSection')), findsOneWidget);
-    expect(find.text('By Category'), findsOneWidget);
-    expect(find.text('By Brand'), findsOneWidget);
-    expect(find.text('By Model'), findsOneWidget);
+    expect(find.byKey(const Key('itemsSoldGroupBy')), findsOneWidget);
     expect(find.text('Bat'), findsOneWidget);
+
+    final selector = find.byKey(const Key('itemsSoldGroupBy'));
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Brand').last);
+    await tester.pumpAndSettle();
     expect(find.text('Easton'), findsOneWidget);
+
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Model').last);
+    await tester.pumpAndSettle();
     expect(find.text('Hype Fire'), findsOneWidget);
   });
 
@@ -285,7 +294,7 @@ void main() {
     expect(find.text('181+ days'), findsOneWidget);
   });
 
-  testWidgets('Deals Quick Report shows active and completed Deal sections', (
+  testWidgets('Deals Quick Report filters by Deal lifecycle status', (
     WidgetTester tester,
   ) async {
     await _pumpReports(tester);
@@ -296,12 +305,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dealsSection')), findsOneWidget);
-    expect(find.text('Uncompleted Deals'), findsOneWidget);
-    expect(find.text('Completed Deals'), findsOneWidget);
+    expect(find.byKey(const Key('dealStatusFilter')), findsOneWidget);
+    expect(find.text('Active'), findsWidgets);
     expect(find.text('deal-open'), findsOneWidget);
+    expect(find.text('deal-completed'), findsNothing);
+
+    final selector = find.byKey(const Key('dealStatusFilter'));
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Completed').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('deal-open'), findsNothing);
     expect(find.text('deal-completed'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
-    expect(find.text('Completed'), findsOneWidget);
   });
 
   testWidgets('Reports defaults date range to Month to Date', (

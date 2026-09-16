@@ -21,6 +21,9 @@ class ReportsSnapshot {
     required this.inventoryAging,
     required this.deals,
     this.recursiveDeals = const RecursiveDealReport(rows: []),
+    this.inventoryItems = const [],
+    this.sales = const [],
+    this.asOf,
   });
 
   final FinancialPerformanceReport financialPerformance;
@@ -29,6 +32,9 @@ class ReportsSnapshot {
   final SalesAnalysisReport salesByModel;
   final InventoryAgingReport inventoryAging;
   final DealRollupReport deals;
+  final List<InventoryItem> inventoryItems;
+  final List<SaleTransaction> sales;
+  final DateTime? asOf;
 
   /// Recursive, branch-aware Deal economics used by the new Deal reporting UI.
   ///
@@ -92,6 +98,9 @@ class ReportsSnapshot {
         disposals: disposals,
         warrantyReplacements: warrantyReplacements,
       ),
+      inventoryItems: List.unmodifiable(inventoryItems),
+      sales: List.unmodifiable(sales),
+      asOf: asOf,
     );
   }
 }
