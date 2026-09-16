@@ -407,12 +407,12 @@ class _QuickReportsGrid extends StatelessWidget {
                   key: const Key('quickReportSalesOverview'),
                   width: width,
                   icon: Icons.show_chart,
-                  title: 'Sales Overview',
-                  subtitle: 'Revenue, profit, margin and monthly trends',
+                  title: 'Sales Trend',
+                  subtitle: 'Revenue, profit and unit trends over time',
                   accent: const Color(0xFF12853D),
                   onTap: () => _openReport(
                     context,
-                    title: 'Sales Overview',
+                    title: 'Sales Trend',
                     child: _SalesOverviewSection(snapshot: snapshot),
                   ),
                 ),
@@ -618,7 +618,32 @@ class _SalesOverviewSectionState extends State<_SalesOverviewSection> {
   @override
   Widget build(BuildContext context) {
     final report = widget.snapshot.financialPerformance;
-    final points = _salesTrendPoints(widget.snapshot.sales, _grouping);
+    final includedSaleIds = report.saleIds.toSet();
+    final scopedSales = report.unitsSold == 0
+        ? <dynamic>[]
+        : includedSaleIds.isEmpty
+        ? widget.snapshot.sales
+        : widget.snapshot.sales
+              .where(
+                (sale) => sale.id != null && includedSaleIds.contains(sale.id),
+              )
+              .toList(growable: false);
+    final rawPoints = _salesTrendPoints(scopedSales, _grouping);
+    final points =
+        rawPoints.isEmpty &&
+            _grouping == _TrendGrouping.month &&
+            report.monthlyTrend.isNotEmpty
+        ? report.monthlyTrend
+              .map(
+                (point) => _TrendPoint(
+                  period: point.month,
+                  units: point.unitsSold,
+                  revenueCents: point.revenueCents,
+                  profitCents: point.profitCents,
+                ),
+              )
+              .toList(growable: false)
+        : rawPoints;
     final averageSale = report.unitsSold == 0
         ? 0
         : (report.revenueCents / report.unitsSold).round();
@@ -628,84 +653,79 @@ class _SalesOverviewSectionState extends State<_SalesOverviewSection> {
     final bestRevenue = _bestTrend(points, (point) => point.revenueCents);
     final bestProfit = _bestTrend(points, (point) => point.profitCents);
 
-    return _ReportSection(
+    return Column(
       key: const Key('financialPerformanceSection'),
-      title: 'Sales Trend',
-      subtitle: 'Revenue, profit, and units sold over time.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DropdownButtonFormField<_TrendGrouping>(
-            key: const Key('salesOverviewGroupBy'),
-            initialValue: _grouping,
-            decoration: const InputDecoration(
-              labelText: 'Group By',
-              border: OutlineInputBorder(),
-              isDense: true,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<_TrendGrouping>(
+          key: const Key('salesOverviewGroupBy'),
+          initialValue: _grouping,
+          decoration: const InputDecoration(
+            labelText: 'Group By',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: const [
+            DropdownMenuItem(value: _TrendGrouping.day, child: Text('Day')),
+            DropdownMenuItem(value: _TrendGrouping.week, child: Text('Week')),
+            DropdownMenuItem(value: _TrendGrouping.month, child: Text('Month')),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              setState(() => _grouping = value);
+            }
+          },
+        ),
+        const SizedBox(height: 14),
+        if (points.isEmpty)
+          const _EmptyReportState(message: 'No sales in this period.')
+        else
+          _SalesTrendChart(points: points, grouping: _grouping),
+        const SizedBox(height: 18),
+        Text(
+          'Key Metrics',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF082A4A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _ResponsiveMetricGrid(
+          children: [
+            _ReportMetricCard(
+              label: 'Average Sale Price',
+              value: CurrencyFormatter.formatCents(averageSale),
             ),
-            items: const [
-              DropdownMenuItem(value: _TrendGrouping.day, child: Text('Day')),
-              DropdownMenuItem(value: _TrendGrouping.week, child: Text('Week')),
-              DropdownMenuItem(
-                value: _TrendGrouping.month,
-                child: Text('Month'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _grouping = value);
-              }
-            },
+            _ReportMetricCard(
+              label: 'Average Profit per Item',
+              value: CurrencyFormatter.formatCents(averageProfit),
+            ),
+            _ReportMetricCard(
+              label: 'Best Revenue Period',
+              value: bestRevenue == null
+                  ? '—'
+                  : '${_trendLabel(bestRevenue.period, _grouping)}\n${CurrencyFormatter.formatCents(bestRevenue.revenueCents)}',
+            ),
+            _ReportMetricCard(
+              label: 'Best Profit Period',
+              value: bestProfit == null
+                  ? '—'
+                  : '${_trendLabel(bestProfit.period, _grouping)}\n${CurrencyFormatter.formatCents(bestProfit.profitCents)}',
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Performance by Period',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF082A4A),
           ),
-          const SizedBox(height: 14),
-          if (points.isEmpty)
-            const _EmptyReportState(message: 'No sales in this period.')
-          else
-            _SalesTrendChart(points: points, grouping: _grouping),
-          const SizedBox(height: 16),
-          Text(
-            'Key Metrics',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          _ResponsiveMetricGrid(
-            children: [
-              _ReportMetricCard(
-                label: 'Average Sale Price',
-                value: CurrencyFormatter.formatCents(averageSale),
-              ),
-              _ReportMetricCard(
-                label: 'Average Profit per Item',
-                value: CurrencyFormatter.formatCents(averageProfit),
-              ),
-              _ReportMetricCard(
-                label: 'Best Revenue Period',
-                value: bestRevenue == null
-                    ? '—'
-                    : '${_trendLabel(bestRevenue.period, _grouping)}\n${CurrencyFormatter.formatCents(bestRevenue.revenueCents)}',
-              ),
-              _ReportMetricCard(
-                label: 'Best Profit Period',
-                value: bestProfit == null
-                    ? '—'
-                    : '${_trendLabel(bestProfit.period, _grouping)}\n${CurrencyFormatter.formatCents(bestProfit.profitCents)}',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Performance',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          for (final point in points)
-            _SalesTrendRow(point: point, grouping: _grouping),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        for (final point in points)
+          _SalesTrendRow(point: point, grouping: _grouping),
+      ],
     );
   }
 }
@@ -719,6 +739,7 @@ class _TrendPoint {
     required this.revenueCents,
     required this.profitCents,
   });
+
   final DateTime period;
   final int units;
   final int revenueCents;
@@ -743,6 +764,7 @@ List<_TrendPoint> _salesTrendPoints(
     };
     groups.putIfAbsent(key, () => <dynamic>[]).add(sale);
   }
+
   final points = <_TrendPoint>[];
   for (final entry in groups.entries) {
     var revenue = 0;
@@ -760,6 +782,7 @@ List<_TrendPoint> _salesTrendPoints(
       ),
     );
   }
+
   points.sort((a, b) => a.period.compareTo(b.period));
   return points;
 }
@@ -771,6 +794,7 @@ _TrendPoint? _bestTrend(
   if (points.isEmpty) {
     return null;
   }
+
   var best = points.first;
   for (final point in points.skip(1)) {
     if (value(point) > value(best)) {
@@ -782,107 +806,358 @@ _TrendPoint? _bestTrend(
 
 class _SalesTrendChart extends StatelessWidget {
   const _SalesTrendChart({required this.points, required this.grouping});
+
   final List<_TrendPoint> points;
   final _TrendGrouping grouping;
 
   @override
   Widget build(BuildContext context) {
-    final visible = points.length > 8
-        ? points.sublist(points.length - 8)
+    final visible = points.length > 7
+        ? points.sublist(points.length - 7)
         : points;
-    var maxRevenue = 1;
-    for (final point in visible) {
-      if (point.revenueCents > maxRevenue) {
-        maxRevenue = point.revenueCents;
-      }
-    }
+
     return Card(
       key: const Key('salesTrendChart'),
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
-        child: SizedBox(
-          height: 190,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final point in visible)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Column(
-                      children: [
-                        Text(
-                          point.units.toString(),
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                        const SizedBox(height: 3),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: FractionallySizedBox(
-                              heightFactor: (point.revenueCents / maxRevenue)
-                                  .clamp(0.05, 1.0),
-                              widthFactor: 0.58,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF125FB8),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          _trendShortLabel(point.period, grouping),
-                          maxLines: 1,
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ],
-                    ),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              label:
+                  'Sales Trend chart showing Revenue, Profit, and Units Sold',
+              child: SizedBox(
+                height: 235,
+                child: CustomPaint(
+                  key: const Key('salesTrendThreeSeriesChart'),
+                  painter: _SalesTrendPainter(
+                    points: visible,
+                    grouping: grouping,
+                    revenueColor: const Color(0xFF12853D),
+                    profitColor: const Color(0xFF125FB8),
+                    unitsColor: const Color(0xFFE07B18),
+                    textColor: const Color(0xFF657080),
+                    gridColor: const Color(0xFFD9E0E8),
                   ),
                 ),
-            ],
-          ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 18,
+              runSpacing: 8,
+              children: [
+                _TrendLegendItem(label: 'Revenue', color: Color(0xFF12853D)),
+                _TrendLegendItem(label: 'Profit', color: Color(0xFF125FB8)),
+                _TrendLegendItem(label: 'Units Sold', color: Color(0xFFE07B18)),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+class _TrendLegendItem extends StatelessWidget {
+  const _TrendLegendItem({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: const Color(0xFF657080),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SalesTrendPainter extends CustomPainter {
+  const _SalesTrendPainter({
+    required this.points,
+    required this.grouping,
+    required this.revenueColor,
+    required this.profitColor,
+    required this.unitsColor,
+    required this.textColor,
+    required this.gridColor,
+  });
+
+  final List<_TrendPoint> points;
+  final _TrendGrouping grouping;
+  final Color revenueColor;
+  final Color profitColor;
+  final Color unitsColor;
+  final Color textColor;
+  final Color gridColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) {
+      return;
+    }
+
+    const left = 52.0;
+    const right = 38.0;
+    const top = 10.0;
+    const bottom = 36.0;
+    final plotWidth = size.width - left - right;
+    final plotHeight = size.height - top - bottom;
+
+    var minMoney = 0;
+    var maxMoney = 1;
+    var maxUnits = 1;
+    for (final point in points) {
+      if (point.revenueCents > maxMoney) {
+        maxMoney = point.revenueCents;
+      }
+      if (point.profitCents > maxMoney) {
+        maxMoney = point.profitCents;
+      }
+      if (point.profitCents < minMoney) {
+        minMoney = point.profitCents;
+      }
+      if (point.units > maxUnits) {
+        maxUnits = point.units;
+      }
+    }
+    if (maxMoney == minMoney) {
+      maxMoney = minMoney + 1;
+    }
+
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    final axisPaint = Paint()
+      ..color = textColor.withValues(alpha: 0.55)
+      ..strokeWidth = 1;
+
+    canvas.drawLine(
+      const Offset(left, top),
+      Offset(left, top + plotHeight),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(left, top + plotHeight),
+      Offset(left + plotWidth, top + plotHeight),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(left + plotWidth, top),
+      Offset(left + plotWidth, top + plotHeight),
+      axisPaint,
+    );
+
+    for (var i = 0; i <= 4; i++) {
+      final ratio = i / 4;
+      final y = top + plotHeight * (1 - ratio);
+      canvas.drawLine(Offset(left, y), Offset(left + plotWidth, y), gridPaint);
+
+      final money = minMoney + ((maxMoney - minMoney) * ratio).round();
+      final units = (maxUnits * ratio).round();
+      _paintChartText(
+        canvas,
+        _compactAxisMoney(money),
+        Offset(0, y - 7),
+        width: left - 5,
+        align: TextAlign.right,
+        color: textColor,
+      );
+      _paintChartText(
+        canvas,
+        units.toString(),
+        Offset(left + plotWidth + 5, y - 7),
+        width: right - 5,
+        align: TextAlign.left,
+        color: textColor,
+      );
+    }
+
+    double moneyY(int cents) {
+      final ratio = (cents - minMoney) / (maxMoney - minMoney);
+      return top + plotHeight * (1 - ratio);
+    }
+
+    double unitsY(int units) {
+      final ratio = units / maxUnits;
+      return top + plotHeight * (1 - ratio);
+    }
+
+    double pointX(int index) {
+      if (points.length == 1) {
+        return left + plotWidth / 2;
+      }
+      return left + (plotWidth * index / (points.length - 1));
+    }
+
+    void drawSeries(Color color, double Function(_TrendPoint point) yForPoint) {
+      final paint = Paint()
+        ..color = color
+        ..strokeWidth = 2.6
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      final dotPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.fill;
+
+      final path = Path();
+      for (var i = 0; i < points.length; i++) {
+        final x = pointX(i);
+        final y = yForPoint(points[i]);
+        if (i == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(path, paint);
+
+      for (var i = 0; i < points.length; i++) {
+        canvas.drawCircle(Offset(pointX(i), yForPoint(points[i])), 4, dotPaint);
+      }
+    }
+
+    drawSeries(revenueColor, (point) => moneyY(point.revenueCents));
+    drawSeries(profitColor, (point) => moneyY(point.profitCents));
+    drawSeries(unitsColor, (point) => unitsY(point.units));
+
+    for (var i = 0; i < points.length; i++) {
+      final x = pointX(i);
+      final label = _trendShortLabel(points[i].period, grouping);
+      _paintChartText(
+        canvas,
+        label,
+        Offset(x - 30, top + plotHeight + 8),
+        width: 60,
+        align: TextAlign.center,
+        color: textColor,
+      );
+    }
+
+    _paintChartText(
+      canvas,
+      r'$',
+      const Offset(2, 0),
+      width: 20,
+      align: TextAlign.left,
+      color: textColor,
+      bold: true,
+    );
+    _paintChartText(
+      canvas,
+      'Units',
+      Offset(size.width - right + 3, 0),
+      width: right - 3,
+      align: TextAlign.left,
+      color: textColor,
+      bold: true,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SalesTrendPainter oldDelegate) {
+    return oldDelegate.points != points || oldDelegate.grouping != grouping;
+  }
+}
+
+void _paintChartText(
+  Canvas canvas,
+  String text,
+  Offset offset, {
+  required double width,
+  required TextAlign align,
+  required Color color,
+  bool bold = false,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        color: color,
+        fontSize: 10,
+        fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    textAlign: align,
+    maxLines: 1,
+  )..layout(maxWidth: width);
+  painter.paint(canvas, offset);
+}
+
+String _compactAxisMoney(int cents) {
+  final dollars = cents / 100;
+  if (dollars.abs() >= 1000) {
+    final value = dollars / 1000;
+    return '\$${value.toStringAsFixed(value.abs() >= 10 ? 0 : 1)}k';
+  }
+  return '\$${dollars.toStringAsFixed(0)}';
+}
+
 class _SalesTrendRow extends StatelessWidget {
   const _SalesTrendRow({required this.point, required this.grouping});
+
   final _TrendPoint point;
   final _TrendGrouping grouping;
+
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               _trendLabel(point.period, grouping),
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF082A4A),
+              ),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 18,
-              runSpacing: 8,
+            const SizedBox(height: 10),
+            Row(
               children: [
-                _LabeledValue(label: 'Units', value: point.units.toString()),
-                _LabeledValue(
-                  label: 'Revenue',
-                  value: CurrencyFormatter.formatCents(point.revenueCents),
+                Expanded(
+                  child: _InlineMetric(
+                    label: 'Units',
+                    value: point.units.toString(),
+                    valueColor: const Color(0xFFE07B18),
+                  ),
                 ),
-                _LabeledValue(
-                  label: 'Profit',
-                  value: CurrencyFormatter.formatCents(point.profitCents),
+                Expanded(
+                  child: _InlineMetric(
+                    label: 'Revenue',
+                    value: CurrencyFormatter.formatCents(point.revenueCents),
+                    valueColor: const Color(0xFF12853D),
+                  ),
+                ),
+                Expanded(
+                  child: _InlineMetric(
+                    label: 'Profit',
+                    value: CurrencyFormatter.formatCents(point.profitCents),
+                    valueColor: _profitColor(point.profitCents),
+                  ),
                 ),
               ],
             ),
@@ -896,6 +1171,7 @@ class _SalesTrendRow extends StatelessWidget {
 class _SalesAnalysisSection extends StatefulWidget {
   const _SalesAnalysisSection({required this.snapshot});
   final ReportsSnapshot snapshot;
+
   @override
   State<_SalesAnalysisSection> createState() => _SalesAnalysisSectionState();
 }
@@ -919,54 +1195,50 @@ class _SalesAnalysisSectionState extends State<_SalesAnalysisSection> {
     final salesByItem = {
       for (final sale in widget.snapshot.sales) sale.inventoryItemId: sale,
     };
-    return _ReportSection(
+
+    return Column(
       key: const Key('salesAnalysisSection'),
-      title: 'Items Sold Analysis',
-      subtitle:
-          'Units, revenue, and profit grouped by category, brand, or model.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DropdownButtonFormField<SalesAnalysisDimension>(
-            key: const Key('itemsSoldGroupBy'),
-            initialValue: _dimension,
-            decoration: const InputDecoration(
-              labelText: 'Group By',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: SalesAnalysisDimension.category,
-                child: Text('Category'),
-              ),
-              DropdownMenuItem(
-                value: SalesAnalysisDimension.brand,
-                child: Text('Brand'),
-              ),
-              DropdownMenuItem(
-                value: SalesAnalysisDimension.model,
-                child: Text('Model'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _dimension = value);
-              }
-            },
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<SalesAnalysisDimension>(
+          key: const Key('itemsSoldGroupBy'),
+          initialValue: _dimension,
+          decoration: const InputDecoration(
+            labelText: 'Group By',
+            border: OutlineInputBorder(),
+            isDense: true,
           ),
-          const SizedBox(height: 12),
-          if (report.rows.isEmpty)
-            const _EmptyReportState(message: 'No sales in this period.')
-          else
-            for (final row in report.rows)
-              _ExpandableSalesGroupRow(
-                row: row,
-                inventoryById: inventoryById,
-                salesByItem: salesByItem,
-              ),
-        ],
-      ),
+          items: const [
+            DropdownMenuItem(
+              value: SalesAnalysisDimension.category,
+              child: Text('Category'),
+            ),
+            DropdownMenuItem(
+              value: SalesAnalysisDimension.brand,
+              child: Text('Brand'),
+            ),
+            DropdownMenuItem(
+              value: SalesAnalysisDimension.model,
+              child: Text('Model'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              setState(() => _dimension = value);
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        if (report.rows.isEmpty)
+          const _EmptyReportState(message: 'No sales in this period.')
+        else
+          for (final row in report.rows)
+            _ExpandableSalesGroupRow(
+              row: row,
+              inventoryById: inventoryById,
+              salesByItem: salesByItem,
+            ),
+      ],
     );
   }
 }
@@ -980,40 +1252,53 @@ class _ExpandableSalesGroupRow extends StatelessWidget {
   final SalesAnalysisRow row;
   final Map<String, dynamic> inventoryById;
   final Map<String, dynamic> salesByItem;
+
   @override
   Widget build(BuildContext context) {
     return Card(
       key: Key('itemsSoldGroup_${row.label}'),
       margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        tilePadding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
         childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
         title: Text(
           row.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w900,
             color: const Color(0xFF082A4A),
           ),
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Wrap(
-            spacing: 18,
-            runSpacing: 6,
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(
             children: [
-              _LabeledValue(label: 'Units', value: row.units.toString()),
-              _LabeledValue(
-                label: 'Revenue',
-                value: CurrencyFormatter.formatCents(row.revenueCents),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Units',
+                  value: row.units.toString(),
+                ),
               ),
-              _LabeledValue(
-                label: 'Profit',
-                value: CurrencyFormatter.formatCents(row.profitCents),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Revenue',
+                  value: CurrencyFormatter.formatCents(row.revenueCents),
+                ),
+              ),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Profit',
+                  value: CurrencyFormatter.formatCents(row.profitCents),
+                  valueColor: _profitColor(row.profitCents),
+                ),
               ),
             ],
           ),
         ),
         children: [
+          const Divider(height: 1),
           for (final id in row.inventoryItemIds)
             _SoldInventoryItemRow(
               item: inventoryById[id],
@@ -1035,22 +1320,21 @@ class _SoldInventoryItemRow extends StatelessWidget {
   final dynamic item;
   final dynamic sale;
   final String fallbackId;
+
   @override
   Widget build(BuildContext context) {
-    final inventoryNumber = item?.inventoryNumber ?? fallbackId;
-    final brand = (item?.brand as String?)?.trim();
-    final model = (item?.model as String?)?.trim();
-    final displayName = [
-      if (brand != null && brand.isNotEmpty) brand,
-      if (model != null && model.isNotEmpty) model,
-    ].join(' ');
+    final inventoryNumber = _inventoryNumber(item, fallbackId);
+    final displayName = _inventoryName(item);
+    final salePrice = sale == null ? null : sale.salePriceCents as int;
+    final profit = sale == null ? null : (sale.profitCents as int?) ?? 0;
+
     return Padding(
       key: Key('soldItem_$fallbackId'),
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.inventory_2_outlined, size: 20),
+          _InventoryThumbnail(item: item, size: 52),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1058,27 +1342,51 @@ class _SoldInventoryItemRow extends StatelessWidget {
               children: [
                 Text(
                   inventoryNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     color: const Color(0xFF125FB8),
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(displayName.isEmpty ? 'Unknown item' : displayName),
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF657080),
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          if (sale != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(CurrencyFormatter.formatCents(sale.salePriceCents as int)),
-                Text(
-                  '${CurrencyFormatter.formatCents((sale.profitCents as int?) ?? 0)} profit',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+          const SizedBox(width: 10),
+          if (salePrice != null && profit != null)
+            SizedBox(
+              width: 86,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    CurrencyFormatter.formatCents(salePrice),
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF082A4A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _signedCurrency(profit),
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: _profitColor(profit),
+                    ),
+                  ),
+                ],
+              ),
             ),
         ],
       ),
@@ -1095,34 +1403,24 @@ class _InventoryAgingSection extends StatelessWidget {
   final InventoryAgingReport report;
   final List<dynamic> inventoryItems;
   final DateTime? asOf;
+
   @override
   Widget build(BuildContext context) {
     final inventoryById = {
       for (final item in inventoryItems)
         if (item.id != null) item.id as String: item,
     };
-    return _ReportSection(
+    return Column(
       key: const Key('inventoryAgingSection'),
-      title: 'Inventory Aging',
-      subtitle: 'Current open inventory grouped by days in inventory.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final row in report.rows)
-            _InventoryAgingRowWidget(
-              row: row,
-              inventoryById: inventoryById,
-              asOf: asOf,
-            ),
-          if (report.unclassifiedItemIds.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${report.unclassifiedItemIds.length} open item(s) have no acquisition date and are not assigned to an aging bucket.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ],
-      ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final row in report.rows)
+          _InventoryAgingRowWidget(
+            row: row,
+            inventoryById: inventoryById,
+            asOf: asOf,
+          ),
+      ],
     );
   }
 }
@@ -1136,8 +1434,10 @@ class _InventoryAgingRowWidget extends StatelessWidget {
   final InventoryAgingRow row;
   final Map<String, dynamic> inventoryById;
   final DateTime? asOf;
+
   @override
   Widget build(BuildContext context) {
+    final accent = _agingBucketColor(row.bucket);
     final ids = [...row.inventoryItemIds]
       ..sort((a, b) {
         final aDate = inventoryById[a]?.purchaseDate as DateTime?;
@@ -1153,56 +1453,89 @@ class _InventoryAgingRowWidget extends StatelessWidget {
         }
         return aDate.compareTo(bDate);
       });
+
     return Card(
       key: Key('agingBucket_${row.bucket.name}'),
       margin: const EdgeInsets.only(bottom: 10),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-        initiallyExpanded: row.bucket == InventoryAgingBucket.days0To30,
-        title: Text(
-          row.bucket.label,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF082A4A),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: accent.withValues(alpha: 0.035),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: accent, width: 5)),
           ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 6,
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.fromLTRB(12, 7, 10, 7),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            initiallyExpanded: row.bucket == InventoryAgingBucket.days0To30,
+            iconColor: accent,
+            collapsedIconColor: const Color(0xFF082A4A),
+            title: Text(
+              row.bucket.label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF082A4A),
+              ),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Items',
+                      value: row.itemCount.toString(),
+                    ),
+                  ),
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Cost',
+                      value: CurrencyFormatter.formatCents(
+                        row.inventoryCostCents,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Asking',
+                      value: CurrencyFormatter.formatCents(
+                        row.askingValueCents,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Potential',
+                      value: CurrencyFormatter.formatCents(
+                        row.potentialProfitCents,
+                      ),
+                      valueColor: _profitColor(row.potentialProfitCents),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             children: [
-              _LabeledValue(label: 'Items', value: row.itemCount.toString()),
-              _LabeledValue(
-                label: 'Cost',
-                value: CurrencyFormatter.formatCents(row.inventoryCostCents),
-              ),
-              _LabeledValue(
-                label: 'Asking',
-                value: CurrencyFormatter.formatCents(row.askingValueCents),
-              ),
-              _LabeledValue(
-                label: 'Potential Profit',
-                value: CurrencyFormatter.formatCents(row.potentialProfitCents),
-              ),
+              const Divider(height: 1),
+              if (ids.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('No inventory items in this bucket.'),
+                  ),
+                )
+              else
+                for (final id in ids)
+                  _AgingItemRow(
+                    item: inventoryById[id],
+                    fallbackId: id,
+                    asOf: asOf,
+                    accent: accent,
+                  ),
             ],
           ),
         ),
-        children: [
-          if (ids.isEmpty)
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('No inventory items in this bucket.'),
-            )
-          else
-            for (final id in ids)
-              _AgingItemRow(
-                item: inventoryById[id],
-                fallbackId: id,
-                asOf: asOf,
-              ),
-        ],
       ),
     );
   }
@@ -1213,19 +1546,17 @@ class _AgingItemRow extends StatelessWidget {
     required this.item,
     required this.fallbackId,
     required this.asOf,
+    required this.accent,
   });
   final dynamic item;
   final String fallbackId;
   final DateTime? asOf;
+  final Color accent;
+
   @override
   Widget build(BuildContext context) {
-    final inventoryNumber = item?.inventoryNumber ?? fallbackId;
-    final brand = (item?.brand as String?)?.trim();
-    final model = (item?.model as String?)?.trim();
-    final displayName = [
-      if (brand != null && brand.isNotEmpty) brand,
-      if (model != null && model.isNotEmpty) model,
-    ].join(' ');
+    final inventoryNumber = _inventoryNumber(item, fallbackId);
+    final displayName = _inventoryName(item);
     final purchaseDate = item?.purchaseDate as DateTime?;
     final reference = asOf ?? DateTime.now();
     final days = purchaseDate == null
@@ -1240,13 +1571,13 @@ class _AgingItemRow extends StatelessWidget {
               )
               .inDays
               .clamp(0, 999999);
+
     return Padding(
       key: Key('agingItem_$fallbackId'),
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.inventory_2_outlined, size: 20),
+          _InventoryThumbnail(item: item, size: 50),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1254,18 +1585,43 @@ class _AgingItemRow extends StatelessWidget {
               children: [
                 Text(
                   inventoryNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     color: const Color(0xFF125FB8),
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(displayName.isEmpty ? 'Unknown item' : displayName),
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF657080),
+                  ),
+                ),
               ],
             ),
           ),
-          if (days != null)
-            Text('$days days', style: Theme.of(context).textTheme.bodySmall),
+          if (days != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.11),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$days days',
+                maxLines: 1,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1276,6 +1632,7 @@ class _DealsSection extends StatelessWidget {
   const _DealsSection({required this.report, required this.recursiveReport});
   final DealRollupReport report;
   final RecursiveDealReport recursiveReport;
+
   @override
   Widget build(BuildContext context) {
     if (recursiveReport.rows.isNotEmpty) {
@@ -1288,6 +1645,7 @@ class _DealsSection extends StatelessWidget {
 class _LegacyDealsFilteredSection extends StatefulWidget {
   const _LegacyDealsFilteredSection({required this.report});
   final DealRollupReport report;
+
   @override
   State<_LegacyDealsFilteredSection> createState() =>
       _LegacyDealsFilteredSectionState();
@@ -1296,29 +1654,26 @@ class _LegacyDealsFilteredSection extends StatefulWidget {
 class _LegacyDealsFilteredSectionState
     extends State<_LegacyDealsFilteredSection> {
   DealStatus _status = DealStatus.open;
+
   @override
   Widget build(BuildContext context) {
     final rows = widget.report.rows
         .where((row) => row.status == _status)
         .toList(growable: false);
-    return _ReportSection(
+    return Column(
       key: const Key('dealsSection'),
-      title: 'Deals',
-      subtitle: 'Filter Deals by lifecycle status.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DealStatusSelector(
-            value: _status,
-            onChanged: (value) => setState(() => _status = value),
-          ),
-          const SizedBox(height: 12),
-          if (rows.isEmpty)
-            _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
-          else
-            for (final row in rows) _DealReportCard(row: row),
-        ],
-      ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DealStatusSelector(
+          value: _status,
+          onChanged: (value) => setState(() => _status = value),
+        ),
+        const SizedBox(height: 12),
+        if (rows.isEmpty)
+          _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
+        else
+          for (final row in rows) _DealReportCard(row: row),
+      ],
     );
   }
 }
@@ -1326,36 +1681,33 @@ class _LegacyDealsFilteredSectionState
 class _RecursiveDealsSection extends StatefulWidget {
   const _RecursiveDealsSection({required this.report});
   final RecursiveDealReport report;
+
   @override
   State<_RecursiveDealsSection> createState() => _RecursiveDealsSectionState();
 }
 
 class _RecursiveDealsSectionState extends State<_RecursiveDealsSection> {
   DealStatus _status = DealStatus.open;
+
   @override
   Widget build(BuildContext context) {
     final rows = widget.report.rows
         .where((row) => row.summary.status == _status)
         .toList(growable: false);
-    return _ReportSection(
+    return Column(
       key: const Key('dealsSection'),
-      title: 'Deals',
-      subtitle:
-          'Track the original sale and each trade-in path through the full Deal.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DealStatusSelector(
-            value: _status,
-            onChanged: (value) => setState(() => _status = value),
-          ),
-          const SizedBox(height: 12),
-          if (rows.isEmpty)
-            _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
-          else
-            for (final row in rows) _RecursiveDealCard(row: row),
-        ],
-      ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DealStatusSelector(
+          value: _status,
+          onChanged: (value) => setState(() => _status = value),
+        ),
+        const SizedBox(height: 12),
+        if (rows.isEmpty)
+          _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
+        else
+          for (final row in rows) _RecursiveDealCard(row: row),
+      ],
     );
   }
 }
@@ -1364,6 +1716,7 @@ class _DealStatusSelector extends StatelessWidget {
   const _DealStatusSelector({required this.value, required this.onChanged});
   final DealStatus value;
   final ValueChanged<DealStatus> onChanged;
+
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<DealStatus>(
@@ -1393,17 +1746,13 @@ class _DealStatusSelector extends StatelessWidget {
 
 class _RecursiveDealCard extends StatelessWidget {
   const _RecursiveDealCard({required this.row});
-
   final RecursiveDealReportRow row;
 
   @override
   Widget build(BuildContext context) {
     final summary = row.summary;
     final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
-    final originalSaleLabel = _inventoryLabel(
-      row.parentInventoryItem,
-      row.parentSale.inventoryItemId,
-    );
+    final item = row.parentInventoryItem;
     final openPathCount = summary.branches
         .where((branch) => branch.openInventoryCount > 0)
         .length;
@@ -1411,95 +1760,108 @@ class _RecursiveDealCard extends StatelessWidget {
     return Card(
       key: Key('recursiveDealCard_$displayId'),
       margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         key: Key('recursiveDealExpansion_$displayId'),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        tilePadding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
         childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        title: Column(
+        title: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              originalSaleLabel,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            _InventoryThumbnail(item: item, size: 60),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _inventoryNumber(item, row.parentSale.inventoryItemId),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF125FB8),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _inventoryName(item),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF082A4A),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Original Sale',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 2),
-            Text('Original Sale', style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 10),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Chip(label: Text(_dealStatusLabel(summary.status))),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 20,
-                runSpacing: 8,
-                children: [
-                  _LabeledValue(
-                    label: 'Current Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.realizedDealProfitCents,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _DealStatusPill(status: summary.status),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F8FB),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _InlineMetric(
+                        label: 'Current Profit',
+                        value: CurrencyFormatter.formatCents(
+                          summary.realizedDealProfitCents,
+                        ),
+                        valueColor: _profitColor(
+                          summary.realizedDealProfitCents,
+                        ),
+                      ),
                     ),
-                  ),
-                  _LabeledValue(
-                    label: 'Projected Profit',
-                    value: CurrencyFormatter.formatCents(
-                      summary.projectedDealProfitCents,
+                    Expanded(
+                      child: _InlineMetric(
+                        label: 'Projected Profit',
+                        value: CurrencyFormatter.formatCents(
+                          summary.projectedDealProfitCents,
+                        ),
+                        valueColor: _profitColor(
+                          summary.projectedDealProfitCents,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _openPathLabel(openPathCount),
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF657080),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
         ),
         children: [
           const Divider(),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Original Sale',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _BusinessEventCard(
-            icon: Icons.receipt_long_outlined,
-            title: originalSaleLabel,
-            label: 'Original Sale Profit',
-            value: CurrencyFormatter.formatCents(
-              summary.parentTransactionProfitCents,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Trade-In Paths',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Each path starts with an item received in the original trade.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          const SizedBox(height: 8),
           for (var i = 0; i < summary.branches.length; i++)
             _RecursiveDealBranchCard(
               row: row,
@@ -1518,7 +1880,6 @@ class _RecursiveDealBranchCard extends StatelessWidget {
     required this.branch,
     required this.pathNumber,
   });
-
   final RecursiveDealReportRow row;
   final DealBranchSummary branch;
   final int pathNumber;
@@ -1526,75 +1887,85 @@ class _RecursiveDealBranchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rootItem = row.inventoryItemFor(branch.rootChildInventoryItemId);
-    final rootLabel = _inventoryLabel(
-      rootItem,
-      branch.rootChildInventoryItemId,
-    );
     final branchNodes = row.tree.branchFor(branch.rootChildInventoryItemId);
     final active = branch.openInventoryCount > 0;
 
     return Card(
       key: Key('recursiveDealBranch_${branch.rootChildInventoryItemId}'),
       margin: const EdgeInsets.only(bottom: 8),
+      color: const Color(0xFFFBFCFE),
       child: ExpansionTile(
-        key: Key(
-          'recursiveDealBranchExpansion_${branch.rootChildInventoryItemId}',
-        ),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        tilePadding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
+        childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        title: Row(
           children: [
-            Text(
-              'Trade-In $pathNumber',
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            _InventoryThumbnail(item: rootItem, size: 46),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trade-In $pathNumber',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  Text(
+                    _inventoryNumber(rootItem, branch.rootChildInventoryItemId),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF125FB8),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    _inventoryName(rootItem),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 2),
-            Text(rootLabel, style: Theme.of(context).textTheme.titleSmall),
           ],
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Wrap(
-                spacing: 18,
-                runSpacing: 8,
-                children: [
-                  _LabeledValue(
-                    label: 'Current Path Profit',
-                    value: CurrencyFormatter.formatCents(
-                      branch.realizedProfitCents,
-                    ),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Current',
+                  value: CurrencyFormatter.formatCents(
+                    branch.realizedProfitCents,
                   ),
-                  _LabeledValue(
-                    label: 'Projected Path Profit',
-                    value: CurrencyFormatter.formatCents(
-                      branch.projectedBranchProfitCents,
-                    ),
-                  ),
-                ],
+                  valueColor: _profitColor(branch.realizedProfitCents),
+                ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                active ? 'Still Active' : 'Completed',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Projected',
+                  value: CurrencyFormatter.formatCents(
+                    branch.projectedBranchProfitCents,
+                  ),
+                  valueColor: _profitColor(branch.projectedBranchProfitCents),
+                ),
+              ),
+              _SmallStatusTag(
+                label: active ? 'Active' : 'Completed',
+                color: active
+                    ? const Color(0xFF125FB8)
+                    : const Color(0xFF12853D),
               ),
             ],
           ),
         ),
         children: [
+          const Divider(height: 1),
           for (var i = 0; i < branchNodes.length; i++)
             _DealPathItemRow(
-              label: _inventoryLabel(
-                row.inventoryItemFor(branchNodes[i].inventoryItemId),
-                branchNodes[i].inventoryItemId,
-              ),
+              item: row.inventoryItemFor(branchNodes[i].inventoryItemId),
+              fallbackId: branchNodes[i].inventoryItemId,
               relationship: branchNodes[i].edgeTypeFromParent,
               isRoot: i == 0,
               isCurrent:
@@ -1608,13 +1979,14 @@ class _RecursiveDealBranchCard extends StatelessWidget {
 
 class _DealPathItemRow extends StatelessWidget {
   const _DealPathItemRow({
-    required this.label,
+    required this.item,
+    required this.fallbackId,
     required this.relationship,
     required this.isRoot,
     required this.isCurrent,
   });
-
-  final String label;
+  final dynamic item;
+  final String fallbackId;
   final DealLineageEdgeType? relationship;
   final bool isRoot;
   final bool isCurrent;
@@ -1630,39 +2002,139 @@ class _DealPathItemRow extends StatelessWidget {
           };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isRoot
-                ? Icons.input_outlined
-                : relationship == DealLineageEdgeType.warrantyReplacement
-                ? Icons.verified_outlined
-                : Icons.swap_horiz,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
+          _InventoryThumbnail(item: item, size: 42),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  eventLabel,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(label),
-                if (isCurrent) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Current Item',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  _inventoryNumber(item, fallbackId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF125FB8),
+                    fontWeight: FontWeight.w900,
                   ),
-                ],
+                ),
+                Text(
+                  _inventoryName(item),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  eventLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ],
+            ),
+          ),
+          if (isCurrent)
+            const _SmallStatusTag(label: 'Current', color: Color(0xFFE07B18)),
+        ],
+      ),
+    );
+  }
+}
+
+class _DealReportCard extends StatelessWidget {
+  const _DealReportCard({required this.row});
+  final DealRollupReportRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    displayId,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                _DealStatusPill(status: row.status),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _InlineMetric(
+                    label: 'Current Profit',
+                    value: CurrencyFormatter.formatCents(
+                      row.realizedProfitCents,
+                    ),
+                    valueColor: _profitColor(row.realizedProfitCents),
+                  ),
+                ),
+                Expanded(
+                  child: _InlineMetric(
+                    label: 'Projected Profit',
+                    value: CurrencyFormatter.formatCents(
+                      row.projectedProfitCents,
+                    ),
+                    valueColor: _profitColor(row.projectedProfitCents),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineMetric extends StatelessWidget {
+  const _InlineMetric({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF657080),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: valueColor ?? const Color(0xFF082A4A),
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -1671,53 +2143,132 @@ class _DealPathItemRow extends StatelessWidget {
   }
 }
 
-class _BusinessEventCard extends StatelessWidget {
-  const _BusinessEventCard({
-    required this.icon,
-    required this.title,
-    required this.label,
-    required this.value,
-  });
+class _InventoryThumbnail extends StatelessWidget {
+  const _InventoryThumbnail({required this.item, this.size = 48});
+  final dynamic item;
+  final double size;
 
-  final IconData icon;
-  final String title;
+  @override
+  Widget build(BuildContext context) {
+    final List<String> photoUrls = item == null
+        ? const <String>[]
+        : (item.photoUrls as List<String>);
+    final photoUrl = photoUrls.isEmpty ? null : photoUrls.first;
+
+    Widget fallback() => Container(
+      color: const Color(0xFFEAF0F6),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.inventory_2_outlined,
+        size: size * 0.42,
+        color: const Color(0xFF657080),
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: photoUrl == null || photoUrl.trim().isEmpty
+            ? fallback()
+            : Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => fallback(),
+              ),
+      ),
+    );
+  }
+}
+
+class _DealStatusPill extends StatelessWidget {
+  const _DealStatusPill({required this.status});
+  final DealStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _dealStatusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        _dealFilterLabel(status),
+        maxLines: 1,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallStatusTag extends StatelessWidget {
+  const _SmallStatusTag({required this.label, required this.color});
   final String label;
-  final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 6),
-                _LabeledValue(label: label, value: value),
-              ],
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        maxLines: 1,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
 }
 
-String _dealStatusLabel(DealStatus status) {
+Color _profitColor(int cents) {
+  if (cents > 0) {
+    return const Color(0xFF12853D);
+  }
+  if (cents < 0) {
+    return const Color(0xFFD6242F);
+  }
+  return const Color(0xFF657080);
+}
+
+String _signedCurrency(int cents) {
+  final formatted = CurrencyFormatter.formatCents(cents.abs());
+  if (cents > 0) {
+    return '+$formatted';
+  }
+  if (cents < 0) {
+    return '-$formatted';
+  }
+  return formatted;
+}
+
+Color _agingBucketColor(InventoryAgingBucket bucket) {
+  return switch (bucket) {
+    InventoryAgingBucket.days0To30 => const Color(0xFF12853D),
+    InventoryAgingBucket.days31To60 => const Color(0xFFC48A00),
+    InventoryAgingBucket.days61To90 => const Color(0xFFE07B18),
+    InventoryAgingBucket.days91To180 => const Color(0xFFD9561F),
+    InventoryAgingBucket.days181Plus => const Color(0xFFD6242F),
+  };
+}
+
+Color _dealStatusColor(DealStatus status) {
   return switch (status) {
-    DealStatus.open => 'Active',
-    DealStatus.partiallyRealized => 'Partially Completed',
-    DealStatus.completed => 'Completed',
+    DealStatus.open => const Color(0xFF125FB8),
+    DealStatus.partiallyRealized => const Color(0xFFE07B18),
+    DealStatus.completed => const Color(0xFF12853D),
   };
 }
 
@@ -1731,119 +2282,25 @@ String _openPathLabel(int count) {
   return '$count Trade-In Paths Still Open';
 }
 
-String _inventoryLabel(dynamic item, String fallbackId) {
-  if (item == null) {
+String _inventoryNumber(dynamic item, String fallbackId) {
+  final value = item?.inventoryNumber as String?;
+  if (value == null || value.trim().isEmpty) {
     return fallbackId;
   }
-
-  final inventoryNumber = item.inventoryNumber as String?;
-  final brand = item.brand as String;
-  final model = item.model as String?;
-
-  final descriptiveName = [
-    brand.trim(),
-    if (model != null && model.trim().isNotEmpty) model.trim(),
-  ].where((value) => value.isNotEmpty).join(' ');
-
-  if (inventoryNumber != null && inventoryNumber.trim().isNotEmpty) {
-    return descriptiveName.isEmpty
-        ? inventoryNumber
-        : '$inventoryNumber - $descriptiveName';
-  }
-
-  return descriptiveName.isEmpty ? fallbackId : descriptiveName;
+  return value.trim();
 }
 
-class _DealReportCard extends StatelessWidget {
-  const _DealReportCard({required this.row});
-
-  final DealRollupReportRow row;
-
-  @override
-  Widget build(BuildContext context) {
-    final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(displayId, style: Theme.of(context).textTheme.titleSmall),
-                Chip(label: Text(row.status.label)),
-                if (row.cycleDetected)
-                  const Chip(label: Text('Cycle detected')),
-                if (row.depthLimitReached)
-                  const Chip(label: Text('Depth limit reached')),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 16,
-              runSpacing: 6,
-              children: [
-                _LabeledValue(
-                  label: 'Realized Profit',
-                  value: CurrencyFormatter.formatCents(row.realizedProfitCents),
-                ),
-                _LabeledValue(
-                  label: 'Projected Profit',
-                  value: CurrencyFormatter.formatCents(
-                    row.projectedProfitCents,
-                  ),
-                ),
-                _LabeledValue(
-                  label: 'Sold Children',
-                  value: row.realizedInventoryCount.toString(),
-                ),
-                _LabeledValue(
-                  label: 'Open Children',
-                  value: row.openInventoryCount.toString(),
-                ),
-                _LabeledValue(
-                  label: 'Nested Deals',
-                  value: row.descendantDealCount.toString(),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+String _inventoryName(dynamic item) {
+  if (item == null) {
+    return 'Unknown item';
   }
-}
-
-class _ReportSection extends StatelessWidget {
-  const _ReportSection({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-    super.key,
-  });
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 4),
-        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 12),
-        child,
-      ],
-    );
-  }
+  final brand = (item.brand as String).trim();
+  final model = (item.model as String?)?.trim();
+  final values = <String>[
+    if (brand.isNotEmpty) brand,
+    if (model != null && model.isNotEmpty) model,
+  ];
+  return values.isEmpty ? 'Unknown item' : values.join(' ');
 }
 
 class _ResponsiveMetricGrid extends StatelessWidget {
@@ -1900,28 +2357,6 @@ class _ReportMetricCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _LabeledValue extends StatelessWidget {
-  const _LabeledValue({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$label $value',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
-        ],
       ),
     );
   }

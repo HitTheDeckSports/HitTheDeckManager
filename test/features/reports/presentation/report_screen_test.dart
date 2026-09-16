@@ -199,7 +199,7 @@ void main() {
     await tester.tap(quickReport);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('closeQuickReportButton')), findsOneWidget);
-    expect(find.text('Sales Overview'), findsWidgets);
+    expect(find.text('Sales Trend'), findsWidgets);
     expect(find.byKey(const Key('financialPerformanceSection')), findsWidgets);
   });
 
@@ -226,7 +226,7 @@ void main() {
     },
   );
 
-  testWidgets('Sales Overview Quick Report shows trend-focused analysis', (
+  testWidgets('Sales Trend Quick Report matches prototype structure', (
     WidgetTester tester,
   ) async {
     await _pumpReports(tester);
@@ -240,14 +240,18 @@ void main() {
       find.byKey(const Key('financialPerformanceSection')),
       findsOneWidget,
     );
-    expect(find.text('Sales Trend'), findsOneWidget);
+    expect(find.text('Sales Trend'), findsWidgets);
     expect(find.byKey(const Key('salesOverviewGroupBy')), findsOneWidget);
+    expect(find.byKey(const Key('salesTrendThreeSeriesChart')), findsOneWidget);
+    expect(find.text('Revenue'), findsWidgets);
+    expect(find.text('Profit'), findsWidgets);
+    expect(find.text('Units Sold'), findsWidgets);
     expect(find.text('Key Metrics'), findsOneWidget);
     expect(find.text('Average Sale Price'), findsOneWidget);
     expect(find.text('Average Profit per Item'), findsOneWidget);
     expect(find.text('Best Revenue Period'), findsOneWidget);
     expect(find.text('Best Profit Period'), findsOneWidget);
-    expect(find.text('Performance'), findsOneWidget);
+    expect(find.text('Performance by Period'), findsOneWidget);
   });
 
   testWidgets('Items Sold Quick Report uses one Group By selector', (
