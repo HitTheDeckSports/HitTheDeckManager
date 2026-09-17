@@ -14,6 +14,7 @@ class ContactHistoryEntry {
     this.date,
     this.inventoryItemId,
     this.transactionId,
+    this.photoUrl,
   });
 
   final ContactHistoryType type;
@@ -22,6 +23,7 @@ class ContactHistoryEntry {
   final DateTime? date;
   final String? inventoryItemId;
   final String? transactionId;
+  final String? photoUrl;
 }
 
 class ContactRelationship {
@@ -122,6 +124,7 @@ ContactRelationship buildContactRelationship({
         date: sale.saleDate,
         inventoryItemId: sale.inventoryItemId,
         transactionId: sale.id,
+        photoUrl: _firstPhotoUrl(inventoryById[sale.inventoryItemId]),
       ),
     for (final item in linkedInventory)
       if (item.acquisitionType == AcquisitionType.purchased)
@@ -131,6 +134,7 @@ ContactRelationship buildContactRelationship({
           description: _inventoryDisplayName(item),
           date: item.purchaseDate,
           inventoryItemId: item.id,
+          photoUrl: _firstPhotoUrl(item),
         ),
     for (final trade in linkedTrades)
       ContactHistoryEntry(
@@ -141,6 +145,7 @@ ContactRelationship buildContactRelationship({
         description: _tradeDescription(trade, inventoryById),
         date: trade.tradeDate,
         transactionId: trade.id,
+        photoUrl: _tradePhotoUrl(trade, inventoryById),
       ),
     for (final consignment in linkedConsignments)
       ContactHistoryEntry(
@@ -152,6 +157,7 @@ ContactRelationship buildContactRelationship({
         date: consignment.consignmentDate,
         inventoryItemId: consignment.inventoryItemId,
         transactionId: consignment.id,
+        photoUrl: _firstPhotoUrl(inventoryById[consignment.inventoryItemId]),
       ),
   ]..sort(_compareHistoryEntries);
 
@@ -213,4 +219,24 @@ String _inventoryDisplayName(InventoryItem? item) {
 String? _normalizedId(String? value) {
   final normalized = value?.trim() ?? '';
   return normalized.isEmpty ? null : normalized;
+}
+
+String? _firstPhotoUrl(InventoryItem? item) {
+  if (item == null || item.photoUrls.isEmpty) return null;
+  final value = item.photoUrls.first.trim();
+  return value.isEmpty ? null : value;
+}
+
+String? _tradePhotoUrl(
+  TradeTransaction trade,
+  Map<String, InventoryItem> inventoryById,
+) {
+  for (final id in [
+    ...trade.incomingInventoryItemIds,
+    ...trade.outgoingInventoryItemIds,
+  ]) {
+    final url = _firstPhotoUrl(inventoryById[id]);
+    if (url != null) return url;
+  }
+  return null;
 }
