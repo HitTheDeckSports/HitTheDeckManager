@@ -62,8 +62,6 @@ void main() {
     await tester.ensureVisible(dealCard);
 
     expect(dealCard, findsOneWidget);
-    expect(find.text('BAT-2609-0001'), findsOneWidget);
-    expect(find.text('Louisville Slugger Atlas'), findsOneWidget);
     expect(find.text('Deal #2026-001'), findsOneWidget);
     expect(find.text('Partially Realized'), findsWidgets);
     expect(find.text('Current Profit'), findsOneWidget);
@@ -75,7 +73,11 @@ void main() {
     await tester.tap(find.byKey(const Key('recursiveDealExpansion_deal-a')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Original Sale'), findsWidgets);
+    expect(find.text('Why this Deal is still open'), findsOneWidget);
+    expect(find.text('Deal Journey'), findsOneWidget);
+    expect(find.text('ORIGINAL SALE'), findsOneWidget);
+    expect(find.text('BAT-2609-0001'), findsOneWidget);
+    expect(find.text('Louisville Slugger Atlas'), findsOneWidget);
 
     final pathCard = find.byKey(const Key('recursiveDealBranch_item-b'));
     await tester.ensureVisible(pathCard);
@@ -90,16 +92,8 @@ void main() {
     expect(find.text(r'$90.00'), findsOneWidget);
     expect(find.text('Active'), findsWidgets);
 
-    final branchExpansion = find.descendant(
-      of: pathCard,
-      matching: find.byType(ExpansionTile),
-    );
-    expect(branchExpansion, findsOneWidget);
-    await tester.tap(branchExpansion);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Received in Trade'), findsOneWidget);
-    expect(find.text('Warranty Replacement'), findsOneWidget);
+    expect(find.text('RECEIVED IN TRADE'), findsOneWidget);
+    expect(find.text('WARRANTY REPLACEMENT'), findsOneWidget);
     expect(find.text('BAT-2609-0003'), findsOneWidget);
     expect(find.text('Marucci CatX2'), findsOneWidget);
     expect(find.text('Current'), findsWidgets);

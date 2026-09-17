@@ -1006,18 +1006,24 @@ class _SalesTrendPainter extends CustomPainter {
       return top + plotHeight * (1 - ratio);
     }
 
-    double pointX(int index) {
-      if (points.length == 1) {
-        return left + plotWidth / 2;
-      }
-      return left + (plotWidth * index / (points.length - 1));
-    }
-
     final zeroY = moneyY(0);
     final availablePerPoint =
         plotWidth / (points.length == 1 ? 2 : points.length);
     final barWidth = (availablePerPoint * 0.26).clamp(9.0, 22.0);
     final barGap = (barWidth * 0.24).clamp(2.0, 5.0);
+
+    // Keep the entire paired Revenue/Profit bar group inside the plot.
+    // Without this inset, the final group is centered on plotRight and
+    // physically covers the right-side Units axis labels.
+    final edgeInset = barWidth + (barGap / 2) + 6;
+    final usablePlotWidth = plotWidth - (edgeInset * 2);
+
+    double pointX(int index) {
+      if (points.length == 1 || usablePlotWidth <= 0) {
+        return left + plotWidth / 2;
+      }
+      return left + edgeInset + (usablePlotWidth * index / (points.length - 1));
+    }
 
     void drawBar(
       double centerX,
@@ -1736,6 +1742,7 @@ class _RecursiveDealsSectionState extends State<_RecursiveDealsSection> {
     final rows = widget.report.rows
         .where((row) => row.status == _status)
         .toList(growable: false);
+
     return Column(
       key: const Key('dealsSection'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1748,7 +1755,8 @@ class _RecursiveDealsSectionState extends State<_RecursiveDealsSection> {
         if (rows.isEmpty)
           _EmptyReportState(message: 'No ${_dealFilterLabel(_status)} Deals.')
         else
-          for (final row in rows) _RecursiveDealCard(row: row),
+          for (final row in rows)
+            _RecursiveDealCard(row: row, report: widget.report),
       ],
     );
   }
@@ -1787,151 +1795,342 @@ class _DealStatusSelector extends StatelessWidget {
 }
 
 class _RecursiveDealCard extends StatelessWidget {
-  const _RecursiveDealCard({required this.row});
+  const _RecursiveDealCard({required this.row, required this.report});
+
   final RecursiveDealReportRow row;
+  final RecursiveDealReport report;
 
   @override
   Widget build(BuildContext context) {
-    final summary = row.summary;
     final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
-    final item = row.parentInventoryItem;
     final openPathCount = row.openBranchCount;
+    final reasons = _dealOpenReasons(row, report);
 
     return Card(
       key: Key('recursiveDealCard_$displayId'),
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         key: Key('recursiveDealExpansion_$displayId'),
-        tilePadding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        title: Row(
+        tilePadding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _InventoryThumbnail(item: item, size: 60),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _inventoryNumber(item, row.parentSale.inventoryItemId),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF125FB8),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _inventoryName(item),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF082A4A),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Original Sale',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (row.displayNumber != null && row.deal.id != null) ...[
-                    const SizedBox(height: 3),
-                    TextButton(
-                      key: Key('reportDealLink_${row.deal.id}'),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        alignment: Alignment.centerLeft,
-                      ),
-                      onPressed: () {
-                        final router = GoRouter.of(context);
-                        Navigator.of(context).pop();
-                        router.pushNamed(
-                          AppRouteNames.dealDetail,
-                          pathParameters: {'dealId': row.deal.id!},
-                        );
-                      },
-                      child: Text(
-                        'Deal #${row.displayNumber}',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: const Color(0xFF125FB8),
-                          fontWeight: FontWeight.w900,
-                          decoration: TextDecoration.underline,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: row.displayNumber == null
+                      ? Text(
+                          'Deal',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: const Color(0xFF082A4A),
+                                fontWeight: FontWeight.w900,
+                              ),
+                        )
+                      : _DealNumberLink(
+                          row: row,
+                          key: Key('reportDealLink_${row.deal.id}'),
                         ),
+                ),
+                _DealStatusPill(status: row.status),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8FB),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Current Profit',
+                      value: CurrencyFormatter.formatCents(
+                        row.currentProfitCents,
                       ),
+                      valueColor: _profitColor(row.currentProfitCents),
                     ),
-                  ],
+                  ),
+                  Container(
+                    width: 1,
+                    height: 42,
+                    color: const Color(0xFFDDE3EA),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _InlineMetric(
+                      label: 'Projected Profit',
+                      value: CurrencyFormatter.formatCents(
+                        row.projectedProfitCents,
+                      ),
+                      valueColor: _profitColor(row.projectedProfitCents),
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _openPathLabel(openPathCount),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF657080),
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (row.status != DealStatus.completed) ...[
+            const SizedBox(height: 4),
+            _WhyDealOpenCard(reasons: reasons),
+            const SizedBox(height: 14),
+          ] else ...[
+            const SizedBox(height: 4),
+            _DealCompleteCard(row: row),
+            const SizedBox(height: 14),
+          ],
+          Row(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _DealStatusPill(status: row.status),
+              const Icon(
+                Icons.account_tree_outlined,
+                size: 19,
+                color: Color(0xFF082A4A),
               ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F8FB),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _InlineMetric(
-                        label: 'Current Profit',
-                        value: CurrencyFormatter.formatCents(
-                          row.currentProfitCents,
-                        ),
-                        valueColor: _profitColor(row.currentProfitCents),
-                      ),
-                    ),
-                    Expanded(
-                      child: _InlineMetric(
-                        label: 'Projected Profit',
-                        value: CurrencyFormatter.formatCents(
-                          row.projectedProfitCents,
-                        ),
-                        valueColor: _profitColor(row.projectedProfitCents),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(width: 7),
               Text(
-                _openPathLabel(openPathCount),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF657080),
-                  fontWeight: FontWeight.w700,
+                'Deal Journey',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: const Color(0xFF082A4A),
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-        ),
-        children: [
-          const Divider(),
-          for (var i = 0; i < summary.branches.length; i++)
+          const SizedBox(height: 10),
+          _DealOriginalSaleNode(row: row),
+          for (var i = 0; i < row.summary.branches.length; i++) ...[
+            const _DealJourneyConnector(label: 'Trade received'),
             _RecursiveDealBranchCard(
               row: row,
-              branch: summary.branches[i],
+              report: report,
+              branch: row.summary.branches[i],
               pathNumber: i + 1,
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DealNumberLink extends StatelessWidget {
+  const _DealNumberLink({required this.row, super.key});
+
+  final RecursiveDealReportRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = row.displayNumber == null
+        ? 'Deal'
+        : 'Deal #${row.displayNumber}';
+    final dealId = row.deal.id;
+
+    if (dealId == null) {
+      return Text(
+        label,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: const Color(0xFF082A4A),
+          fontWeight: FontWeight.w900,
+        ),
+      );
+    }
+
+    return TextButton(
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        alignment: Alignment.centerLeft,
+      ),
+      onPressed: () {
+        final router = GoRouter.of(context);
+        Navigator.of(context).pop();
+        router.pushNamed(
+          AppRouteNames.dealDetail,
+          pathParameters: {'dealId': dealId},
+        );
+      },
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: const Color(0xFF125FB8),
+          fontWeight: FontWeight.w900,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
+}
+
+class _WhyDealOpenCard extends StatelessWidget {
+  const _WhyDealOpenCard({required this.reasons});
+
+  final List<String> reasons;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayedReasons = reasons.isEmpty
+        ? const ['A trade-in path or descendant Deal is still unresolved.']
+        : reasons;
+
+    return Container(
+      key: const Key('whyDealOpenCard'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF0C36A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Color(0xFFE07B18),
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Why this Deal is still open',
+                  maxLines: 2,
+                  softWrap: true,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF8A4B00),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          for (final reason in displayedReasons)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                '• $reason',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF60420F),
+                  height: 1.35,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DealCompleteCard extends StatelessWidget {
+  const _DealCompleteCard({required this.row});
+  final RecursiveDealReportRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('dealFullyRealizedCard'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7EF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFA9D8B9)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            color: Color(0xFF12853D),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Deal fully realized. All trade-in paths and descendant Deals '
+              'have been resolved.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF176B35),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DealOriginalSaleNode extends StatelessWidget {
+  const _DealOriginalSaleNode({required this.row});
+  final RecursiveDealReportRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final sale = row.parentSale;
+    return Container(
+      key: const Key('dealJourneyOriginalSale'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3FAF5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCDE9D6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _JourneyEventPill(
+            label: 'ORIGINAL SALE',
+            color: Color(0xFF12853D),
+          ),
+          const SizedBox(height: 10),
+          _JourneyInventoryIdentity(
+            item: row.parentInventoryItem,
+            fallbackId: sale.inventoryItemId,
+            trailing: const _SmallStatusTag(
+              label: 'Sold',
+              color: Color(0xFF657080),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _JourneyMoneyMetric(
+                  label: 'Cash Received',
+                  cents: sale.cashReceivedCents,
+                  accent: const Color(0xFF12853D),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _JourneyMoneyMetric(
+                  label: 'Trade Credit',
+                  cents: sale.tradeInCreditCents,
+                  accent: const Color(0xFF125FB8),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1941,55 +2140,44 @@ class _RecursiveDealCard extends StatelessWidget {
 class _RecursiveDealBranchCard extends StatelessWidget {
   const _RecursiveDealBranchCard({
     required this.row,
+    required this.report,
     required this.branch,
     required this.pathNumber,
   });
+
   final RecursiveDealReportRow row;
+  final RecursiveDealReport report;
   final DealBranchSummary branch;
   final int pathNumber;
 
   @override
   Widget build(BuildContext context) {
-    final rootItem = row.inventoryItemFor(branch.rootChildInventoryItemId);
     final branchNodes = row.tree.branchFor(branch.rootChildInventoryItemId);
     final active = branch.openInventoryCount > 0;
 
     return Card(
       key: Key('recursiveDealBranch_${branch.rootChildInventoryItemId}'),
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.zero,
       color: const Color(0xFFFBFCFE),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
-        childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        initiallyExpanded: true,
+        tilePadding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         title: Row(
           children: [
-            _InventoryThumbnail(item: rootItem, size: 46),
-            const SizedBox(width: 9),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Trade-In $pathNumber',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                  Text(
-                    _inventoryNumber(rootItem, branch.rootChildInventoryItemId),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFF125FB8),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    _inventoryName(rootItem),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+              child: Text(
+                'Trade-In $pathNumber',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: const Color(0xFF082A4A),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
+            ),
+            _SmallStatusTag(
+              label: active ? 'Active' : 'Completed',
+              color: active ? const Color(0xFF125FB8) : const Color(0xFF12853D),
             ),
           ],
         ),
@@ -2015,18 +2203,16 @@ class _RecursiveDealBranchCard extends StatelessWidget {
                   valueColor: _profitColor(branch.projectedBranchProfitCents),
                 ),
               ),
-              _SmallStatusTag(
-                label: active ? 'Active' : 'Completed',
-                color: active
-                    ? const Color(0xFF125FB8)
-                    : const Color(0xFF12853D),
-              ),
             ],
           ),
         ),
         children: [
           const Divider(height: 1),
-          for (var i = 0; i < branchNodes.length; i++)
+          for (var i = 0; i < branchNodes.length; i++) ...[
+            if (i > 0)
+              _DealJourneyConnector(
+                label: _relationshipLabel(branchNodes[i].edgeTypeFromParent),
+              ),
             _DealPathItemRow(
               item: row.inventoryItemFor(branchNodes[i].inventoryItemId),
               fallbackId: branchNodes[i].inventoryItemId,
@@ -2035,6 +2221,12 @@ class _RecursiveDealBranchCard extends StatelessWidget {
               isCurrent:
                   i == branchNodes.length - 1 && branch.openInventoryCount > 0,
             ),
+            if (_nestedDealForInventory(report, branchNodes[i].inventoryItemId)
+                case final nestedDeal?) ...[
+              const _DealJourneyConnector(label: 'Sold • continued as Deal'),
+              _NestedDealContinuationCard(row: nestedDeal, report: report),
+            ],
+          ],
         ],
       ),
     );
@@ -2049,6 +2241,7 @@ class _DealPathItemRow extends StatelessWidget {
     required this.isRoot,
     required this.isCurrent,
   });
+
   final dynamic item;
   final String fallbackId;
   final DealLineageEdgeType? relationship;
@@ -2065,46 +2258,357 @@ class _DealPathItemRow extends StatelessWidget {
             null => 'Continued Deal Item',
           };
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return Container(
+      key: Key('dealJourneyItem_$fallbackId'),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _InventoryThumbnail(item: item, size: 42),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _inventoryNumber(item, fallbackId),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFF125FB8),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  _inventoryName(item),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  eventLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ],
-            ),
+          _JourneyEventPill(
+            label: eventLabel.toUpperCase(),
+            color: relationship == DealLineageEdgeType.warrantyReplacement
+                ? const Color(0xFF125FB8)
+                : const Color(0xFF6F42C1),
           ),
-          if (isCurrent)
-            const _SmallStatusTag(label: 'Current', color: Color(0xFFE07B18)),
+          const SizedBox(height: 8),
+          _JourneyInventoryIdentity(
+            item: item,
+            fallbackId: fallbackId,
+            trailing: isCurrent
+                ? const _SmallStatusTag(
+                    label: 'Current',
+                    color: Color(0xFFE07B18),
+                  )
+                : null,
+          ),
         ],
       ),
     );
   }
+}
+
+class _NestedDealContinuationCard extends StatelessWidget {
+  const _NestedDealContinuationCard({required this.row, required this.report});
+
+  final RecursiveDealReportRow row;
+  final RecursiveDealReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final reasons = _dealOpenReasons(row, report);
+    final openItems = row.lineageInventoryItems
+        .where((item) => item.isAvailable)
+        .toList(growable: false);
+
+    return Container(
+      key: Key('nestedDealContinuation_${row.deal.id}'),
+      margin: const EdgeInsets.only(top: 2, bottom: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4ECFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD6B9F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.link, color: Color(0xFF6F2DA8), size: 20),
+              const SizedBox(width: 7),
+              Expanded(child: _DealNumberLink(row: row)),
+              _DealStatusPill(status: row.status),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Created from this sale • continues the financial lineage',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF6F42C1),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Current',
+                  value: CurrencyFormatter.formatCents(row.currentProfitCents),
+                  valueColor: _profitColor(row.currentProfitCents),
+                ),
+              ),
+              Expanded(
+                child: _InlineMetric(
+                  label: 'Projected',
+                  value: CurrencyFormatter.formatCents(
+                    row.projectedProfitCents,
+                  ),
+                  valueColor: _profitColor(row.projectedProfitCents),
+                ),
+              ),
+            ],
+          ),
+          if (openItems.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Current open inventory',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: const Color(0xFF657080),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (final item in openItems.take(2))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _JourneyInventoryIdentity(
+                  item: item,
+                  fallbackId: item.id ?? '',
+                  compact: true,
+                  trailing: const _SmallStatusTag(
+                    label: 'Available',
+                    color: Color(0xFF12853D),
+                  ),
+                ),
+              ),
+          ] else if (row.status != DealStatus.completed &&
+              reasons.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              reasons.first,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF60420F),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyInventoryIdentity extends StatelessWidget {
+  const _JourneyInventoryIdentity({
+    required this.item,
+    required this.fallbackId,
+    this.trailing,
+    this.compact = false,
+  });
+
+  final dynamic item;
+  final String fallbackId;
+  final Widget? trailing;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final inventoryNumber = _inventoryNumber(item, fallbackId);
+    final displayName = _inventoryName(item);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _InventoryThumbnail(item: item, size: compact ? 42 : 54),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                inventoryNumber,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: const Color(0xFF125FB8),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                displayName,
+                maxLines: compact ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF082A4A),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+      ],
+    );
+  }
+}
+
+class _JourneyEventPill extends StatelessWidget {
+  const _JourneyEventPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyMoneyMetric extends StatelessWidget {
+  const _JourneyMoneyMetric({
+    required this.label,
+    required this.cents,
+    required this.accent,
+  });
+
+  final String label;
+  final int cents;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF657080),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            CurrencyFormatter.formatCents(cents),
+            maxLines: 1,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DealJourneyConnector extends StatelessWidget {
+  const _DealJourneyConnector({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          const SizedBox(width: 24),
+          Container(width: 2, height: 22, color: const Color(0xFFB9C4D0)),
+          const SizedBox(width: 10),
+          const Icon(Icons.arrow_downward, size: 15, color: Color(0xFF657080)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: const Color(0xFF657080),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+RecursiveDealReportRow? _nestedDealForInventory(
+  RecursiveDealReport report,
+  String inventoryItemId,
+) {
+  for (final candidate in report.rows) {
+    if (candidate.parentSale.inventoryItemId == inventoryItemId) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+String _relationshipLabel(DealLineageEdgeType? relationship) {
+  return switch (relationship) {
+    DealLineageEdgeType.trade => 'Later trade-in',
+    DealLineageEdgeType.warrantyReplacement => 'Warranty replacement',
+    null => 'Continues',
+  };
+}
+
+List<String> _dealOpenReasons(
+  RecursiveDealReportRow row,
+  RecursiveDealReport report,
+) {
+  final reasons = <String>[];
+
+  for (final item in row.lineageInventoryItems) {
+    if (item.isAvailable) {
+      reasons.add(
+        '${_inventoryNumber(item, item.id ?? '')} is still in inventory.',
+      );
+    }
+  }
+
+  final lineageIds = row.lineageInventoryItems
+      .map((item) => item.id)
+      .whereType<String>()
+      .toSet();
+
+  for (final nested in report.rows) {
+    if (!lineageIds.contains(nested.parentSale.inventoryItemId) ||
+        nested.status == DealStatus.completed) {
+      continue;
+    }
+
+    final number = nested.displayNumber == null
+        ? 'A descendant Deal'
+        : 'Deal #${nested.displayNumber}';
+    final openItems = nested.lineageInventoryItems
+        .where((item) => item.isAvailable)
+        .toList(growable: false);
+
+    if (openItems.isEmpty) {
+      reasons.add('$number continues this trade-in path.');
+    } else {
+      final first = openItems.first;
+      reasons.add(
+        '$number continues this trade-in path; '
+        '${_inventoryNumber(first, first.id ?? '')} is still in inventory.',
+      );
+    }
+  }
+
+  return reasons;
 }
 
 class _DealReportCard extends StatelessWidget {
