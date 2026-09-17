@@ -9,7 +9,7 @@ import 'package:hit_the_deck_manager/features/transactions/domain/models/transac
 
 void main() {
   test(
-    'builds confirmed totals without counting consignments as sold to us',
+    'builds confirmed counts and dollar totals without counting consignments as sold to us',
     () {
       final relationship = buildContactRelationship(
         contactId: 'contact-1',
@@ -56,6 +56,10 @@ void main() {
       expect(relationship.boughtFromUsCount, 1);
       expect(relationship.soldToUsCount, 2);
       expect(relationship.consignmentCount, 1);
+      expect(relationship.boughtFromUsCents, 10000);
+      expect(relationship.soldToUsCents, 10000);
+      expect(relationship.lastInteractionDate, DateTime(2026, 4, 1));
+      expect(relationship.totalInteractionCount, 4);
       expect(relationship.history.map((entry) => entry.type), [
         ContactHistoryType.sale,
         ContactHistoryType.consignment,
@@ -104,6 +108,7 @@ void main() {
         ContactHistoryType.trade,
         ContactHistoryType.consignment,
       });
+      expect(relationship.soldToUsCents, 5000);
     },
   );
 
@@ -127,6 +132,7 @@ void main() {
 
     expect(relationship.history.first.type, ContactHistoryType.sale);
     expect(relationship.history.last.date, isNull);
+    expect(relationship.lastInteractionDate, DateTime(2026, 4, 1));
   });
 }
 

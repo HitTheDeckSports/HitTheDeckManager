@@ -30,18 +30,38 @@ class ContactRelationship {
     required this.soldToUsCount,
     required this.consignmentCount,
     required this.history,
+    this.boughtFromUsCents = 0,
+    this.soldToUsCents = 0,
   });
 
   const ContactRelationship.empty()
     : boughtFromUsCount = 0,
       soldToUsCount = 0,
       consignmentCount = 0,
+      boughtFromUsCents = 0,
+      soldToUsCents = 0,
       history = const [];
 
   final int boughtFromUsCount;
   final int soldToUsCount;
   final int consignmentCount;
+
+  /// Total historical Sale Price for sales linked to this buyer.
+  final int boughtFromUsCents;
+
+  /// Total acquisition value of non-consignment inventory linked to this seller.
+  final int soldToUsCents;
+
   final List<ContactHistoryEntry> history;
+
+  DateTime? get lastInteractionDate {
+    for (final entry in history) {
+      if (entry.date != null) return entry.date;
+    }
+    return null;
+  }
+
+  int get totalInteractionCount => history.length;
 }
 
 ContactRelationship buildContactRelationship({
@@ -80,9 +100,18 @@ ContactRelationship buildContactRelationship({
       )
       .toList(growable: false);
 
-  final soldToUsCount = linkedInventory
+  final soldToUsItems = linkedInventory
       .where((item) => item.acquisitionType != AcquisitionType.consignment)
-      .length;
+      .toList(growable: false);
+  final soldToUsCount = soldToUsItems.length;
+  final boughtFromUsCents = linkedSales.fold<int>(
+    0,
+    (total, sale) => total + sale.salePriceCents,
+  );
+  final soldToUsCents = soldToUsItems.fold<int>(
+    0,
+    (total, item) => total + item.acquisitionValueCents,
+  );
 
   final history = <ContactHistoryEntry>[
     for (final sale in linkedSales)
@@ -130,6 +159,8 @@ ContactRelationship buildContactRelationship({
     boughtFromUsCount: linkedSales.length,
     soldToUsCount: soldToUsCount,
     consignmentCount: linkedConsignments.length,
+    boughtFromUsCents: boughtFromUsCents,
+    soldToUsCents: soldToUsCents,
     history: List.unmodifiable(history),
   );
 }
