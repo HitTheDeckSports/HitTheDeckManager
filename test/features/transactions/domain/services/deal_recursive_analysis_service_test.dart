@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal_status.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
@@ -158,6 +159,7 @@ void main() {
       expect(result.projectedOpenInventoryValueCents, 15000);
       expect(result.projectedProfitCents, 24000);
       expect(result.openBranchCount, 1);
+      expect(result.status, DealStatus.partiallyRealized);
 
       final branchB = result.branches[0];
       expect(branchB.realizedProfitCents, 15500);

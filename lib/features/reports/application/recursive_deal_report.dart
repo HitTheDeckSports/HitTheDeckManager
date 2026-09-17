@@ -8,7 +8,9 @@ import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/trade_transaction.dart';
 import '../../transactions/domain/models/warranty_replacement_deal.dart';
 import '../../transactions/domain/services/deal_lineage_service.dart';
+import '../../transactions/domain/models/deal_status.dart';
 import '../../transactions/domain/services/deal_tree_profit_service.dart';
+import '../../transactions/domain/services/deal_recursive_analysis_service.dart';
 
 class RecursiveDealReportRow {
   RecursiveDealReportRow({
@@ -18,6 +20,8 @@ class RecursiveDealReportRow {
     required this.tree,
     required this.summary,
     required List<InventoryItem> lineageInventoryItems,
+    this.recursiveAnalysis,
+    this.displayNumber,
   }) : lineageInventoryItems = List.unmodifiable(lineageInventoryItems),
        _inventoryById = {
          for (final item in lineageInventoryItems)
@@ -29,8 +33,23 @@ class RecursiveDealReportRow {
   final InventoryItem? parentInventoryItem;
   final DealLineageTree tree;
   final DealTreeProfitSummary summary;
+  final DealRecursiveFinancialAnalysis? recursiveAnalysis;
+  final String? displayNumber;
   final List<InventoryItem> lineageInventoryItems;
   final Map<String, InventoryItem> _inventoryById;
+
+  DealStatus get status => recursiveAnalysis?.status ?? summary.status;
+
+  int get currentProfitCents =>
+      recursiveAnalysis?.currentProfitCents ?? summary.realizedDealProfitCents;
+
+  int get projectedProfitCents =>
+      recursiveAnalysis?.projectedProfitCents ??
+      summary.projectedDealProfitCents;
+
+  int get openBranchCount =>
+      recursiveAnalysis?.openBranchCount ??
+      summary.branches.where((branch) => branch.openInventoryCount > 0).length;
 
   InventoryItem? inventoryItemFor(String inventoryItemId) {
     return _inventoryById[inventoryItemId];
@@ -62,6 +81,7 @@ class RecursiveDealReport {
     };
 
     final rows = <RecursiveDealReportRow>[];
+    final displayNumbers = _dealDisplayNumbers(deals);
 
     for (final deal in deals) {
       final parentSale = saleById[deal.parentSaleTransactionId];
@@ -127,6 +147,17 @@ class RecursiveDealReport {
         warrantyReplacements: lineageWarranties,
       );
 
+      final recursiveAnalysis = DealRecursiveAnalysisService.calculate(
+        deal: deal,
+        deals: deals,
+        inventoryItems: inventoryItems,
+        sales: sales,
+        repairs: repairs,
+        disposals: disposals,
+        trades: trades,
+        warrantyReplacements: warrantyReplacements,
+      );
+
       rows.add(
         RecursiveDealReportRow(
           deal: deal,
@@ -135,10 +166,47 @@ class RecursiveDealReport {
           tree: tree,
           summary: summary,
           lineageInventoryItems: lineageItems,
+          recursiveAnalysis: recursiveAnalysis,
+          displayNumber: deal.id == null ? null : displayNumbers[deal.id!],
         ),
       );
     }
 
     return RecursiveDealReport(rows: List.unmodifiable(rows));
   }
+}
+
+Map<String, String> _dealDisplayNumbers(List<Deal> deals) {
+  final result = <String, String>{};
+  final byYear = <int, List<Deal>>{};
+
+  for (final deal in deals) {
+    final id = deal.id;
+    final createdAt = deal.createdAt;
+    if (id == null || createdAt == null) {
+      continue;
+    }
+    byYear.putIfAbsent(createdAt.year, () => <Deal>[]).add(deal);
+  }
+
+  for (final entry in byYear.entries) {
+    final yearDeals = entry.value
+      ..sort((first, second) {
+        final timeComparison = first.createdAt!.compareTo(second.createdAt!);
+        if (timeComparison != 0) {
+          return timeComparison;
+        }
+        return (first.id ?? '').compareTo(second.id ?? '');
+      });
+
+    for (var index = 0; index < yearDeals.length; index++) {
+      final id = yearDeals[index].id;
+      if (id == null) {
+        continue;
+      }
+      result[id] = '${entry.key}-${(index + 1).toString().padLeft(3, '0')}';
+    }
+  }
+
+  return result;
 }

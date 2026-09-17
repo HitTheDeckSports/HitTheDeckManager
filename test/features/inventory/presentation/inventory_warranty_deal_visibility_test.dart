@@ -42,11 +42,12 @@ void main() {
         status: InventoryStatus.available,
       );
 
-      const recursiveDeal = Deal(
+      final recursiveDeal = Deal(
         id: 'deal-root',
         parentSaleTransactionId: 'sale-root',
-        childInventoryItemIds: ['trade-item'],
-        lineageInventoryItemIds: ['trade-item', 'replacement-item'],
+        childInventoryItemIds: const ['trade-item'],
+        lineageInventoryItemIds: const ['trade-item', 'replacement-item'],
+        createdAt: DateTime(2026, 9, 1),
       );
 
       final warrantyDeal = WarrantyReplacementDeal(
@@ -63,7 +64,7 @@ void main() {
       );
       final transactionRepository = InMemoryTransactionRepository();
       final dealRepository = InMemoryDealRepository(
-        initialDeals: const [recursiveDeal],
+        initialDeals: [recursiveDeal],
       );
       final warrantyRepository = InMemoryWarrantyReplacementDealRepository(
         initialDeals: [warrantyDeal],
@@ -106,6 +107,9 @@ void main() {
         find.text('This inventory item is part of a continuing Deal lineage.'),
         findsOneWidget,
       );
+      expect(find.text('Deal #2026-001'), findsOneWidget);
+      expect(find.byKey(const Key('inventoryDealNumberLink')), findsOneWidget);
+      expect(find.text('View Deal'), findsNothing);
       expect(
         find.byKey(const Key('inventoryTradeHistoryEmpty')),
         findsOneWidget,

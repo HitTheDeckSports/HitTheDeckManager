@@ -46,63 +46,73 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    final quickReport = find.byKey(const Key('quickReportDeals'));
+    await tester.ensureVisible(quickReport);
+    await tester.tap(quickReport);
+    await tester.pumpAndSettle();
+
+    final statusFilter = find.byKey(const Key('dealStatusFilter'));
+    expect(statusFilter, findsOneWidget);
+    await tester.tap(statusFilter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Partially Realized').last);
+    await tester.pumpAndSettle();
+
     final dealCard = find.byKey(const Key('recursiveDealCard_deal-a'));
     await tester.ensureVisible(dealCard);
 
     expect(dealCard, findsOneWidget);
-    expect(
-      find.text('BAT-2609-0001 - Louisville Slugger Atlas'),
-      findsOneWidget,
-    );
-    expect(find.text('Partially Completed'), findsOneWidget);
-    expect(find.text('Profit So Far'), findsOneWidget);
+    expect(find.text('BAT-2609-0001'), findsOneWidget);
+    expect(find.text('Louisville Slugger Atlas'), findsOneWidget);
+    expect(find.text('Deal #2026-001'), findsOneWidget);
+    expect(find.text('Partially Realized'), findsWidgets);
+    expect(find.text('Current Profit'), findsOneWidget);
     expect(find.text(r'$190.00'), findsOneWidget);
-    expect(find.text('Estimated Final Profit'), findsOneWidget);
+    expect(find.text('Projected Profit'), findsOneWidget);
     expect(find.text(r'$240.00'), findsOneWidget);
     expect(find.text('1 Trade-In Path Still Open'), findsOneWidget);
-    expect(find.text('Parent Item'), findsNothing);
-    expect(find.text('Branch Realized'), findsNothing);
-    expect(find.text('Open Projection'), findsNothing);
 
     await tester.tap(find.byKey(const Key('recursiveDealExpansion_deal-a')));
     await tester.pumpAndSettle();
 
     expect(find.text('Original Sale'), findsWidgets);
-    expect(find.text('Original Sale Profit'), findsOneWidget);
-    expect(find.text(r'$150.00'), findsOneWidget);
-    expect(find.text('Trade-In Paths'), findsOneWidget);
 
     final pathCard = find.byKey(const Key('recursiveDealBranch_item-b'));
     await tester.ensureVisible(pathCard);
 
     expect(pathCard, findsOneWidget);
     expect(find.text('Trade-In 1'), findsOneWidget);
-    expect(find.text('BAT-2609-0002 - Easton Hype Fire'), findsOneWidget);
-    expect(find.text('Path Profit So Far'), findsOneWidget);
+    expect(find.text('BAT-2609-0002'), findsOneWidget);
+    expect(find.text('Easton Hype Fire'), findsOneWidget);
+    expect(find.text('Current'), findsWidgets);
     expect(find.text(r'$40.00'), findsOneWidget);
-    expect(find.text('Est. Final Path Profit'), findsOneWidget);
+    expect(find.text('Projected'), findsWidgets);
     expect(find.text(r'$90.00'), findsOneWidget);
-    expect(find.text('Still Active'), findsOneWidget);
+    expect(find.text('Active'), findsWidgets);
 
-    await tester.tap(
-      find.byKey(const Key('recursiveDealBranchExpansion_item-b')),
+    final branchExpansion = find.descendant(
+      of: pathCard,
+      matching: find.byType(ExpansionTile),
     );
+    expect(branchExpansion, findsOneWidget);
+    await tester.tap(branchExpansion);
     await tester.pumpAndSettle();
 
     expect(find.text('Received in Trade'), findsOneWidget);
     expect(find.text('Warranty Replacement'), findsOneWidget);
-    expect(find.text('BAT-2609-0003 - Marucci CatX2'), findsOneWidget);
-    expect(find.text('Current Item'), findsOneWidget);
-    expect(find.text('Branch Root'), findsNothing);
+    expect(find.text('BAT-2609-0003'), findsOneWidget);
+    expect(find.text('Marucci CatX2'), findsOneWidget);
+    expect(find.text('Current'), findsWidgets);
   });
 }
 
 ReportsSnapshot _recursiveSnapshot() {
-  const deal = Deal(
+  final deal = Deal(
     id: 'deal-a',
     parentSaleTransactionId: 'sale-parent',
-    childInventoryItemIds: ['item-b'],
-    lineageInventoryItemIds: ['item-b', 'item-w'],
+    childInventoryItemIds: const ['item-b'],
+    lineageInventoryItemIds: const ['item-b', 'item-w'],
+    createdAt: DateTime(2026, 9, 1),
   );
 
   final parentSale = SaleTransaction(
@@ -189,6 +199,7 @@ ReportsSnapshot _recursiveSnapshot() {
         tree: tree,
         summary: summary,
         lineageInventoryItems: const [itemB, itemW],
+        displayNumber: '2026-001',
       ),
     ],
   );

@@ -1203,11 +1203,26 @@ void main() {
     await tester.tap(viewTransactionButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sale Transaction'), findsOneWidget);
-    expect(find.text('Transaction Summary'), findsOneWidget);
-
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
-
+    final transactionHero = find.byKey(const Key('saleTransactionItemHero'));
+    expect(transactionHero, findsOneWidget);
+    expect(
+      find.byKey(const Key('saleTransactionDetailsSection')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: transactionHero,
+        matching: find.text('BAT-2608-0001'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: transactionHero,
+        matching: find.text('Combat Spec H1'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Navigation test sale.'), findsOneWidget);
   });
   testWidgets('item without a seller displays no seller linked', (
@@ -1868,10 +1883,8 @@ void main() {
       findsOneWidget,
     );
 
-    expect(
-      find.text('BAT-2608-0001 — Combat Spec H1'),
-      findsAtLeastNWidgets(1),
-    );
+    expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
 
     expect(find.byKey(const Key('addRepairCostField')), findsOneWidget);
 

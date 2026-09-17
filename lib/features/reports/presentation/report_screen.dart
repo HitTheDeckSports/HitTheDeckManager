@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/formatting/currency_formatter.dart';
 import '../../authentication/presentation/providers/app_permissions_provider.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
@@ -915,12 +917,14 @@ class _SalesTrendPainter extends CustomPainter {
       return;
     }
 
-    const left = 52.0;
-    const right = 38.0;
-    const top = 10.0;
+    const left = 54.0;
+    const right = 54.0;
+    const top = 26.0;
     const bottom = 36.0;
     final plotWidth = size.width - left - right;
     final plotHeight = size.height - top - bottom;
+    final plotRight = left + plotWidth;
+    final plotBottom = top + plotHeight;
 
     var minMoney = 0;
     var maxMoney = 1;
@@ -952,40 +956,41 @@ class _SalesTrendPainter extends CustomPainter {
 
     canvas.drawLine(
       const Offset(left, top),
-      Offset(left, top + plotHeight),
+      Offset(left, plotBottom),
       axisPaint,
     );
     canvas.drawLine(
-      Offset(left, top + plotHeight),
-      Offset(left + plotWidth, top + plotHeight),
+      Offset(left, plotBottom),
+      Offset(plotRight, plotBottom),
       axisPaint,
     );
     canvas.drawLine(
-      Offset(left + plotWidth, top),
-      Offset(left + plotWidth, top + plotHeight),
+      Offset(plotRight, top),
+      Offset(plotRight, plotBottom),
       axisPaint,
     );
 
     for (var i = 0; i <= 4; i++) {
       final ratio = i / 4;
       final y = top + plotHeight * (1 - ratio);
-      canvas.drawLine(Offset(left, y), Offset(left + plotWidth, y), gridPaint);
+      canvas.drawLine(Offset(left, y), Offset(plotRight, y), gridPaint);
 
       final money = minMoney + ((maxMoney - minMoney) * ratio).round();
       final units = (maxUnits * ratio).round();
+
       _paintChartText(
         canvas,
         _compactAxisMoney(money),
         Offset(0, y - 7),
-        width: left - 5,
+        width: left - 6,
         align: TextAlign.right,
         color: textColor,
       );
       _paintChartText(
         canvas,
         units.toString(),
-        Offset(left + plotWidth + 5, y - 7),
-        width: right - 5,
+        Offset(plotRight + 7, y - 7),
+        width: right - 10,
         align: TextAlign.left,
         color: textColor,
       );
@@ -1008,37 +1013,74 @@ class _SalesTrendPainter extends CustomPainter {
       return left + (plotWidth * index / (points.length - 1));
     }
 
-    void drawSeries(Color color, double Function(_TrendPoint point) yForPoint) {
+    final zeroY = moneyY(0);
+    final availablePerPoint =
+        plotWidth / (points.length == 1 ? 2 : points.length);
+    final barWidth = (availablePerPoint * 0.26).clamp(9.0, 22.0);
+    final barGap = (barWidth * 0.24).clamp(2.0, 5.0);
+
+    void drawBar(
+      double centerX,
+      int cents,
+      Color color,
+      double horizontalOffset,
+    ) {
+      final valueY = moneyY(cents);
+      final rect = Rect.fromLTRB(
+        centerX + horizontalOffset - barWidth / 2,
+        valueY < zeroY ? valueY : zeroY,
+        centerX + horizontalOffset + barWidth / 2,
+        valueY < zeroY ? zeroY : valueY,
+      );
       final paint = Paint()
         ..color = color
-        ..strokeWidth = 2.6
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-      final dotPaint = Paint()
-        ..color = color
         ..style = PaintingStyle.fill;
-
-      final path = Path();
-      for (var i = 0; i < points.length; i++) {
-        final x = pointX(i);
-        final y = yForPoint(points[i]);
-        if (i == 0) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
-      }
-      canvas.drawPath(path, paint);
-
-      for (var i = 0; i < points.length; i++) {
-        canvas.drawCircle(Offset(pointX(i), yForPoint(points[i])), 4, dotPaint);
-      }
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+        paint,
+      );
     }
 
-    drawSeries(revenueColor, (point) => moneyY(point.revenueCents));
-    drawSeries(profitColor, (point) => moneyY(point.profitCents));
-    drawSeries(unitsColor, (point) => unitsY(point.units));
+    for (var i = 0; i < points.length; i++) {
+      final x = pointX(i);
+      drawBar(
+        x,
+        points[i].revenueCents,
+        revenueColor,
+        -(barWidth + barGap) / 2,
+      );
+      drawBar(x, points[i].profitCents, profitColor, (barWidth + barGap) / 2);
+    }
+
+    final unitsPaint = Paint()
+      ..color = unitsColor
+      ..strokeWidth = 2.8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final unitsDotPaint = Paint()
+      ..color = unitsColor
+      ..style = PaintingStyle.fill;
+
+    final unitsPath = Path();
+    for (var i = 0; i < points.length; i++) {
+      final x = pointX(i);
+      final y = unitsY(points[i].units);
+      if (i == 0) {
+        unitsPath.moveTo(x, y);
+      } else {
+        unitsPath.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(unitsPath, unitsPaint);
+
+    for (var i = 0; i < points.length; i++) {
+      canvas.drawCircle(
+        Offset(pointX(i), unitsY(points[i].units)),
+        4,
+        unitsDotPaint,
+      );
+    }
 
     for (var i = 0; i < points.length; i++) {
       final x = pointX(i);
@@ -1046,7 +1088,7 @@ class _SalesTrendPainter extends CustomPainter {
       _paintChartText(
         canvas,
         label,
-        Offset(x - 30, top + plotHeight + 8),
+        Offset(x - 30, plotBottom + 8),
         width: 60,
         align: TextAlign.center,
         color: textColor,
@@ -1055,9 +1097,9 @@ class _SalesTrendPainter extends CustomPainter {
 
     _paintChartText(
       canvas,
-      r'$',
-      const Offset(2, 0),
-      width: 20,
+      'Dollars',
+      const Offset(2, 2),
+      width: left - 7,
       align: TextAlign.left,
       color: textColor,
       bold: true,
@@ -1065,8 +1107,8 @@ class _SalesTrendPainter extends CustomPainter {
     _paintChartText(
       canvas,
       'Units',
-      Offset(size.width - right + 3, 0),
-      width: right - 3,
+      Offset(plotRight + 7, 2),
+      width: right - 8,
       align: TextAlign.left,
       color: textColor,
       bold: true,
@@ -1467,7 +1509,7 @@ class _InventoryAgingRowWidget extends StatelessWidget {
           child: ExpansionTile(
             tilePadding: const EdgeInsets.fromLTRB(12, 7, 10, 7),
             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            initiallyExpanded: row.bucket == InventoryAgingBucket.days0To30,
+            initiallyExpanded: false,
             iconColor: accent,
             collapsedIconColor: const Color(0xFF082A4A),
             title: Text(
@@ -1692,7 +1734,7 @@ class _RecursiveDealsSectionState extends State<_RecursiveDealsSection> {
   @override
   Widget build(BuildContext context) {
     final rows = widget.report.rows
-        .where((row) => row.summary.status == _status)
+        .where((row) => row.status == _status)
         .toList(growable: false);
     return Column(
       key: const Key('dealsSection'),
@@ -1753,9 +1795,7 @@ class _RecursiveDealCard extends StatelessWidget {
     final summary = row.summary;
     final displayId = row.deal.id ?? 'Sale ${row.deal.parentSaleTransactionId}';
     final item = row.parentInventoryItem;
-    final openPathCount = summary.branches
-        .where((branch) => branch.openInventoryCount > 0)
-        .length;
+    final openPathCount = row.openBranchCount;
 
     return Card(
       key: Key('recursiveDealCard_$displayId'),
@@ -1798,6 +1838,34 @@ class _RecursiveDealCard extends StatelessWidget {
                     'Original Sale',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+                  if (row.displayNumber != null && row.deal.id != null) ...[
+                    const SizedBox(height: 3),
+                    TextButton(
+                      key: Key('reportDealLink_${row.deal.id}'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: () {
+                        final router = GoRouter.of(context);
+                        Navigator.of(context).pop();
+                        router.pushNamed(
+                          AppRouteNames.dealDetail,
+                          pathParameters: {'dealId': row.deal.id!},
+                        );
+                      },
+                      child: Text(
+                        'Deal #${row.displayNumber}',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: const Color(0xFF125FB8),
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1810,7 +1878,7 @@ class _RecursiveDealCard extends StatelessWidget {
             children: [
               Align(
                 alignment: Alignment.centerLeft,
-                child: _DealStatusPill(status: summary.status),
+                child: _DealStatusPill(status: row.status),
               ),
               const SizedBox(height: 10),
               Container(
@@ -1828,22 +1896,18 @@ class _RecursiveDealCard extends StatelessWidget {
                       child: _InlineMetric(
                         label: 'Current Profit',
                         value: CurrencyFormatter.formatCents(
-                          summary.realizedDealProfitCents,
+                          row.currentProfitCents,
                         ),
-                        valueColor: _profitColor(
-                          summary.realizedDealProfitCents,
-                        ),
+                        valueColor: _profitColor(row.currentProfitCents),
                       ),
                     ),
                     Expanded(
                       child: _InlineMetric(
                         label: 'Projected Profit',
                         value: CurrencyFormatter.formatCents(
-                          summary.projectedDealProfitCents,
+                          row.projectedProfitCents,
                         ),
-                        valueColor: _profitColor(
-                          summary.projectedDealProfitCents,
-                        ),
+                        valueColor: _profitColor(row.projectedProfitCents),
                       ),
                     ),
                   ],

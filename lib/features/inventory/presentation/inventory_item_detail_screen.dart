@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -1599,43 +1599,85 @@ class _InventoryDealSection extends ConsumerWidget {
   }
 }
 
-class _DealLinkSection extends StatelessWidget {
+class _DealLinkSection extends ConsumerWidget {
   const _DealLinkSection({required this.dealId, required this.message});
 
   final String? dealId;
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final id = dealId?.trim() ?? '';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = dealId;
+    final displayNumberAsync = id == null
+        ? const AsyncValue<String?>.data(null)
+        : ref.watch(dealDisplayNumberProvider(id));
 
-    if (id.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final label = displayNumberAsync.maybeWhen(
+      data: (displayNumber) =>
+          displayNumber == null ? 'Deal' : 'Deal #$displayNumber',
+      orElse: () => 'Deal',
+    );
 
-    return _CollapsibleDetailSection(
+    return Card(
       key: const Key('inventoryDealSection'),
-      icon: Icons.handshake_outlined,
-      title: 'Deal',
-      summary: message,
-      children: [
-        Text(message),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const Key('inventoryViewDealButton'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.dealDetail,
-                pathParameters: {'dealId': id},
-              );
-            },
-            icon: const Icon(Icons.handshake_outlined),
-            label: const Text('View Deal'),
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.handshake_outlined, color: Color(0xFF6F42C1)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Deal',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: const Color(0xFF657080),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(message, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 5),
+                  if (id == null)
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    )
+                  else
+                    TextButton(
+                      key: const Key('inventoryDealNumberLink'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: () {
+                        context.pushNamed(
+                          AppRouteNames.dealDetail,
+                          pathParameters: {'dealId': id},
+                        );
+                      },
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: const Color(0xFF125FB8),
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
