@@ -85,17 +85,15 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Trade-In Information'), findsOneWidget);
     expect(
-      find.text('GLV-2608-0001 — Rawlings Heart of the Hide'),
+      find.byKey(const Key('transactionTradeInInformationCard')),
       findsOneWidget,
     );
-    expect(find.text('Good'), findsOneWidget);
-    expect(find.text(r'$150.00'), findsOneWidget);
+    expect(find.text('Trade-In Items (1)'), findsOneWidget);
+    expect(find.text('Rawlings Heart of the Hide'), findsOneWidget);
+    expect(find.text(r'Trade Value: $150.00'), findsOneWidget);
     expect(
-      find.byKey(
-        const ValueKey('transactionTradeInViewInventoryButton-trade-in-1'),
-      ),
+      find.byKey(const ValueKey('tradeInInventoryEntry-trade-in-1')),
       findsOneWidget,
     );
   });
@@ -150,11 +148,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Trade-In Information'), findsOneWidget);
     expect(
-      find.text('No trade-in items were included with this sale.'),
-      findsOneWidget,
+      find.byKey(const Key('transactionTradeInInformationCard')),
+      findsNothing,
     );
+    expect(find.textContaining('Trade-In Items'), findsNothing);
   });
 
   testWidgets('View Inventory Item opens the linked inventory route', (
@@ -249,12 +247,12 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final button = find.byKey(
-      const ValueKey('transactionTradeInViewInventoryButton-trade-in-1'),
+    final inventoryEntry = find.byKey(
+      const ValueKey('tradeInInventoryEntry-trade-in-1'),
     );
 
-    await tester.ensureVisible(button);
-    await tester.tap(button);
+    await tester.ensureVisible(inventoryEntry);
+    await tester.tap(inventoryEntry);
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory route: trade-in-1'), findsOneWidget);

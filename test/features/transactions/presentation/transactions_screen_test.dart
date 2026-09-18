@@ -9,8 +9,10 @@ import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal_status.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_ledger_provider.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
@@ -95,34 +97,72 @@ void main() {
     expect(find.text('No transactions yet.'), findsOneWidget);
   });
 
-  testWidgets('Deals do not appear as Transactions', (tester) async {
+  testWidgets('Deals appear as first-class business events', (tester) async {
     final repository = InMemoryTransactionRepository();
     final inventoryRepository = InMemoryInventoryRepository();
     addTearDown(repository.dispose);
     addTearDown(inventoryRepository.dispose);
 
+    const rootItem = InventoryItem(
+      id: 'root-item',
+      inventoryNumber: 'BAT-2609-0001',
+      category: InventoryCategory.bat,
+      brand: 'Root Bat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.sold,
+    );
+    const childItem = InventoryItem(
+      id: 'child-item',
+      inventoryNumber: 'BAT-2609-0002',
+      category: InventoryCategory.bat,
+      brand: 'Trade Bat',
+      acquisitionType: AcquisitionType.traded,
+      acquisitionValueCents: 8000,
+      status: InventoryStatus.available,
+    );
+    final deal = Deal(
+      id: 'deal-1',
+      parentSaleTransactionId: 'sale-1',
+      childInventoryItemIds: const ['child-item'],
+      createdAt: DateTime(2026, 9, 10),
+    );
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           transactionRepositoryProvider.overrideWithValue(repository),
-          dealsProvider.overrideWith(
-            (ref) => Stream.value(const [
-              Deal(
-                id: 'deal-1',
-                parentSaleTransactionId: 'sale-1',
-                childInventoryItemIds: ['item-1'],
-              ),
-            ]),
-          ),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          dealsProvider.overrideWith((ref) => Stream.value([deal])),
+          dealLedgerSummariesProvider.overrideWith(
+            (ref) async => [
+              DealLedgerSummary(
+                deal: deal,
+                displayNumber: '2026-001',
+                status: DealStatus.open,
+                currentProfitCents: 2500,
+                date: DateTime(2026, 9, 10),
+                rootItem: rootItem,
+                relatedInventoryItems: const [childItem],
+              ),
+            ],
+          ),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No transactions yet.'), findsOneWidget);
-    expect(find.textContaining('Deals ('), findsNothing);
+    expect(find.byKey(const ValueKey('dealLedgerCard-deal-1')), findsOneWidget);
+    expect(find.text('Deal #2026-001'), findsOneWidget);
+    expect(find.textContaining('Open'), findsOneWidget);
+    expect(find.textContaining('BAT-2609-0002'), findsOneWidget);
+    expect(
+      find.text('Open \u2022 BAT-2609-0001 \u2192 BAT-2609-0002'),
+      findsOneWidget,
+    );
+    expect(find.text('CURRENT PROFIT'), findsOneWidget);
+    expect(find.text(r'+$25.00'), findsOneWidget);
   });
 
   testWidgets('displays compact sales with visible values newest first', (

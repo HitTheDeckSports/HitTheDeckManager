@@ -12,6 +12,7 @@ import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_
 import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/trade_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
 
@@ -42,6 +43,7 @@ void main() {
           transactionRepositoryProvider.overrideWithValue(
             transactionRepository,
           ),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),

@@ -275,7 +275,7 @@ void main() {
     await tester.tap(buyerLink);
     await tester.pumpAndSettle();
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.byKey(const Key('contactIdentityCard')), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
   });
 

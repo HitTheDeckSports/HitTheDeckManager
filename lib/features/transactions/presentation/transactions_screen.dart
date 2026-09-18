@@ -19,6 +19,7 @@ import '../domain/models/repair_transaction.dart';
 import '../domain/models/sale_transaction.dart';
 import '../domain/models/trade_transaction.dart';
 import '../domain/models/transaction_enums.dart';
+import 'providers/deal_ledger_provider.dart';
 import 'providers/transaction_providers.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget {
@@ -74,6 +75,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final disposalsAsync = ref.watch(disposalTransactionsProvider);
     final consignmentsAsync = ref.watch(consignmentTransactionsProvider);
     final inventoryAsync = ref.watch(inventoryItemsProvider);
+    final dealSummariesAsync = ref.watch(dealLedgerSummariesProvider);
     final permissions = ref.watch(currentAppPermissionsProvider);
 
     final asyncValues = <AsyncValue<Object?>>[
@@ -83,6 +85,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       disposalsAsync,
       consignmentsAsync,
       inventoryAsync,
+      dealSummariesAsync,
     ];
 
     if (asyncValues.any((value) => value.isLoading)) {
@@ -114,6 +117,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             ref.invalidate(disposalTransactionsProvider);
             ref.invalidate(consignmentTransactionsProvider);
             ref.invalidate(inventoryItemsProvider);
+            ref.invalidate(dealLedgerSummariesProvider);
           },
         ),
       );
@@ -130,6 +134,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       trades: tradesAsync.requireValue,
       disposals: disposalsAsync.requireValue,
       consignments: consignmentsAsync.requireValue,
+      dealSummaries: dealSummariesAsync.requireValue,
       inventoryItems: inventoryAsync.requireValue,
       inventoryById: inventoryById,
     );
@@ -271,10 +276,40 @@ List<_LedgerEntry> _buildLedgerEntries({
   required List<TradeTransaction> trades,
   required List<DisposalTransaction> disposals,
   required List<ConsignmentTransaction> consignments,
+  required List<DealLedgerSummary> dealSummaries,
   required List<InventoryItem> inventoryItems,
   required Map<String, InventoryItem> inventoryById,
 }) {
   final entries = <_LedgerEntry>[
+    for (final summary in dealSummaries)
+      _LedgerEntry(
+        type: _LedgerType.deal,
+        date: summary.date,
+        title: 'Deal #${summary.displayNumber}',
+        subtitle:
+            '${summary.statusLabel} \u2022 ${_dealInventoryTrail(summary)}',
+        displayAmountCents: summary.currentProfitCents,
+        filterAmountCents: summary.currentProfitCents.abs(),
+        amountDirection: summary.currentProfitCents < 0
+            ? _AmountDirection.negative
+            : _AmountDirection.positive,
+        amountCaption: 'CURRENT PROFIT',
+        routeName: AppRouteNames.dealDetail,
+        routeId: summary.deal.id,
+        routeParameterName: 'dealId',
+        cardKey: ValueKey('dealLedgerCard-${summary.deal.id}'),
+        tapKey: ValueKey('dealLedgerTap-${summary.deal.id}'),
+        searchableText: _searchableText([
+          'deal',
+          'deal ${summary.displayNumber}',
+          summary.displayNumber,
+          summary.statusLabel,
+          summary.deal.notes,
+          _inventoryDisplayName(summary.rootItem),
+          ...summary.relatedInventoryItems.map(_inventoryDisplayName),
+          CurrencyFormatter.formatCents(summary.currentProfitCents),
+        ]),
+      ),
     for (final item in inventoryItems)
       if (item.acquisitionType == AcquisitionType.purchased &&
           item.purchaseDate != null)
@@ -468,6 +503,7 @@ List<_LedgerEntry> _buildLedgerEntries({
 }
 
 enum _LedgerType {
+  deal('Deal', Icons.account_tree_outlined),
   sale('Sale', Icons.point_of_sale_outlined),
   purchase('Purchase', Icons.shopping_cart_outlined),
   trade('Trade-In', Icons.swap_horiz_rounded),
@@ -481,6 +517,7 @@ enum _LedgerType {
   final IconData icon;
 
   Color get accentColor => switch (this) {
+    _LedgerType.deal => const Color(0xFF6E23B6),
     _LedgerType.sale => const Color(0xFF18834B),
     _LedgerType.purchase => const Color(0xFFED1C24),
     _LedgerType.trade => const Color(0xFF1769AA),
@@ -490,6 +527,7 @@ enum _LedgerType {
   };
 
   Color get softColor => switch (this) {
+    _LedgerType.deal => const Color(0xFFF3E8FF),
     _LedgerType.sale => const Color(0xFFE4F5EA),
     _LedgerType.purchase => const Color(0xFFFFE7E9),
     _LedgerType.trade => const Color(0xFFE5F0FA),
@@ -512,6 +550,7 @@ class _LedgerEntry {
     required this.amountDirection,
     required this.cardKey,
     required this.searchableText,
+    this.amountCaption,
     this.routeName,
     this.routeId,
     this.routeParameterName,
@@ -527,6 +566,7 @@ class _LedgerEntry {
   final _AmountDirection amountDirection;
   final Key cardKey;
   final String searchableText;
+  final String? amountCaption;
   final String? routeName;
   final String? routeId;
   final String? routeParameterName;
@@ -644,6 +684,18 @@ class _TransactionLedgerCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        if (entry.amountCaption != null) ...[
+                          Text(
+                            entry.amountCaption!,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: const Color(0xFF7B8794),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 9,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                        ],
                         Text(
                           _displayAmount(entry, canViewFinancialData),
                           style: Theme.of(context).textTheme.titleMedium
@@ -1038,6 +1090,30 @@ String _formatDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '$month/$day/${date.year}';
+}
+
+String _dealInventoryTrail(DealLedgerSummary summary) {
+  final labels = <String>[];
+
+  void addItem(InventoryItem item) {
+    final label = item.inventoryNumber?.trim();
+    final value = label == null || label.isEmpty ? item.brand : label;
+    if (!labels.contains(value)) {
+      labels.add(value);
+    }
+  }
+
+  addItem(summary.rootItem);
+  for (final item in summary.relatedInventoryItems) {
+    addItem(item);
+  }
+
+  if (labels.length <= 3) {
+    return labels.join(' \u2192 ');
+  }
+
+  return '${labels.take(3).join(' \u2192 ')} '
+      '\u2192 +${labels.length - 3} more';
 }
 
 String _inventoryDisplayName(InventoryItem? item) {
