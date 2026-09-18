@@ -12,6 +12,7 @@ class FakeAuthorizationRepository implements AuthorizationRepository {
   String? addedEmail;
   String? disabledEmail;
   String? restoredEmail;
+  String? removedEmail;
 
   @override
   Future<AuthorizedUser?> getAuthorization(AuthUser user) async => null;
@@ -32,6 +33,11 @@ class FakeAuthorizationRepository implements AuthorizationRepository {
   @override
   Future<void> restoreAuthorizedUser(String email) async {
     restoredEmail = email;
+  }
+
+  @override
+  Future<void> removeAuthorizedUser(String email) async {
+    removedEmail = email;
   }
 }
 
@@ -108,8 +114,16 @@ void main() {
 
       expect(find.text('Add Admin'), findsOneWidget);
       expect(find.text('Owner'), findsOneWidget);
-      expect(find.text('Disable'), findsOneWidget);
-      expect(find.text('Restore'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('adminProfileMenu-active-admin@example.com')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('adminProfileMenu-disabled-admin@example.com'),
+        ),
+        findsOneWidget,
+      );
     },
   );
 
@@ -124,11 +138,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Add Admin'), findsOneWidget);
-      expect(find.text('Disable'), findsNothing);
-      expect(find.text('Restore'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('adminProfileMenu-active-admin@example.com')),
+        findsNothing,
+      );
       expect(find.text('Admin'), findsNWidgets(2));
     },
   );
+
+  testWidgets('Owner can permanently remove an Admin profile', (tester) async {
+    final repository = FakeAuthorizationRepository();
+
+    await tester.pumpWidget(
+      buildUserAccess(session: ownerSession, repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('adminProfileMenu-active-admin@example.com')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remove Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove Admin Profile?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirmRemoveAdminButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.removedEmail, 'active-admin@example.com');
+  });
 
   testWidgets('Admin Add dialog creates a new Admin access record', (
     tester,

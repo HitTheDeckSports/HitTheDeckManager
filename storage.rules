@@ -18,18 +18,27 @@ service firebase.storage {
           && userEmail() == 'sales.hitthedecksports@gmail.com';
     }
 
-function isActiveAuthorizedUser() {
-  return hasVerifiedEmail()
-      && firestore.exists(
+    function currentAccessRecordExists() {
+      return hasVerifiedEmail()
+          && firestore.exists(
+            /databases/(default)/documents/authorized_users/$(userEmail())
+          );
+    }
+
+    function currentAccessRecord() {
+      return firestore.get(
         /databases/(default)/documents/authorized_users/$(userEmail())
-      )
-      && firestore.get(
-        /databases/(default)/documents/authorized_users/$(userEmail())
-      ).data.active == true;
-}
+      );
+    }
+
+    function isActiveAdmin() {
+      return currentAccessRecordExists()
+          && currentAccessRecord().data.active == true
+          && currentAccessRecord().data.role == 'admin';
+    }
 
     function isAuthorizedAppUser() {
-      return isRootOwner() || isActiveAuthorizedUser();
+      return isRootOwner() || isActiveAdmin();
     }
 
     function isValidImageUpload() {

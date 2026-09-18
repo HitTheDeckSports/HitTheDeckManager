@@ -158,6 +158,7 @@ void main() {
         id: 'contact-1',
         name: 'Taylor Morgan',
         phone: '555-111-1111',
+        photoUrl: 'old-contact-photo.jpg',
       );
 
       final repository = InMemoryContactRepository(
@@ -177,6 +178,7 @@ void main() {
       controller.setName('Taylor A. Morgan');
       controller.setPhone('555-222-2222');
       controller.setEmail('taylor@example.com');
+      controller.setPhotoUrl('new-contact-photo.jpg');
 
       final updatedContact = await controller.submit();
 
@@ -185,10 +187,12 @@ void main() {
       expect(updatedContact?.name, 'Taylor A. Morgan');
       expect(updatedContact?.phone, '555-222-2222');
       expect(updatedContact?.email, 'taylor@example.com');
+      expect(updatedContact?.photoUrl, 'new-contact-photo.jpg');
 
       final storedContact = await repository.getContact('contact-1');
 
       expect(storedContact, updatedContact);
+      expect(storedContact?.photoUrl, 'new-contact-photo.jpg');
 
       final resetState = container.read(contactFormControllerProvider);
 

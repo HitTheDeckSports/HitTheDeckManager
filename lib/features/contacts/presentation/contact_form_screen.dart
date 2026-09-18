@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,7 +29,7 @@ class ContactFormScreen extends ConsumerStatefulWidget {
   final String subtitle;
   final String submitLabel;
   final Contact? initialContact;
-  final ValueChanged<Contact>? onSaved;
+  final FutureOr<void> Function(Contact)? onSaved;
 
   @override
   ConsumerState<ContactFormScreen> createState() => _ContactFormScreenState();
@@ -107,7 +109,15 @@ class _ContactFormScreenState extends ConsumerState<ContactFormScreen> {
         return;
       }
 
-      widget.onSaved?.call(saved);
+      final onSaved = widget.onSaved;
+      if (onSaved != null) {
+        await onSaved(saved);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_routes.dart';
-import '../../authentication/presentation/providers/authorization_providers.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
+import '../../authentication/presentation/providers/authentication_providers.dart';
+import '../../authentication/presentation/providers/authorization_providers.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -50,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
               leading: const Icon(Icons.admin_panel_settings),
               title: const Text('User Access'),
               subtitle: const Text(
-                'Add, disable, or restore access to Hit the Deck Manager.',
+                'Add and manage access to Hit the Deck Manager.',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -58,9 +60,67 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ],
+          const SizedBox(height: 24),
+          const _SettingsSectionHeader(title: 'Account'),
+          ListTile(
+            leading: const Icon(Icons.account_circle_outlined),
+            title: const Text('Signed In As'),
+            subtitle: Text(session?.user.email ?? 'Unknown account'),
+          ),
+          ListTile(
+            key: const Key('settingsSignOutTile'),
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign Out'),
+            subtitle: const Text(
+              'Sign out so another authorized Google account can sign in.',
+            ),
+            onTap: session == null ? null : () => _confirmSignOut(context, ref),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Sign Out?'),
+          content: const Text(
+            'You will return to the sign-in screen. Another authorized '
+            'Google account can then sign in.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('confirmSignOutButton'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await ref.read(authenticationRepositoryProvider).signOut();
+    } on AppException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 }
 

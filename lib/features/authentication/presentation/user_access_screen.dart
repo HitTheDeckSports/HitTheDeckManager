@@ -65,6 +65,7 @@ class UserAccessScreen extends ConsumerWidget {
                 isBusy: actionState.isLoading,
                 onDisable: () => _confirmDisableUser(context, ref, user),
                 onRestore: () => _restoreUser(context, ref, user),
+                onRemove: () => _confirmRemoveUser(context, ref, user),
               );
             },
           );
@@ -178,6 +179,63 @@ class UserAccessScreen extends ConsumerWidget {
       ).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
+
+  Future<void> _confirmRemoveUser(
+    BuildContext context,
+    WidgetRef ref,
+    AuthorizedUser user,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Remove Admin Profile?'),
+          content: Text(
+            '${user.email} will lose access and the authorization profile '
+            'will be permanently removed. Historical business records are '
+            'not deleted.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('confirmRemoveAdminButton'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(userAccessControllerProvider.notifier)
+          .removeUser(user.email);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Admin profile removed for ${user.email}.')),
+      );
+    } on AppException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
 }
 
 class _AddAdminDialog extends StatefulWidget {
@@ -229,6 +287,8 @@ class _AddAdminDialogState extends State<_AddAdminDialog> {
   }
 }
 
+enum _AdminProfileAction { disable, restore, remove }
+
 class _AuthorizedUserTile extends StatelessWidget {
   const _AuthorizedUserTile({
     required this.user,
@@ -236,6 +296,7 @@ class _AuthorizedUserTile extends StatelessWidget {
     required this.isBusy,
     required this.onDisable,
     required this.onRestore,
+    required this.onRemove,
   });
 
   final AuthorizedUser user;
@@ -243,6 +304,7 @@ class _AuthorizedUserTile extends StatelessWidget {
   final bool isBusy;
   final VoidCallback onDisable;
   final VoidCallback onRestore;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -266,14 +328,40 @@ class _AuthorizedUserTile extends StatelessWidget {
           ? const Chip(label: Text('Owner'))
           : !canManageProfile
           ? const Chip(label: Text('Admin'))
-          : user.active
-          ? OutlinedButton(
-              onPressed: isBusy ? null : onDisable,
-              child: const Text('Disable'),
-            )
-          : FilledButton.tonal(
-              onPressed: isBusy ? null : onRestore,
-              child: const Text('Restore'),
+          : PopupMenuButton<_AdminProfileAction>(
+              key: ValueKey('adminProfileMenu-${user.email}'),
+              enabled: !isBusy,
+              tooltip: 'Manage Admin profile',
+              onSelected: (action) {
+                switch (action) {
+                  case _AdminProfileAction.disable:
+                    onDisable();
+                    break;
+                  case _AdminProfileAction.restore:
+                    onRestore();
+                    break;
+                  case _AdminProfileAction.remove:
+                    onRemove();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                if (user.active)
+                  const PopupMenuItem(
+                    value: _AdminProfileAction.disable,
+                    child: Text('Disable Access'),
+                  )
+                else
+                  const PopupMenuItem(
+                    value: _AdminProfileAction.restore,
+                    child: Text('Restore Access'),
+                  ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: _AdminProfileAction.remove,
+                  child: Text('Remove Profile'),
+                ),
+              ],
             ),
     );
   }

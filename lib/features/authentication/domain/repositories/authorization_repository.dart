@@ -22,4 +22,7 @@ abstract interface class AuthorizationRepository {
 
   /// Restores access for a previously disabled user.
   Future<void> restoreAuthorizedUser(String email);
+
+  /// Permanently removes an Admin authorization profile.
+  Future<void> removeAuthorizedUser(String email);
 }

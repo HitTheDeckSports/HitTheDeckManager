@@ -78,8 +78,11 @@ service cloud.firestore {
           && resource.data.role == 'admin'
           && request.resource.data.role == 'admin';
 
-      // Access records are disabled/restored instead of deleted.
-      allow delete: if false;
+      // The permanent Owner may remove an Admin authorization profile.
+      // Admins may never remove another Admin or the Owner.
+      allow delete: if isRootOwner()
+          && userEmailDocument != 'sales.hitthedecksports@gmail.com'
+          && resource.data.role == 'admin';
     }
 
     match /inventory/{itemId} {

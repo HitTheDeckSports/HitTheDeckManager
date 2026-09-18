@@ -21,6 +21,7 @@ const secondAdminEmail = 'second-admin@example.com';
 const inactiveAdminEmail = 'inactive-admin@example.com';
 const legacyUserEmail = 'legacy-user@example.com';
 const unauthorizedEmail = 'unauthorized@example.com';
+const removableAdminEmail = 'removable-admin@example.com';
 
 async function seedAccessRecords(testEnv) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -41,6 +42,12 @@ async function seedAccessRecords(testEnv) {
     await setDoc(doc(db, 'authorized_users', inactiveAdminEmail), {
       email: inactiveAdminEmail,
       active: false,
+      role: 'admin',
+    });
+
+    await setDoc(doc(db, 'authorized_users', removableAdminEmail), {
+      email: removableAdminEmail,
+      active: true,
       role: 'admin',
     });
 
@@ -226,6 +233,15 @@ async function main() {
       updateDoc(doc(rootOwner.firestore(), 'authorized_users', secondAdminEmail), {
         active: true,
       }),
+    );
+
+    await assertFails(
+      deleteDoc(doc(admin.firestore(), 'authorized_users', removableAdminEmail)),
+    );
+    await assertSucceeds(
+      deleteDoc(
+        doc(rootOwner.firestore(), 'authorized_users', removableAdminEmail),
+      ),
     );
 
     console.log('Firestore Owner/Admin security rules tests passed.');

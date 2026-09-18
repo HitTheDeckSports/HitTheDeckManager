@@ -58,6 +58,9 @@ class FakeAuthorizationRepository implements AuthorizationRepository {
 
   @override
   Future<void> restoreAuthorizedUser(String email) async {}
+
+  @override
+  Future<void> removeAuthorizedUser(String email) async {}
 }
 
 Future<AuthenticatedSession?> readSession(ProviderContainer container) async {

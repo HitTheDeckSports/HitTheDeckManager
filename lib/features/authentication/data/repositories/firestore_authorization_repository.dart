@@ -79,6 +79,10 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
                 active: true,
               ),
               ...snapshot.docs
+                  .where(
+                    (document) =>
+                        _normalizeEmail(document.id) != rootOwnerEmail,
+                  )
                   .map(
                     (document) => _authorizedUserFromData(
                       email: document.id,
@@ -184,6 +188,42 @@ class FirestoreAuthorizationRepository implements AuthorizationRepository {
         'active': true,
         'restoredAt': FieldValue.serverTimestamp(),
       });
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseException(error);
+    }
+  }
+
+  @override
+  Future<void> removeAuthorizedUser(String email) async {
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (normalizedEmail.isEmpty) {
+      throw const ValidationException('An email address is required.');
+    }
+
+    if (normalizedEmail == rootOwnerEmail) {
+      throw const PermissionException('The owner account cannot be removed.');
+    }
+
+    try {
+      final reference = _firestore
+          .collection(_collectionName)
+          .doc(normalizedEmail);
+
+      final existing = await reference.get();
+
+      if (!existing.exists) {
+        throw const NotFoundException('Authorized user not found.');
+      }
+
+      final data = existing.data();
+      if (data == null || data['role'] != 'admin') {
+        throw const PermissionException(
+          'Only Admin authorization profiles can be removed.',
+        );
+      }
+
+      await reference.delete();
     } on FirebaseException catch (error) {
       throw _mapFirebaseException(error);
     }
