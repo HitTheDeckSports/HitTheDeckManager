@@ -7,12 +7,14 @@ class UniversalSearchEntry {
     required this.title,
     required this.searchText,
     this.subtitle,
+    this.imageUrl,
   });
 
   final UniversalSearchResultType type;
   final String id;
   final String title;
   final String? subtitle;
+  final String? imageUrl;
   final String searchText;
 }
 
