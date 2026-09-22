@@ -77,6 +77,11 @@ class _SellInventoryScreenState extends ConsumerState<SellInventoryScreen> {
   }
 
   void _returnFromSell({InventoryItem? item}) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
     final itemId = item?.id ?? widget.initialItem?.id;
     if (itemId != null && itemId.trim().isNotEmpty) {
       context.goNamed(

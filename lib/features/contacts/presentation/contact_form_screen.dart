@@ -138,16 +138,16 @@ class _ContactFormScreenState extends ConsumerState<ContactFormScreen> {
   void _cancel() {
     final contactId = widget.initialContact?.id?.trim() ?? '';
 
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
     if (contactId.isNotEmpty) {
       context.goNamed(
         AppRouteNames.contactDetail,
         pathParameters: {'contactId': contactId},
       );
-      return;
-    }
-
-    if (context.canPop()) {
-      context.pop();
       return;
     }
 

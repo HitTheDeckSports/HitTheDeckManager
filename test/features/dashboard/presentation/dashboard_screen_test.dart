@@ -177,6 +177,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add Inventory destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
   });
 
   testWidgets('Dashboard Scan QR action navigates correctly', (
@@ -191,6 +195,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Scanner destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
   });
 }
 

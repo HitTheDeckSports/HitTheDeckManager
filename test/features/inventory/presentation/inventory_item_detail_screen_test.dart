@@ -550,6 +550,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Selling BAT-2608-0101'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('inventoryItemPrimaryActions')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('sold inventory does not display the Sell Item action', (
@@ -1465,10 +1472,10 @@ void main() {
     await tester.tap(sellerLink);
     await tester.pumpAndSettle();
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.byKey(const Key('contactIdentityCard')), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('(555) 123-4567'), findsAtLeastNWidgets(1));
+    expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Inventory seller.'), findsOneWidget);
   });
@@ -1792,10 +1799,10 @@ void main() {
     await tester.tap(viewBuyerButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.byKey(const Key('contactIdentityCard')), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('(555) 123-4567'), findsAtLeastNWidgets(1));
+    expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat buyer.'), findsOneWidget);
   });

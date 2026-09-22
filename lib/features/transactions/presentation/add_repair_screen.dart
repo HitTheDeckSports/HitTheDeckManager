@@ -159,10 +159,14 @@ class _AddRepairFormState extends ConsumerState<_AddRepairForm> {
       widget.onSaved?.call();
 
       if (!mounted) return;
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': _inventoryItemId},
-      );
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': _inventoryItemId},
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(

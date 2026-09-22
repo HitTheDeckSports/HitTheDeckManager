@@ -67,7 +67,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
         key: const Key('inventoryAddButton'),
-        onPressed: () => context.goNamed(AppRouteNames.buyInventory),
+        onPressed: () => context.pushNamed(AppRouteNames.buyInventory),
         backgroundColor: AppTheme.primaryRed,
         foregroundColor: Colors.white,
         tooltip: 'Add Inventory',
@@ -97,7 +97,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       key: const Key('inventoryScanQrButton'),
                       tooltip: 'Scan QR code',
                       onPressed: () {
-                        context.goNamed(AppRouteNames.inventoryScanner);
+                        context.pushNamed(AppRouteNames.inventoryScanner);
                       },
                       icon: const Icon(Icons.qr_code_scanner),
                     ),
@@ -212,7 +212,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         key: const Key('inventoryScanQrButton'),
                         tooltip: 'Scan QR code',
                         onPressed: () {
-                          context.goNamed(AppRouteNames.inventoryScanner);
+                          context.pushNamed(AppRouteNames.inventoryScanner);
                         },
                         icon: const Icon(Icons.qr_code_scanner),
                       ),

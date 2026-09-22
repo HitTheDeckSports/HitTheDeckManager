@@ -95,10 +95,14 @@ class _RepairBody extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Repair was deleted successfully.')),
       );
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': repair.inventoryItemId},
-      );
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': repair.inventoryItemId},
+        );
+      }
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

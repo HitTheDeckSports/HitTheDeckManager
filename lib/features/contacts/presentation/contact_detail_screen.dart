@@ -155,7 +155,7 @@ class _IdentityCard extends StatelessWidget {
                             IconButton(
                               key: const Key('editContactButton'),
                               tooltip: 'Edit Contact',
-                              onPressed: () => context.goNamed(
+                              onPressed: () => context.pushNamed(
                                 AppRouteNames.editContact,
                                 pathParameters: {'contactId': contact.id!},
                               ),

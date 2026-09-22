@@ -74,7 +74,7 @@ class _DashboardContent extends StatelessWidget {
               key: const Key('dashboardScanQrButton'),
               tooltip: 'Scan QR code',
               onPressed: () {
-                context.goNamed(AppRouteNames.inventoryScanner);
+                context.pushNamed(AppRouteNames.inventoryScanner);
               },
               icon: const Icon(Icons.qr_code_scanner),
             ),
@@ -198,7 +198,7 @@ class _DashboardContent extends StatelessWidget {
           icon: Icons.add_circle_outline,
           label: 'ADD INVENTORY',
           onPressed: () {
-            context.goNamed(AppRouteNames.buyInventory);
+            context.pushNamed(AppRouteNames.buyInventory);
           },
         ),
       ],

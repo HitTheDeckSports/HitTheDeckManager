@@ -68,10 +68,14 @@ class EditContactScreen extends ConsumerWidget {
               return;
             }
 
-            context.goNamed(
-              AppRouteNames.contactDetail,
-              pathParameters: {'contactId': savedContactId},
-            );
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(
+                AppRouteNames.contactDetail,
+                pathParameters: {'contactId': savedContactId},
+              );
+            }
           },
         );
       },

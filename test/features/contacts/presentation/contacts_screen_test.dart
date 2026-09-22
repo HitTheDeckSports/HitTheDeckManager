@@ -12,6 +12,53 @@ import 'package:hit_the_deck_manager/features/contacts/presentation/providers/co
 import 'package:hit_the_deck_manager/features/contacts/presentation/providers/contact_providers.dart';
 
 void main() {
+  testWidgets('Add Contact returns to the existing Contacts screen', (
+    tester,
+  ) async {
+    final repository = InMemoryContactRepository();
+    addTearDown(repository.dispose);
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.contacts,
+      routes: [
+        GoRoute(
+          path: AppRoutes.contacts,
+          name: AppRouteNames.contacts,
+          builder: (context, state) => const Scaffold(body: ContactsScreen()),
+        ),
+        GoRoute(
+          path: AppRoutes.createContact,
+          name: AppRouteNames.createContact,
+          builder: (context, state) => const Scaffold(
+            body: Center(child: Text('Add Contact destination')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          contactRepositoryProvider.overrideWithValue(repository),
+          contactRelationshipsProvider.overrideWith(
+            (ref) => const AsyncData(<String, ContactRelationship>{}),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('addContactButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Contact destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('No contacts yet.'), findsOneWidget);
+  });
+
   testWidgets('uses compact prototype layout and empty contacts state', (
     tester,
   ) async {

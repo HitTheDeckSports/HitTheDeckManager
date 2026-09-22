@@ -80,6 +80,28 @@ void main() {
     expect(find.text('Contacts destination'), findsOneWidget);
   });
 
+  testWidgets('inventory edit returns to the existing detail screen', (
+    tester,
+  ) async {
+    final router = await _pump(tester);
+    router.go(AppRoutes.inventory);
+    await tester.pumpAndSettle();
+
+    router.pushNamed(
+      AppRouteNames.inventoryDetail,
+      pathParameters: const {'itemId': 'item-1'},
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('inventoryDetailHeaderEditButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit destination'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inventoryEditHeaderBackButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Detail destination'), findsOneWidget);
+  });
+
   testWidgets('transaction-family details keep Transactions selected', (
     tester,
   ) async {

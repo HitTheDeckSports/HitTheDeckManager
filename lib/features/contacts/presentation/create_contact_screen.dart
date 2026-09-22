@@ -38,7 +38,7 @@ class _CreateContactScreenState extends ConsumerState<CreateContactScreen> {
           return;
         }
 
-        context.goNamed(
+        context.pushReplacementNamed(
           AppRouteNames.contactDetail,
           pathParameters: {'contactId': contactId},
         );

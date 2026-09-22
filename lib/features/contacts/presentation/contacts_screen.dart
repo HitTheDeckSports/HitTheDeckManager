@@ -128,7 +128,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         padding: const EdgeInsets.only(right: 2, bottom: 18),
         child: FloatingActionButton(
           key: const Key('addContactButton'),
-          onPressed: () => context.goNamed(AppRouteNames.createContact),
+          onPressed: () => context.pushNamed(AppRouteNames.createContact),
           backgroundColor: AppTheme.primaryRed,
           foregroundColor: Colors.white,
           tooltip: 'Add Contact',

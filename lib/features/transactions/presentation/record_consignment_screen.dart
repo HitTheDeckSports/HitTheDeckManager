@@ -90,10 +90,14 @@ class RecordConsignmentScreen extends ConsumerWidget {
                       'This inventory item already has a consignment agreement.',
                   action: OutlinedButton(
                     onPressed: () {
-                      context.goNamed(
-                        AppRouteNames.inventoryDetail,
-                        pathParameters: {'itemId': inventoryItemId},
-                      );
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.goNamed(
+                          AppRouteNames.inventoryDetail,
+                          pathParameters: {'itemId': inventoryItemId},
+                        );
+                      }
                     },
                     child: const Text('Return to Inventory Item'),
                   ),
@@ -201,10 +205,14 @@ class _RecordConsignmentFormState
         const SnackBar(content: Text('Consignment agreement recorded.')),
       );
 
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': widget.item.id!},
-      );
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': widget.item.id!},
+        );
+      }
     } catch (error) {
       if (!mounted) {
         return;

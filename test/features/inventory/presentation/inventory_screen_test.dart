@@ -104,6 +104,60 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory scanner destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('No inventory items yet.'), findsOneWidget);
+  });
+
+  testWidgets('Add Inventory returns to the existing Inventory screen', (
+    WidgetTester tester,
+  ) async {
+    final repository = InMemoryInventoryRepository();
+    addTearDown(repository.dispose);
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.inventory,
+      routes: [
+        GoRoute(
+          path: AppRoutes.inventory,
+          name: AppRouteNames.inventory,
+          builder: (context, state) => const Scaffold(body: InventoryScreen()),
+        ),
+        GoRoute(
+          path: AppRoutes.buyInventory,
+          name: AppRouteNames.buyInventory,
+          builder: (context, state) => const Scaffold(
+            body: Center(child: Text('Add Inventory destination')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+          repairTransactionsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('inventoryAddButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Inventory destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('No inventory items yet.'), findsOneWidget);
   });
 
   testWidgets('Inventory filter preloads locations before first open', (

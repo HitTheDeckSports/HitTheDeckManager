@@ -676,7 +676,7 @@ class _InventoryPrimaryActions extends ConsumerWidget {
 
     if (selectedStatus == InventoryStatus.disposed) {
       if (item.id != null) {
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.disposeInventory,
           pathParameters: {'itemId': item.id!},
         );
@@ -735,7 +735,7 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                     onPressed: isUpdatingStatus
                         ? null
                         : () {
-                            context.goNamed(
+                            context.pushNamed(
                               AppRouteNames.sellInventory,
                               extra: item,
                             );
@@ -753,7 +753,7 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                     onPressed: isUpdatingStatus
                         ? null
                         : () {
-                            context.goNamed(
+                            context.pushNamed(
                               AppRouteNames.addRepair,
                               pathParameters: {'itemId': item.id!},
                             );
@@ -1357,7 +1357,7 @@ class _ConsignmentSection extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     key: const Key('recordConsignmentAgreementButton'),
                     onPressed: () {
-                      context.goNamed(
+                      context.pushNamed(
                         AppRouteNames.recordConsignment,
                         pathParameters: {'itemId': itemId},
                       );
@@ -1508,7 +1508,7 @@ class _InventoryWarrantySection extends ConsumerWidget {
               child: OutlinedButton.icon(
                 key: const Key('inventoryWarrantyViewItemButton'),
                 onPressed: () {
-                  context.goNamed(
+                  context.pushNamed(
                     AppRouteNames.inventoryDetail,
                     pathParameters: {'itemId': relatedInventoryItemId},
                   );
@@ -1829,7 +1829,7 @@ class _TradeHistoryEntry extends StatelessWidget {
                       'inventoryTradeViewItemButton-${relatedIds.single}',
                     ),
                     onPressed: () {
-                      context.goNamed(
+                      context.pushNamed(
                         AppRouteNames.inventoryDetail,
                         pathParameters: {'itemId': relatedIds.single},
                       );
@@ -1843,7 +1843,7 @@ class _TradeHistoryEntry extends StatelessWidget {
                   child: OutlinedButton.icon(
                     key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
                     onPressed: () {
-                      context.goNamed(
+                      context.pushNamed(
                         AppRouteNames.transactionDetail,
                         pathParameters: {
                           'transactionId': trade.saleTransactionId!,
@@ -1862,7 +1862,7 @@ class _TradeHistoryEntry extends StatelessWidget {
               child: OutlinedButton.icon(
                 key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
                 onPressed: () {
-                  context.goNamed(
+                  context.pushNamed(
                     AppRouteNames.transactionDetail,
                     pathParameters: {'transactionId': trade.saleTransactionId!},
                   );
@@ -1932,7 +1932,7 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
             child: OutlinedButton.icon(
               key: ValueKey('inventoryTradeViewItemButton-$inventoryItemId'),
               onPressed: () {
-                context.goNamed(
+                context.pushNamed(
                   AppRouteNames.inventoryDetail,
                   pathParameters: {'itemId': inventoryItemId},
                 );
@@ -2063,7 +2063,7 @@ class _WarrantyReplacementDealEntry extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   key: ValueKey('createWarrantyReplacementButton-$disposalId'),
                   onPressed: () {
-                    context.goNamed(
+                    context.pushNamed(
                       AppRouteNames.warrantyReplacement,
                       pathParameters: {'disposalId': disposalId},
                     );
@@ -2086,7 +2086,7 @@ class _WarrantyReplacementDealEntry extends ConsumerWidget {
               child: OutlinedButton.icon(
                 key: ValueKey('viewWarrantyReplacementItemButton-${deal.id}'),
                 onPressed: () {
-                  context.goNamed(
+                  context.pushNamed(
                     AppRouteNames.inventoryDetail,
                     pathParameters: {'itemId': deal.replacementInventoryItemId},
                   );
@@ -2239,7 +2239,7 @@ class _RepairHistoryEntry extends StatelessWidget {
             child: OutlinedButton.icon(
               key: ValueKey('repairHistoryViewButton-$repairId'),
               onPressed: () {
-                context.goNamed(
+                context.pushNamed(
                   AppRouteNames.repairDetail,
                   pathParameters: {'repairId': repairId},
                 );
@@ -2299,7 +2299,7 @@ class _SellerInformationSection extends ConsumerWidget {
           title: 'Seller',
           summary: seller.name,
           onSummaryTap: () {
-            context.goNamed(
+            context.pushNamed(
               AppRouteNames.contactDetail,
               pathParameters: {'contactId': contactId},
             );
@@ -2412,7 +2412,7 @@ class _SaleInformationCardContent extends ConsumerWidget {
             OutlinedButton.icon(
               key: const Key('inventoryItemViewBuyerButton'),
               onPressed: () {
-                context.goNamed(
+                context.pushNamed(
                   AppRouteNames.contactDetail,
                   pathParameters: {'contactId': contactId},
                 );
@@ -2425,7 +2425,7 @@ class _SaleInformationCardContent extends ConsumerWidget {
             onPressed: sale.id == null
                 ? null
                 : () {
-                    context.goNamed(
+                    context.pushNamed(
                       AppRouteNames.transactionDetail,
                       pathParameters: {'transactionId': sale.id!},
                     );

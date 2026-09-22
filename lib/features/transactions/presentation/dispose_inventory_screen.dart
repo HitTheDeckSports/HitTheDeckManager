@@ -183,10 +183,14 @@ class _DisposeInventoryFormState extends ConsumerState<_DisposeInventoryForm> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': widget.item.id!},
-      );
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': widget.item.id!},
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

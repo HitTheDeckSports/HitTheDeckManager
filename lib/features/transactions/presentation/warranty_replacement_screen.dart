@@ -496,7 +496,7 @@ class _WarrantyReplacementFormState
       ),
     );
 
-    context.goNamed(
+    context.pushReplacementNamed(
       AppRouteNames.inventoryDetail,
       pathParameters: {'itemId': replacementId},
     );
@@ -568,7 +568,7 @@ class _WarrantyReplacementFormState
         ),
       );
 
-      context.goNamed(
+      context.pushReplacementNamed(
         AppRouteNames.inventoryDetail,
         pathParameters: {'itemId': replacementId},
       );
@@ -667,7 +667,7 @@ class _WarrantyReplacementFormState
                     onPressed: _isUploadingPhotos
                         ? null
                         : () {
-                            context.goNamed(
+                            context.pushReplacementNamed(
                               AppRouteNames.inventoryDetail,
                               pathParameters: {'itemId': replacementId},
                             );
@@ -695,7 +695,7 @@ class _WarrantyReplacementFormState
                   'This disposal is already linked to replacement inventory.',
               action: OutlinedButton(
                 onPressed: () {
-                  context.goNamed(
+                  context.pushReplacementNamed(
                     AppRouteNames.inventoryDetail,
                     pathParameters: {
                       'itemId': existingDeal.replacementInventoryItemId,

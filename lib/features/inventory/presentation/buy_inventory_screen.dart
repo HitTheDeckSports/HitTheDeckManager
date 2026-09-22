@@ -382,10 +382,14 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
       if (widget.isEditing && completedItem.id != null) {
         ref.invalidate(inventoryItemProvider(completedItem.id!));
 
-        context.goNamed(
-          AppRouteNames.inventoryDetail,
-          pathParameters: {'itemId': completedItem.id!},
-        );
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.goNamed(
+            AppRouteNames.inventoryDetail,
+            pathParameters: {'itemId': completedItem.id!},
+          );
+        }
       }
     } catch (error) {
       if (!mounted) {
@@ -433,7 +437,11 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
       _savedItemForPhotoRetry = null;
     });
 
-    context.go(AppRoutes.inventory);
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.inventory);
+    }
   }
 
   @override

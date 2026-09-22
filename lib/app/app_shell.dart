@@ -186,7 +186,7 @@ class AppShell extends ConsumerWidget {
                 key: const Key('inventoryDetailHeaderEditButton'),
                 tooltip: 'Edit inventory item',
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => context.goNamed(
+                onPressed: () => context.pushNamed(
                   AppRouteNames.inventoryEdit,
                   pathParameters: {'itemId': detailId},
                 ),
