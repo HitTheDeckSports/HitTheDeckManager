@@ -58,6 +58,50 @@ void main() {
     expect(find.text('Recent Activity'), findsOneWidget);
   });
 
+  testWidgets('contact photo opens in a zoomable full-screen viewer', (
+    tester,
+  ) async {
+    const contact = Contact(
+      id: 'contact-1',
+      name: 'Taylor Morgan',
+      photoUrl: 'https://example.com/contact.jpg',
+    );
+    final repository = InMemoryContactRepository(
+      initialContacts: const [contact],
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          contactRepositoryProvider.overrideWithValue(repository),
+          contactRelationshipsProvider.overrideWith(
+            (ref) => const AsyncData(<String, ContactRelationship>{}),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: ContactDetailScreen(contactId: 'contact-1')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('contactPhotoTapTarget')), findsOneWidget);
+    expect(find.byKey(const Key('contactPhotoViewer')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('contactPhotoTapTarget')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('contactPhotoViewer')), findsOneWidget);
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.byKey(const Key('contactPhotoViewerImage')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('contactPhotoViewerCloseButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('contactPhotoViewer')), findsNothing);
+  });
+
   testWidgets('shows relationship money, counts, and recent activity', (
     tester,
   ) async {

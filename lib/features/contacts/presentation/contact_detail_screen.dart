@@ -739,21 +739,91 @@ class _ContactAvatar extends StatelessWidget {
   final Contact contact;
   final double size;
 
+  void _openPhotoViewer(BuildContext context, String photoUrl) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) => _ContactPhotoViewer(photoUrl: photoUrl),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final url = _clean(contact.photoUrl);
+    final hasViewablePhoto = url != null && _isNetworkUrl(url);
+    final avatar = ClipOval(
+      child: hasViewablePhoto
+          ? Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  _InitialsAvatar(name: contact.name),
+            )
+          : _InitialsAvatar(name: contact.name),
+    );
+
     return SizedBox(
       width: size,
       height: size,
-      child: ClipOval(
-        child: url != null && _isNetworkUrl(url)
-            ? Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _InitialsAvatar(name: contact.name),
-              )
-            : _InitialsAvatar(name: contact.name),
+      child: hasViewablePhoto
+          ? Semantics(
+              button: true,
+              label: 'View ${contact.name} photo',
+              child: GestureDetector(
+                key: const Key('contactPhotoTapTarget'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _openPhotoViewer(context, url),
+                child: avatar,
+              ),
+            )
+          : avatar,
+    );
+  }
+}
+
+class _ContactPhotoViewer extends StatelessWidget {
+  const _ContactPhotoViewer({required this.photoUrl});
+
+  final String photoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('contactPhotoViewer'),
+      color: Colors.black,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Image.network(
+                  photoUrl,
+                  key: const Key('contactPhotoViewerImage'),
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.broken_image_outlined,
+                      size: 64,
+                      color: Colors.white70,
+                    );
+                  },
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                key: const Key('contactPhotoViewerCloseButton'),
+                tooltip: 'Close',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -128,6 +128,54 @@ void main() {
     }
   });
 
+  testWidgets('horizontal swipes move between main destinations with bounds', (
+    tester,
+  ) async {
+    await _pump(tester);
+
+    final swipeArea = find.byKey(const Key('mainNavigationSwipeArea'));
+    expect(find.text('Dashboard destination'), findsOneWidget);
+
+    await tester.drag(swipeArea, const Offset(320, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard destination'), findsOneWidget);
+
+    for (final destination in const [
+      'Inventory destination',
+      'Transactions destination',
+      'Contacts destination',
+      'Reports destination',
+    ]) {
+      await tester.drag(swipeArea, const Offset(-320, 0));
+      await tester.pumpAndSettle();
+      expect(find.text(destination), findsOneWidget);
+    }
+
+    await tester.drag(swipeArea, const Offset(-320, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Reports destination'), findsOneWidget);
+
+    await tester.drag(swipeArea, const Offset(320, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Contacts destination'), findsOneWidget);
+  });
+
+  testWidgets('system back gestures step toward Dashboard without exiting', (
+    tester,
+  ) async {
+    final router = await _pump(tester);
+    router.go(AppRoutes.inventory);
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard destination'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard destination'), findsOneWidget);
+  });
+
   testWidgets('standard shell retains core navigation', (tester) async {
     await _pump(tester);
     expect(find.byType(NavigationBar), findsOneWidget);

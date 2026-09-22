@@ -91,6 +91,22 @@ void main() {
     expect(find.text('Potential Profit'), findsNothing);
   });
 
+  testWidgets('Dashboard overview cards use the compact height', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    expect(
+      tester
+          .getSize(find.byKey(const Key('dashboardInventoryCountCard')))
+          .height,
+      136,
+    );
+  });
+
   testWidgets('Dashboard quick stats remain one four-column row', (
     WidgetTester tester,
   ) async {

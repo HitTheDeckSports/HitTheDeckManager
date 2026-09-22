@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/app/app_routes.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_location_repository.dart';
@@ -512,6 +514,56 @@ void main() {
     expect(find.textContaining('was created.'), findsOneWidget);
     expect(find.text('Brand is required.'), findsNothing);
     expect(find.text('Acquisition value is required.'), findsNothing);
+  });
+  testWidgets('new inventory opens its detail screen after save', (
+    WidgetTester tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: AppRoutes.buyInventory,
+      routes: [
+        GoRoute(
+          path: AppRoutes.buyInventory,
+          builder: (context, state) =>
+              const Scaffold(body: BuyInventoryScreen()),
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) => const Scaffold(
+            body: Center(child: Text('New inventory detail destination')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '200.00',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('New inventory detail destination'), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      isNot(AppRoutes.buyInventory),
+    );
   });
   testWidgets('saves condition and purchase date with inventory item', (
     WidgetTester tester,

@@ -54,7 +54,13 @@ class AppShell extends ConsumerWidget {
                   ),
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: child),
+                Expanded(
+                  child: _mainNavigationSwipeBody(
+                    context,
+                    currentLocation,
+                    canAccessReports: canAccessReports,
+                  ),
+                ),
               ],
             ),
           );
@@ -62,7 +68,11 @@ class AppShell extends ConsumerWidget {
 
         return Scaffold(
           appBar: _buildAppBar(context, currentLocation),
-          body: child,
+          body: _mainNavigationSwipeBody(
+            context,
+            currentLocation,
+            canAccessReports: canAccessReports,
+          ),
           bottomNavigationBar: DecoratedBox(
             decoration: const BoxDecoration(
               color: AppTheme.surface,
@@ -95,6 +105,64 @@ class AppShell extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _mainNavigationSwipeBody(
+    BuildContext context,
+    String currentLocation, {
+    required bool canAccessReports,
+  }) {
+    final routes = <String>[
+      AppRoutes.dashboard,
+      AppRoutes.inventory,
+      AppRoutes.transactions,
+      AppRoutes.contacts,
+      if (canAccessReports) AppRoutes.reports,
+    ];
+    final currentIndex = routes.indexOf(currentLocation);
+
+    if (currentIndex < 0) {
+      return child;
+    }
+
+    var horizontalDistance = 0.0;
+
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && currentIndex > 0) {
+          context.go(routes[currentIndex - 1]);
+        }
+      },
+      child: GestureDetector(
+        key: const Key('mainNavigationSwipeArea'),
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) {
+          horizontalDistance = 0;
+        },
+        onHorizontalDragUpdate: (details) {
+          horizontalDistance += details.delta.dx;
+        },
+        onHorizontalDragEnd: (details) {
+          const minimumDistance = 72.0;
+          const minimumVelocity = 300.0;
+          final velocity = details.primaryVelocity ?? 0;
+          final swipedTowardNext =
+              horizontalDistance <= -minimumDistance ||
+              velocity <= -minimumVelocity;
+          final swipedTowardPrevious =
+              horizontalDistance >= minimumDistance ||
+              velocity >= minimumVelocity;
+
+          if (swipedTowardNext && currentIndex < routes.length - 1) {
+            context.go(routes[currentIndex + 1]);
+          } else if (swipedTowardPrevious && currentIndex > 0) {
+            context.go(routes[currentIndex - 1]);
+          }
+        },
+        child: child,
+      ),
     );
   }
 

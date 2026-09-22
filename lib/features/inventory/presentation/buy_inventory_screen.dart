@@ -379,15 +379,24 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
         ),
       );
 
-      if (widget.isEditing && completedItem.id != null) {
-        ref.invalidate(inventoryItemProvider(completedItem.id!));
+      final completedItemId = completedItem.id;
 
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.goNamed(
+      if (completedItemId != null) {
+        ref.invalidate(inventoryItemProvider(completedItemId));
+
+        if (widget.isEditing) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.goNamed(
+              AppRouteNames.inventoryDetail,
+              pathParameters: {'itemId': completedItemId},
+            );
+          }
+        } else if (GoRouter.maybeOf(context) != null) {
+          context.pushReplacementNamed(
             AppRouteNames.inventoryDetail,
-            pathParameters: {'itemId': completedItem.id!},
+            pathParameters: {'itemId': completedItemId},
           );
         }
       }
