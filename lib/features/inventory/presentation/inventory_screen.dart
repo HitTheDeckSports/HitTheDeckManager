@@ -30,7 +30,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   InventoryFilterCriteria _filters = const InventoryFilterCriteria();
-  InventoryStatus? _quickStatus;
+  InventoryStatus? _quickStatus = InventoryStatus.available;
 
   @override
   void dispose() {
@@ -285,12 +285,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 if (filteredItems.isEmpty)
                   AppEmptyState(
                     icon: Icons.search_off,
-                    title: _filters.isActive || _quickStatus != null
-                        ? 'No inventory items match your filters.'
-                        : 'No inventory items match your search.',
-                    message: _filters.isActive || _quickStatus != null
-                        ? 'Clear or adjust one or more filters and try again.'
-                        : 'Try a different inventory number, brand, or model.',
+                    title: hasQuery
+                        ? 'No inventory items match your search.'
+                        : 'No inventory items match your filters.',
+                    message: hasQuery
+                        ? 'Try a different inventory number, brand, or model.'
+                        : 'Clear or adjust one or more filters and try again.',
                   )
                 else
                   for (final item in filteredItems)
@@ -422,7 +422,10 @@ class _InventoryItemCard extends StatelessWidget {
     final condition = item.condition?.label;
     final age = _inventoryAgeLabel(item.purchaseDate);
     final categoryColor = _inventoryCategoryColor(item.category);
-    final profitCents = item.askingPriceCents == null || repairCostCents == null
+    final profitCents =
+        item.acquisitionType == AcquisitionType.consignment ||
+            item.askingPriceCents == null ||
+            repairCostCents == null
         ? null
         : item.askingPriceCents! -
               item.acquisitionValueCents -

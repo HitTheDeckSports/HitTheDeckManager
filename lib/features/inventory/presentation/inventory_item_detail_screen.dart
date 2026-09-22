@@ -102,12 +102,16 @@ class _InventoryItemDetailContent extends ConsumerWidget {
           );
 
     final isUpdatingStatus = inventoryControllerState.isLoading;
+    final hasOperationalActions =
+        item.id != null &&
+        item.status != InventoryStatus.sold &&
+        item.status != InventoryStatus.disposed;
 
     return Stack(
       children: [
         Positioned.fill(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 72),
+            padding: EdgeInsets.only(bottom: hasOperationalActions ? 72 : 0),
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -218,16 +222,17 @@ class _InventoryItemDetailContent extends ConsumerWidget {
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _InventoryPrimaryActions(
-            item: item,
-            canDisposeInventory: permissions.canDisposeInventory,
-            isUpdatingStatus: isUpdatingStatus,
+        if (hasOperationalActions)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _InventoryPrimaryActions(
+              item: item,
+              canDisposeInventory: permissions.canDisposeInventory,
+              isUpdatingStatus: isUpdatingStatus,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -273,7 +278,9 @@ class _InventoryQuickInfoGrid extends StatelessWidget {
       if (canViewFinancialData)
         _QuickInfoData(
           'Cost',
-          CurrencyFormatter.formatCents(item.acquisitionValueCents),
+          item.acquisitionType == AcquisitionType.consignment
+              ? 'Consignment'
+              : CurrencyFormatter.formatCents(item.acquisitionValueCents),
           Icons.paid_outlined,
         )
       else
@@ -439,7 +446,9 @@ class _InventorySummarySection extends ConsumerWidget {
         ? null
         : item.acquisitionValueCents + totalRepairCostCents;
     final estimatedProfitCents =
-        totalCostCents == null || item.askingPriceCents == null
+        item.acquisitionType == AcquisitionType.consignment ||
+            totalCostCents == null ||
+            item.askingPriceCents == null
         ? null
         : item.askingPriceCents! - totalCostCents;
     final specifications = _compactItemSpecifications(item);
@@ -746,7 +755,9 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                 ),
               if (item.id != null && item.status == InventoryStatus.available)
                 const SizedBox(width: 8),
-              if (item.id != null && item.status != InventoryStatus.disposed)
+              if (item.id != null &&
+                  item.status != InventoryStatus.sold &&
+                  item.status != InventoryStatus.disposed)
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('inventoryItemAddRepairButton'),
@@ -766,7 +777,9 @@ class _InventoryPrimaryActions extends ConsumerWidget {
                     ),
                   ),
                 ),
-              if (item.id != null && item.status != InventoryStatus.disposed)
+              if (item.id != null &&
+                  item.status != InventoryStatus.sold &&
+                  item.status != InventoryStatus.disposed)
                 const SizedBox(width: 8),
               if (item.id != null)
                 Expanded(

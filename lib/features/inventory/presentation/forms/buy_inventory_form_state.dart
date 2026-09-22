@@ -82,9 +82,9 @@ class BuyInventoryFormState {
   final List<String> photoUrls;
 
   InventoryItem? toInventoryItem() {
-    final acquisitionValueCents = CurrencyFormatter.tryParseToCents(
-      acquisitionValue,
-    );
+    final acquisitionValueCents = acquisitionType == AcquisitionType.consignment
+        ? 0
+        : CurrencyFormatter.tryParseToCents(acquisitionValue);
 
     if (acquisitionValueCents == null) {
       return null;

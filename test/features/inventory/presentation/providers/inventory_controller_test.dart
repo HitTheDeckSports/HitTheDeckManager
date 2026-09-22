@@ -184,6 +184,81 @@ void main() {
       },
     );
 
+    test(
+      'rejects ordinary status changes from sold or disposed inventory',
+      () async {
+        for (final terminalStatus in const [
+          InventoryStatus.sold,
+          InventoryStatus.disposed,
+        ]) {
+          final item = InventoryItem(
+            id: 'item-${terminalStatus.name}',
+            category: InventoryCategory.bat,
+            brand: 'Terminal',
+            acquisitionType: AcquisitionType.purchased,
+            acquisitionValueCents: 10000,
+            status: terminalStatus,
+          );
+          final repository = InMemoryInventoryRepository(initialItems: [item]);
+          final container = ProviderContainer(
+            overrides: [
+              inventoryRepositoryProvider.overrideWithValue(repository),
+            ],
+          );
+
+          await expectLater(
+            () => container
+                .read(inventoryControllerProvider.notifier)
+                .updateStatus(item: item, status: InventoryStatus.available),
+            throwsA(isA<StateError>()),
+          );
+
+          expect(
+            (await repository.getInventoryItem(item.id!))?.status,
+            terminalStatus,
+          );
+
+          container.dispose();
+          repository.dispose();
+        }
+      },
+    );
+
+    test(
+      'rejects Sold and Disposed as ordinary Change Status targets',
+      () async {
+        const item = InventoryItem(
+          id: 'item-active',
+          category: InventoryCategory.bat,
+          brand: 'Active',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 10000,
+        );
+        final repository = InMemoryInventoryRepository(
+          initialItems: const [item],
+        );
+        final container = ProviderContainer(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        addTearDown(repository.dispose);
+
+        for (final terminalStatus in const [
+          InventoryStatus.sold,
+          InventoryStatus.disposed,
+        ]) {
+          await expectLater(
+            () => container
+                .read(inventoryControllerProvider.notifier)
+                .updateStatus(item: item, status: terminalStatus),
+            throwsA(isA<StateError>()),
+          );
+        }
+      },
+    );
+
     test('deletes an inventory item', () async {
       const item = InventoryItem(
         id: 'item-1',

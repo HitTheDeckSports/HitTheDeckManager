@@ -1,19 +1,49 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/core/errors/app_exception.dart';
+import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
+import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
 import 'package:hit_the_deck_manager/features/transactions/domain/models/repair_transaction.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/repair_transaction_controller.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
 
 void main() {
+  late InMemoryInventoryRepository defaultInventoryRepository;
+
+  setUp(() {
+    defaultInventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [
+        InventoryItem(
+          id: 'item-1',
+          category: InventoryCategory.bat,
+          brand: 'Available Test Item',
+          acquisitionType: AcquisitionType.purchased,
+          acquisitionValueCents: 10000,
+          status: InventoryStatus.available,
+        ),
+      ],
+    );
+  });
+
+  tearDown(() {
+    defaultInventoryRepository.dispose();
+  });
+
   test('createRepair saves a repair and returns to data state', () async {
     final repository = InMemoryTransactionRepository();
 
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -46,13 +76,68 @@ void main() {
     expect(controllerState.hasError, isFalse);
   });
 
+  test('createRepair rejects sold and disposed inventory', () async {
+    for (final terminalStatus in const [
+      InventoryStatus.sold,
+      InventoryStatus.disposed,
+    ]) {
+      final inventoryItem = InventoryItem(
+        id: 'item-${terminalStatus.name}',
+        category: InventoryCategory.bat,
+        brand: 'Terminal',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 10000,
+        status: terminalStatus,
+      );
+      final inventoryRepository = InMemoryInventoryRepository(
+        initialItems: [inventoryItem],
+      );
+      final transactionRepository = InMemoryTransactionRepository();
+      final container = ProviderContainer(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+      );
+
+      await container.read(repairTransactionControllerProvider.future);
+
+      await expectLater(
+        container
+            .read(repairTransactionControllerProvider.notifier)
+            .createRepair(
+              RepairTransaction(
+                inventoryItemId: inventoryItem.id!,
+                repairDate: DateTime(2026, 9, 22),
+                costCents: 2500,
+                description: 'Should not be recorded.',
+              ),
+            ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(await transactionRepository.getRepairs(), isEmpty);
+
+      container.dispose();
+      inventoryRepository.dispose();
+      transactionRepository.dispose();
+    }
+  });
+
   test('createRepair exposes loading state while saving', () async {
     final repository = InMemoryTransactionRepository();
 
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -94,7 +179,12 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -138,7 +228,12 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -171,7 +266,12 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -212,7 +312,12 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);
@@ -239,7 +344,12 @@ void main() {
     addTearDown(repository.dispose);
 
     final container = ProviderContainer(
-      overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        transactionRepositoryProvider.overrideWithValue(repository),
+        inventoryRepositoryProvider.overrideWithValue(
+          defaultInventoryRepository,
+        ),
+      ],
     );
 
     addTearDown(container.dispose);

@@ -63,6 +63,22 @@ void main() {
     expect(find.byKey(const Key('transactionsFilterButton')), findsOneWidget);
     expect(
       find.byKey(const Key('transactionsMinimumAmountField')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('transactionsMaximumAmountField')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-sale')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('transactionsMinimumAmountField')),
       findsOneWidget,
     );
     expect(
@@ -71,7 +87,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('transactionsTypeFilter-sale')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 

@@ -79,6 +79,21 @@ void main() {
       expect(batState.toInventoryItem()?.helmetSize, isNull);
     });
 
+    test('consignment ignores acquisition value and stores zero cost', () {
+      const state = BuyInventoryFormState(
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.consignment,
+        acquisitionValue: 'not applicable',
+        askingPrice: '300.00',
+      );
+
+      final item = state.toInventoryItem();
+
+      expect(item, isNotNull);
+      expect(item?.acquisitionType, AcquisitionType.consignment);
+      expect(item?.acquisitionValueCents, 0);
+    });
+
     test('returns null when acquisition value is invalid', () {
       const state = BuyInventoryFormState(
         brand: 'Combat',

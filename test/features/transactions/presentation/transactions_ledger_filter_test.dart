@@ -159,6 +159,14 @@ void main() {
     addTearDown(repository.dispose);
     await pumpLedger(tester, transactionRepository: repository);
 
+    expect(
+      find.byKey(const Key('transactionsMinimumAmountField')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
       find.byKey(const Key('transactionsMinimumAmountField')),
       '50',
@@ -167,6 +175,7 @@ void main() {
       find.byKey(const Key('transactionsMaximumAmountField')),
       '100',
     );
+    await tester.tap(find.byKey(const Key('transactionsTypeSheetDoneButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('1 of 4 transactions'), findsOneWidget);

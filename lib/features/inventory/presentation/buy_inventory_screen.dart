@@ -516,7 +516,8 @@ class _BuyInventoryScreenState extends ConsumerState<BuyInventoryScreen> {
     final permissions = ref.watch(currentAppPermissionsProvider);
 
     final showAcquisitionValue =
-        !widget.isEditing || permissions.canViewFinancialData;
+        formState.acquisitionType != AcquisitionType.consignment &&
+        (!widget.isEditing || permissions.canViewFinancialData);
 
     final isSaving =
         inventoryControllerState.isLoading ||

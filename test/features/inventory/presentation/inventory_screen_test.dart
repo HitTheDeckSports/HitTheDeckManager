@@ -219,6 +219,58 @@ void main() {
     expect(find.text('Filter Inventory'), findsOneWidget);
   });
 
+  testWidgets('InventoryScreen defaults to Available quick filter', (
+    WidgetTester tester,
+  ) async {
+    const available = InventoryItem(
+      id: 'available-default',
+      inventoryNumber: 'BAT-2609-0001',
+      category: InventoryCategory.bat,
+      brand: 'Available Brand',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.available,
+    );
+    const sold = InventoryItem(
+      id: 'sold-default',
+      inventoryNumber: 'BAT-2609-0002',
+      category: InventoryCategory.bat,
+      brand: 'Sold Brand',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.sold,
+    );
+    final repository = InMemoryInventoryRepository(
+      initialItems: const [available, sold],
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          inventoryLocationsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+          repairTransactionsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('inventoryItemTile-available-default')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryItemTile-sold-default')),
+      findsNothing,
+    );
+  });
+
   testWidgets('InventoryScreen displays photo-forward inventory cards', (
     WidgetTester tester,
   ) async {
@@ -493,6 +545,8 @@ void main() {
           child: const MaterialApp(home: Scaffold(body: InventoryScreen())),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Broken'));
       await tester.pumpAndSettle();
 
       expect(find.text('Broken'), findsAtLeastNWidgets(1));

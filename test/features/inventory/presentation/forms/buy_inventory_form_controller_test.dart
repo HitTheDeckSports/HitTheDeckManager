@@ -49,6 +49,22 @@ void main() {
       expect(state.gloveSizeInches, '11.5');
       expect(state.handOrientation, 'Right Hand Throw');
     });
+    test('selecting consignment clears acquisition value', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        buyInventoryFormControllerProvider.notifier,
+      );
+
+      controller.setAcquisitionValue('200.00');
+      controller.setAcquisitionType(AcquisitionType.consignment);
+
+      final state = container.read(buyInventoryFormControllerProvider);
+      expect(state.acquisitionType, AcquisitionType.consignment);
+      expect(state.acquisitionValue, isEmpty);
+    });
+
     test('initializes the form from an existing inventory item', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);

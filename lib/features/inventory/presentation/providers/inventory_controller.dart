@@ -38,6 +38,22 @@ class InventoryController extends AsyncNotifier<void> {
 
     final repository = ref.read(inventoryRepositoryProvider);
 
+    final itemId = item.id;
+    if (itemId != null && itemId.trim().isNotEmpty) {
+      final existingItem = await repository.getInventoryItem(itemId);
+      final existingStatus = existingItem?.status;
+      final existingIsTerminal =
+          existingStatus == InventoryStatus.sold ||
+          existingStatus == InventoryStatus.disposed;
+
+      if (existingIsTerminal && item.status != existingStatus) {
+        throw StateError(
+          '${existingStatus!.label} inventory is historical and cannot be '
+          'returned to an active status without an explicit reversal workflow.',
+        );
+      }
+    }
+
     final updatedItem = await AsyncValue.guard(
       () => repository.updateInventoryItem(item),
     );
@@ -59,6 +75,21 @@ class InventoryController extends AsyncNotifier<void> {
     required InventoryItem item,
     required InventoryStatus status,
   }) {
+    if (item.status == InventoryStatus.sold ||
+        item.status == InventoryStatus.disposed) {
+      throw StateError(
+        '${item.status.label} inventory is historical and its status cannot '
+        'be changed without an explicit reversal workflow.',
+      );
+    }
+
+    if (status == InventoryStatus.sold || status == InventoryStatus.disposed) {
+      throw StateError(
+        '${status.label} must be recorded through its dedicated business '
+        'workflow rather than Change Status.',
+      );
+    }
+
     return updateItem(item.copyWith(status: status));
   }
 

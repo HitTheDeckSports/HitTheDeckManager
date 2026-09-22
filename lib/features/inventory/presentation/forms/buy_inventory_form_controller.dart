@@ -33,7 +33,12 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
   }
 
   void setAcquisitionType(AcquisitionType acquisitionType) {
-    state = state.copyWith(acquisitionType: acquisitionType);
+    state = state.copyWith(
+      acquisitionType: acquisitionType,
+      acquisitionValue: acquisitionType == AcquisitionType.consignment
+          ? ''
+          : state.acquisitionValue,
+    );
   }
 
   void setAcquisitionValue(String acquisitionValue) {

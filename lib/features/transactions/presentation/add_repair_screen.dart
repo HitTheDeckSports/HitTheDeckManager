@@ -64,6 +64,23 @@ class AddRepairScreen extends ConsumerWidget {
           );
         }
 
+        if (inventoryItem.status == InventoryStatus.sold ||
+            inventoryItem.status == InventoryStatus.disposed) {
+          return AppPage(
+            title: 'Add Repair',
+            showHeader: false,
+            compact: true,
+            child: AppEmptyState(
+              icon: Icons.lock_outline,
+              title: 'Repair unavailable.',
+              message:
+                  '${inventoryItem.status.label} inventory is no longer in '
+                  'possession. Reverse the original business event before '
+                  'recording additional work.',
+            ),
+          );
+        }
+
         return _AddRepairForm(inventoryItem: inventoryItem, onSaved: onSaved);
       },
     );

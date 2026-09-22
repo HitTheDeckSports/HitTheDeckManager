@@ -120,6 +120,33 @@ void main() {
       },
     );
 
+    test(
+      'open consignment inventory does not inflate invested cost or potential profit',
+      () {
+        const inventoryItems = [
+          InventoryItem(
+            id: 'consigned',
+            category: InventoryCategory.bat,
+            brand: 'Consigned',
+            acquisitionType: AcquisitionType.consignment,
+            acquisitionValueCents: 25000,
+            askingPriceCents: 40000,
+          ),
+        ];
+
+        final metrics = DashboardMetrics.calculate(
+          inventoryItems: inventoryItems,
+          saleTransactions: const [],
+          asOf: DateTime(2026, 9, 22),
+        );
+
+        expect(metrics.openInventoryValueCents, 40000);
+        expect(metrics.openInventoryCostCents, 0);
+        expect(metrics.openPotentialProfitCents, 0);
+        expect(metrics.inventoryCount, 1);
+      },
+    );
+
     test('treats missing asking price as zero inventory value', () {
       final inventoryItems = [
         const InventoryItem(
