@@ -137,6 +137,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory inventory-1'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    final restoredSearch = tester.widget<TextField>(
+      find.byKey(const Key('universalSearchField')),
+    );
+    expect(restoredSearch.controller?.text, 'Combat');
+    expect(
+      find.byKey(const ValueKey('universalSearchResult-inventory-inventory-1')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('contact result navigates to contact detail', (tester) async {

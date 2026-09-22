@@ -80,6 +80,32 @@ void main() {
     expect(find.text('Contacts destination'), findsOneWidget);
   });
 
+  testWidgets('transaction-family details keep Transactions selected', (
+    tester,
+  ) async {
+    final router = await _pump(tester);
+
+    for (final route in <String>[
+      '/deals/deal-1',
+      '/trades/trade-1',
+      '/repairs/repair-1',
+      '/disposals/disposal-1',
+      '/consignments/consignment-1',
+    ]) {
+      router.go(route);
+      await tester.pumpAndSettle();
+
+      final navigationBar = tester.widget<NavigationBar>(
+        find.byType(NavigationBar),
+      );
+      expect(
+        navigationBar.selectedIndex,
+        2,
+        reason: 'Expected Transactions to remain selected for $route',
+      );
+    }
+  });
+
   testWidgets('standard shell retains core navigation', (tester) async {
     await _pump(tester);
     expect(find.byType(NavigationBar), findsOneWidget);
@@ -116,6 +142,10 @@ Future<GoRouter> _pump(WidgetTester tester) async {
           _r(AppRoutes.warrantyReplacement, 'Warranty destination'),
           _r(AppRoutes.repairDetail, 'Repair detail destination'),
           _r(AppRoutes.editRepair, 'Edit repair destination'),
+          _r(AppRoutes.tradeDetail, 'Trade detail destination'),
+          _r(AppRoutes.disposalDetail, 'Disposal detail destination'),
+          _r(AppRoutes.consignmentDetail, 'Consignment detail destination'),
+          _r(AppRoutes.dealDetail, 'Deal detail destination'),
           GoRoute(
             path: AppRoutes.transactionDetail,
             name: AppRouteNames.transactionDetail,

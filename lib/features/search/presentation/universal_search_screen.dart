@@ -298,22 +298,22 @@ class _UniversalSearchScreenState extends ConsumerState<UniversalSearchScreen> {
   void _openResult(BuildContext context, UniversalSearchEntry entry) {
     switch (entry.type) {
       case UniversalSearchResultType.inventory:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.inventoryDetail,
           pathParameters: {'itemId': entry.id},
         );
       case UniversalSearchResultType.contact:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.contactDetail,
           pathParameters: {'contactId': entry.id},
         );
       case UniversalSearchResultType.transaction:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.transactionDetail,
           pathParameters: {'transactionId': entry.id},
         );
       case UniversalSearchResultType.deal:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.dealDetail,
           pathParameters: {'dealId': entry.id},
         );

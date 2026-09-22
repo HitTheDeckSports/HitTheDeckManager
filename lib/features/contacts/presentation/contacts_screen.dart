@@ -585,7 +585,7 @@ class _ContactCard extends StatelessWidget {
         ),
         onTap: contact.id == null
             ? null
-            : () => context.goNamed(
+            : () => context.pushNamed(
                 AppRouteNames.contactDetail,
                 pathParameters: {'contactId': contact.id!},
               ),

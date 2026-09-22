@@ -718,6 +718,12 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    await tester.enterText(
+      find.byKey(const Key('inventorySearchField')),
+      'Combat',
+    );
+    await tester.pumpAndSettle();
+
     final itemTile = find.byKey(const ValueKey('inventoryItemTile-item-1'));
     expect(itemTile, findsOneWidget);
 
@@ -727,5 +733,17 @@ void main() {
     expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
     expect(find.byKey(const Key('inventoryItemSummarySpecs')), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    final restoredSearch = tester.widget<TextField>(
+      find.byKey(const Key('inventorySearchField')),
+    );
+    expect(restoredSearch.controller?.text, 'Combat');
+    expect(
+      find.byKey(const ValueKey('inventoryItemTile-item-1')),
+      findsOneWidget,
+    );
   });
 }

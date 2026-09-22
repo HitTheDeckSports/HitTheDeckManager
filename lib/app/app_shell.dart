@@ -391,7 +391,8 @@ class AppShell extends ConsumerWidget {
     if (location.startsWith(AppRoutes.inventory)) {
       return 1;
     }
-    if (location.startsWith(AppRoutes.transactions)) {
+    if (location.startsWith(AppRoutes.transactions) ||
+        _isTransactionFamilyDetail(location)) {
       return 2;
     }
     if (location.startsWith(AppRoutes.contacts)) {

@@ -326,6 +326,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.enterText(
+      find.byKey(const Key('contactSearchField')),
+      'Taylor',
+    );
+    await tester.pumpAndSettle();
+
     final contactCard = find.byKey(const ValueKey('contactCard-contact-1'));
     expect(contactCard, findsOneWidget);
     await tester.tap(contactCard);
@@ -337,6 +343,15 @@ void main() {
     expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat customer.'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    final restoredSearch = tester.widget<TextField>(
+      find.byKey(const Key('contactSearchField')),
+    );
+    expect(restoredSearch.controller?.text, 'Taylor');
+    expect(find.byKey(const ValueKey('contactCard-contact-1')), findsOneWidget);
   });
 }
 
