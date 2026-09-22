@@ -14,6 +14,7 @@ void main() {
       id: 'inventory-1',
       title: 'Combat Spec H1',
       subtitle: 'BAT-2608-0001',
+      imageUrl: 'https://example.com/combat-spec-h1.jpg',
       searchText: 'Combat Spec H1 BAT-2608-0001 BBCOR',
     ),
     UniversalSearchEntry(
@@ -77,6 +78,36 @@ void main() {
     expect(find.text('Contacts'), findsNothing);
   });
 
+  testWidgets('inventory result shows its inventory photo thumbnail', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(body: UniversalSearchScreen(entriesOverride: entries)),
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('universalSearchField')),
+      'Combat',
+    );
+    await tester.pump();
+
+    final imageFinder = find.byKey(
+      const ValueKey('universalSearchResultImage-inventory-1'),
+    );
+    expect(imageFinder, findsOneWidget);
+
+    final image = tester.widget<Image>(
+      find.descendant(of: imageFinder, matching: find.byType(Image)),
+    );
+    expect(
+      (image.image as NetworkImage).url,
+      'https://example.com/combat-spec-h1.jpg',
+    );
+  });
   testWidgets('clear search returns to guidance state', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
@@ -137,6 +168,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Inventory inventory-1'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    final restoredSearch = tester.widget<TextField>(
+      find.byKey(const Key('universalSearchField')),
+    );
+    expect(restoredSearch.controller?.text, 'Combat');
+    expect(
+      find.byKey(const ValueKey('universalSearchResult-inventory-inventory-1')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('contact result navigates to contact detail', (tester) async {

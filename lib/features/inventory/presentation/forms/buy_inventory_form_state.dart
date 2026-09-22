@@ -15,6 +15,7 @@ class BuyInventoryFormState {
     this.askingPrice = '',
     this.minimumPrice = '',
     this.sellerContactId,
+    this.locationId,
     this.notes = '',
     this.lengthInches = '',
     this.weightOunces = '',
@@ -23,6 +24,7 @@ class BuyInventoryFormState {
     this.gloveSizeInches = '',
     this.handOrientation = '',
     this.catchersGearSize = '',
+    this.helmetSize = '',
     this.photoUrls = const [],
   });
   factory BuyInventoryFormState.fromInventoryItem(InventoryItem item) {
@@ -38,6 +40,7 @@ class BuyInventoryFormState {
       askingPrice: _formatOptionalCentsForInput(item.askingPriceCents),
       minimumPrice: _formatOptionalCentsForInput(item.minimumPriceCents),
       sellerContactId: item.sellerContactId,
+      locationId: item.locationId,
       notes: item.notes ?? '',
       lengthInches: _formatOptionalNumber(item.lengthInches),
       weightOunces: _formatOptionalNumber(item.weightOunces),
@@ -46,6 +49,7 @@ class BuyInventoryFormState {
       gloveSizeInches: _formatOptionalNumber(item.gloveSizeInches),
       handOrientation: item.handOrientation ?? '',
       catchersGearSize: item.catchersGearSize ?? '',
+      helmetSize: item.helmetSize ?? '',
       photoUrls: item.photoUrls,
     );
   }
@@ -60,6 +64,7 @@ class BuyInventoryFormState {
   final String askingPrice;
   final String minimumPrice;
   final String? sellerContactId;
+  final String? locationId;
   final String notes;
 
   final String lengthInches;
@@ -72,12 +77,14 @@ class BuyInventoryFormState {
 
   final String catchersGearSize;
 
+  final String helmetSize;
+
   final List<String> photoUrls;
 
   InventoryItem? toInventoryItem() {
-    final acquisitionValueCents = CurrencyFormatter.tryParseToCents(
-      acquisitionValue,
-    );
+    final acquisitionValueCents = acquisitionType == AcquisitionType.consignment
+        ? 0
+        : CurrencyFormatter.tryParseToCents(acquisitionValue);
 
     if (acquisitionValueCents == null) {
       return null;
@@ -95,6 +102,7 @@ class BuyInventoryFormState {
       askingPriceCents: CurrencyFormatter.tryParseToCents(askingPrice),
       minimumPriceCents: CurrencyFormatter.tryParseToCents(minimumPrice),
       sellerContactId: sellerContactId,
+      locationId: locationId,
       notes: _emptyToNull(notes),
       lengthInches: category == InventoryCategory.bat
           ? double.tryParse(lengthInches.trim())
@@ -117,6 +125,9 @@ class BuyInventoryFormState {
       catchersGearSize: category == InventoryCategory.catchersGear
           ? _emptyToNull(catchersGearSize)
           : null,
+      helmetSize: category == InventoryCategory.helmet
+          ? _emptyToNull(helmetSize)
+          : null,
       photoUrls: photoUrls,
     );
 
@@ -135,6 +146,7 @@ class BuyInventoryFormState {
     String? askingPrice,
     String? minimumPrice,
     Object? sellerContactId = _unset,
+    Object? locationId = _unset,
     String? notes,
     String? lengthInches,
     String? weightOunces,
@@ -143,6 +155,7 @@ class BuyInventoryFormState {
     String? gloveSizeInches,
     String? handOrientation,
     String? catchersGearSize,
+    String? helmetSize,
     List<String>? photoUrls,
   }) {
     return BuyInventoryFormState(
@@ -163,6 +176,9 @@ class BuyInventoryFormState {
       sellerContactId: identical(sellerContactId, _unset)
           ? this.sellerContactId
           : sellerContactId as String?,
+      locationId: identical(locationId, _unset)
+          ? this.locationId
+          : locationId as String?,
       notes: notes ?? this.notes,
       lengthInches: lengthInches ?? this.lengthInches,
       weightOunces: weightOunces ?? this.weightOunces,
@@ -171,6 +187,7 @@ class BuyInventoryFormState {
       gloveSizeInches: gloveSizeInches ?? this.gloveSizeInches,
       handOrientation: handOrientation ?? this.handOrientation,
       catchersGearSize: catchersGearSize ?? this.catchersGearSize,
+      helmetSize: helmetSize ?? this.helmetSize,
       photoUrls: photoUrls ?? this.photoUrls,
     );
   }

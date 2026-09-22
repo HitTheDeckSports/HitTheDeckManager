@@ -9,6 +9,7 @@ class Contact {
     this.address,
     this.notes,
     this.photoUrl,
+    this.isActive = true,
   });
 
   /// Database identifier assigned after the contact is saved.
@@ -24,6 +25,9 @@ class Contact {
 
   /// Reference to the contact's optional profile photo.
   final String? photoUrl;
+
+  /// Inactive contacts remain available for historical business records.
+  final bool isActive;
 
   bool get isValid => validationErrors.isEmpty;
 
@@ -51,6 +55,7 @@ class Contact {
     Object? address = _unset,
     Object? notes = _unset,
     Object? photoUrl = _unset,
+    bool? isActive,
   }) {
     return Contact(
       id: identical(id, _unset) ? this.id : id as String?,
@@ -62,6 +67,7 @@ class Contact {
       photoUrl: identical(photoUrl, _unset)
           ? this.photoUrl
           : photoUrl as String?,
+      isActive: isActive ?? this.isActive,
     );
   }
 

@@ -18,13 +18,13 @@ import '../../transactions/domain/models/disposal_transaction.dart';
 import '../../transactions/domain/models/repair_transaction.dart';
 import '../../transactions/domain/models/sale_transaction.dart';
 import '../../transactions/domain/models/trade_transaction.dart';
-import '../../transactions/domain/models/transaction_enums.dart';
 import '../../transactions/presentation/providers/deal_providers.dart';
 import '../../transactions/presentation/providers/transaction_providers.dart';
 import '../../transactions/presentation/providers/warranty_replacement_providers.dart';
 import '../domain/models/inventory_enums.dart';
 import '../domain/models/inventory_item.dart';
 import 'providers/inventory_controller.dart';
+import 'providers/inventory_location_providers.dart';
 import 'providers/inventory_providers.dart';
 import '../application/labels/inventory_label_data.dart';
 import '../application/labels/inventory_label_pdf_generator.dart';
@@ -81,264 +81,734 @@ class _InventoryItemDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final displayName = item.model == null || item.model!.trim().isEmpty
-        ? item.brand
-        : '${item.brand} ${item.model}';
     final inventoryControllerState = ref.watch(inventoryControllerProvider);
     final permissions = ref.watch(currentAppPermissionsProvider);
+    final locationsAsync = ref.watch(inventoryLocationsProvider);
+
+    final locationLabel = item.locationId == null
+        ? 'Unassigned'
+        : locationsAsync.maybeWhen(
+            data: (locations) {
+              for (final location in locations) {
+                if (location.id == item.locationId) {
+                  return location.active
+                      ? location.name
+                      : '${location.name} (Inactive)';
+                }
+              }
+              return 'Unknown Location';
+            },
+            orElse: () => 'Loading...',
+          );
 
     final isUpdatingStatus = inventoryControllerState.isLoading;
-    return AppPage(
-      title: displayName,
-      subtitle: item.inventoryNumber ?? 'Inventory number not assigned',
-      actions: [
-        if (item.id != null)
-          PopupMenuButton<InventoryStatus>(
-            key: const Key('inventoryItemStatusButton'),
-            enabled: !isUpdatingStatus,
-            tooltip: 'Change inventory status',
-            onSelected: (status) async {
-              try {
-                final updatedItem = await ref
-                    .read(inventoryControllerProvider.notifier)
-                    .updateStatus(item: item, status: status);
+    final hasOperationalActions =
+        item.id != null &&
+        item.status != InventoryStatus.sold &&
+        item.status != InventoryStatus.disposed;
 
-                ref.invalidate(inventoryItemProvider(updatedItem.id!));
-
-                if (!context.mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Inventory status changed to ${updatedItem.status.label}.',
-                    ),
-                  ),
-                );
-              } catch (error) {
-                if (!context.mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Unable to change inventory status: $error'),
-                  ),
-                );
-              }
-            },
-            itemBuilder: (context) {
-              return [
-                for (final status in const [
-                  InventoryStatus.available,
-                  InventoryStatus.inactive,
-                  InventoryStatus.broken,
-                ])
-                  PopupMenuItem<InventoryStatus>(
-                    value: status,
-                    enabled: status != item.status,
-                    child: Row(
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: hasOperationalActions ? 72 : 0),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _InventoryPhotosSection(item: item),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          status == item.status
-                              ? Icons.check
-                              : Icons.circle_outlined,
-                          size: 18,
+                        _InventorySummarySection(
+                          item: item,
+                          canViewFinancialData:
+                              permissions.canViewFinancialData,
                         ),
-                        const SizedBox(width: 12),
-                        Text(status.label),
+                        const SizedBox(height: 12),
+                        _InventoryQuickInfoGrid(
+                          item: item,
+                          locationLabel: locationLabel,
+                          canViewFinancialData:
+                              permissions.canViewFinancialData,
+                        ),
+                        if (item.notes != null &&
+                            item.notes!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _CollapsibleDetailSection(
+                            key: const Key('inventoryNotesSection'),
+                            icon: Icons.description_outlined,
+                            title: 'Notes',
+                            summary: _singleLineSummary(item.notes!.trim()),
+                            child: Text(item.notes!.trim()),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        _CollapsibleDetailSection(
+                          key: const Key('inventoryAdditionalPricingSection'),
+                          icon: Icons.paid_outlined,
+                          title: 'Additional Pricing',
+                          child: _ThreeValueSummary(
+                            values: [
+                              (
+                                'Price New',
+                                _formatOptionalMoney(item.newValueCents),
+                              ),
+                              (
+                                'Asking Price',
+                                _formatOptionalMoney(item.askingPriceCents),
+                              ),
+                              (
+                                'Min Price',
+                                _formatOptionalMoney(item.minimumPriceCents),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _SellerInformationSection(
+                          sellerContactId: item.sellerContactId,
+                        ),
+                        if (item.acquisitionType ==
+                                AcquisitionType.consignment &&
+                            item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _ConsignmentSection(item: item),
+                        ],
+                        if (item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _RepairHistorySection(
+                            inventoryItemId: item.id!,
+                            acquisitionValueCents: item.acquisitionValueCents,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                          const SizedBox(height: 10),
+                          _DisposalHistorySection(inventoryItemId: item.id!),
+                        ],
+                        if (item.status == InventoryStatus.sold &&
+                            item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _SaleInformationSection(
+                            inventoryItemId: item.id!,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                        ],
+                        if (item.id != null) ...[
+                          const SizedBox(height: 10),
+                          _TradeHistorySection(
+                            inventoryItemId: item.id!,
+                            canViewFinancialData:
+                                permissions.canViewFinancialData,
+                          ),
+                          const SizedBox(height: 10),
+                          _InventoryWarrantySection(inventoryItemId: item.id!),
+                          const SizedBox(height: 10),
+                          _InventoryDealSection(
+                            inventoryItemId: item.id!,
+                            status: item.status,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                       ],
                     ),
                   ),
-              ];
-            },
-            child: OutlinedButton.icon(
-              onPressed: null,
-              icon: isUpdatingStatus
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.swap_horiz),
-              label: Text(
-                isUpdatingStatus ? 'Updating Status...' : 'Change Status',
+                ],
               ),
             ),
           ),
-        if (item.id != null)
-          FilledButton.icon(
-            key: const Key('inventoryItemEditButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    context.goNamed(
-                      AppRouteNames.inventoryEdit,
-                      pathParameters: {'itemId': item.id!},
-                    );
-                  },
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Edit'),
-          ),
-        if (item.id != null)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemQrButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    showDialog<void>(
-                      context: context,
-                      builder: (context) {
-                        return _InventoryQrDialog(item: item);
-                      },
-                    );
-                  },
-            icon: const Icon(Icons.qr_code),
-            label: const Text('QR Code'),
-          ),
-        if (item.id != null && item.status != InventoryStatus.disposed)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemAddRepairButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    context.goNamed(
-                      AppRouteNames.addRepair,
-                      pathParameters: {'itemId': item.id!},
-                    );
-                  },
-            icon: const Icon(Icons.build_outlined),
-            label: const Text('Add Repair'),
-          ),
-        if (permissions.canDisposeInventory &&
-            item.id != null &&
-            item.status != InventoryStatus.sold &&
-            item.status != InventoryStatus.disposed)
-          OutlinedButton.icon(
-            key: const Key('inventoryItemDisposeButton'),
-            onPressed: isUpdatingStatus
-                ? null
-                : () {
-                    context.goNamed(
-                      AppRouteNames.disposeInventory,
-                      pathParameters: {'itemId': item.id!},
-                    );
-                  },
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Dispose'),
+        ),
+        if (hasOperationalActions)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _InventoryPrimaryActions(
+              item: item,
+              canDisposeInventory: permissions.canDisposeInventory,
+              isUpdatingStatus: isUpdatingStatus,
+            ),
           ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DetailSection(
-            title: 'Basic Information',
-            children: [
-              _DetailRow(
-                label: 'Inventory Number',
-                value: item.inventoryNumber ?? 'Not assigned',
-              ),
-              _DetailRow(label: 'Category', value: item.category.label),
-              _DetailRow(label: 'Brand', value: item.brand),
-              _DetailRow(
-                label: 'Model',
-                value: _displayOptionalText(item.model),
-              ),
-              _DetailRow(
-                label: 'Acquisition Type',
-                value: item.acquisitionType.label,
-              ),
-              _DetailRow(
-                label: 'Condition',
-                value: item.condition?.label ?? 'Not specified',
-              ),
-              _DetailRow(label: 'Status', value: item.status.label),
-              _DetailRow(
-                label: 'Purchase Date',
-                value: item.purchaseDate == null
-                    ? 'Not specified'
-                    : _formatDate(item.purchaseDate!),
-              ),
-            ],
-          ),
-          if (item.photoUrls.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _InventoryPhotosSection(photoUrls: item.photoUrls),
-          ],
-          const SizedBox(height: 24),
-          _SellerInformationSection(sellerContactId: item.sellerContactId),
-          if (item.acquisitionType == AcquisitionType.consignment &&
-              item.id != null) ...[
-            const SizedBox(height: 24),
-            _ConsignmentSection(item: item),
-          ],
-          const SizedBox(height: 24),
-          _DetailSection(
-            title: 'Pricing',
-            children: [
-              if (permissions.canViewFinancialData)
-                _DetailRow(
-                  label: 'Acquisition Value',
-                  value: CurrencyFormatter.formatCents(
-                    item.acquisitionValueCents,
+    );
+  }
+}
+
+class _InventoryQuickInfoGrid extends StatelessWidget {
+  const _InventoryQuickInfoGrid({
+    required this.item,
+    required this.locationLabel,
+    required this.canViewFinancialData,
+  });
+
+  final InventoryItem item;
+  final String locationLabel;
+  final bool canViewFinancialData;
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = <_QuickInfoData>[
+      _QuickInfoData(
+        'Category',
+        item.category.label,
+        _inventoryCategoryIcon(item.category),
+      ),
+      _QuickInfoData('Brand', item.brand, Icons.sell_outlined),
+      _QuickInfoData(
+        'Model',
+        _displayOptionalText(item.model),
+        Icons.local_offer_outlined,
+      ),
+      _QuickInfoData(
+        'Condition',
+        item.condition?.label ?? 'Not specified',
+        Icons.workspace_premium_outlined,
+      ),
+      _QuickInfoData(
+        'Purchased',
+        item.purchaseDate == null
+            ? 'Not specified'
+            : _formatDate(item.purchaseDate!),
+        Icons.calendar_month_outlined,
+      ),
+      if (canViewFinancialData)
+        _QuickInfoData(
+          'Cost',
+          item.acquisitionType == AcquisitionType.consignment
+              ? 'Consignment'
+              : CurrencyFormatter.formatCents(item.acquisitionValueCents),
+          Icons.paid_outlined,
+        )
+      else
+        const _QuickInfoData('Cost', 'Restricted', Icons.lock_outline),
+      _QuickInfoData('Location', locationLabel, Icons.location_on_outlined),
+      _QuickInfoData(
+        'Acquired',
+        item.acquisitionType.label,
+        Icons.shopping_cart_outlined,
+      ),
+      _QuickInfoData(
+        'QR Code',
+        'View / Print',
+        Icons.qr_code_2,
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (context) => _InventoryQrDialog(item: item),
+          );
+        },
+      ),
+    ];
+
+    return Card(
+      key: const Key('inventoryItemQuickInfoGrid'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            const columns = 3;
+            final width =
+                (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final cell in cells)
+                  SizedBox(
+                    width: width,
+                    child: _QuickInfoCell(data: cell),
                   ),
-                ),
-              _DetailRow(
-                label: 'New Value',
-                value: _formatOptionalMoney(item.newValueCents),
-              ),
-              _DetailRow(
-                label: 'Asking Price',
-                value: _formatOptionalMoney(item.askingPriceCents),
-              ),
-              _DetailRow(
-                label: 'Minimum Acceptable Price',
-                value: _formatOptionalMoney(item.minimumPriceCents),
-              ),
-            ],
-          ),
-          if (item.id != null) ...[
-            const SizedBox(height: 24),
-            _RepairHistorySection(
-              inventoryItemId: item.id!,
-              acquisitionValueCents: item.acquisitionValueCents,
-              canViewFinancialData: permissions.canViewFinancialData,
-            ),
-            const SizedBox(height: 24),
-            _DisposalHistorySection(inventoryItemId: item.id!),
-          ],
-          if (item.status == InventoryStatus.sold && item.id != null) ...[
-            const SizedBox(height: 24),
-            _SaleInformationSection(
-              inventoryItemId: item.id!,
-              canViewFinancialData: permissions.canViewFinancialData,
-            ),
-          ],
-          if (item.id != null) ...[
-            const SizedBox(height: 24),
-            _TradeHistorySection(
-              inventoryItemId: item.id!,
-              canViewFinancialData: permissions.canViewFinancialData,
-            ),
-            const SizedBox(height: 24),
-            _InventoryDealSection(
-              inventoryItemId: item.id!,
-              status: item.status,
-            ),
-          ],
-          const SizedBox(height: 24),
-          _DetailSection(
-            title: 'Item Details',
-            children: [
-              ..._categorySpecificRows(item),
-              _DetailRow(
-                label: 'Notes',
-                value: _displayOptionalText(item.notes),
-              ),
-            ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickInfoData {
+  const _QuickInfoData(this.label, this.value, this.icon, {this.onTap});
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback? onTap;
+}
+
+class _QuickInfoCell extends StatelessWidget {
+  const _QuickInfoCell({required this.data});
+
+  final _QuickInfoData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Container(
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x16062A4D),
+            blurRadius: 7,
+            offset: Offset(0, 2),
           ),
         ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                data.icon,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  data.label.toUpperCase(),
+                  key: ValueKey('inventoryQuickInfoLabel-${data.label}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            data.value,
+            key: ValueKey('inventoryQuickInfoValue-${data.label}'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+
+    if (data.onTap == null) {
+      return content;
+    }
+
+    return Semantics(
+      button: true,
+      child: InkWell(
+        key: ValueKey('inventoryQuickInfoAction-${data.label}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: data.onTap,
+        child: content,
+      ),
+    );
+  }
+}
+
+class _InventorySummarySection extends ConsumerWidget {
+  const _InventorySummarySection({
+    required this.item,
+    required this.canViewFinancialData,
+  });
+
+  final InventoryItem item;
+  final bool canViewFinancialData;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayName = item.model == null || item.model!.trim().isEmpty
+        ? item.brand
+        : '${item.brand} ${item.model}';
+    final itemId = item.id;
+    final repairsAsync = itemId == null
+        ? const AsyncValue<List<RepairTransaction>>.data([])
+        : ref.watch(repairsForInventoryItemProvider(itemId));
+    final totalRepairCostCents = repairsAsync.maybeWhen<int?>(
+      data: (repairs) =>
+          repairs.fold<int>(0, (total, repair) => total + repair.costCents),
+      orElse: () => null,
+    );
+    final totalCostCents = totalRepairCostCents == null
+        ? null
+        : item.acquisitionValueCents + totalRepairCostCents;
+    final estimatedProfitCents =
+        item.acquisitionType == AcquisitionType.consignment ||
+            totalCostCents == null ||
+            item.askingPriceCents == null
+        ? null
+        : item.askingPriceCents! - totalCostCents;
+    final specifications = _compactItemSpecifications(item);
+    final categoryColor = _inventoryCategoryColor(item.category);
+    final ageText = _inventoryAgeLabel(item);
+
+    return Card(
+      key: const Key('inventoryItemSummaryCard'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: categoryColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Flexible(
+                        child: Text(
+                          item.inventoryNumber ?? 'Not assigned',
+                          key: const Key('inventoryItemSummaryNumber'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: categoryColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    displayName,
+                    key: const Key('inventoryItemSummaryName'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (specifications != null) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      specifications,
+                      key: const Key('inventoryItemSummarySpecs'),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (item.condition != null)
+                        Container(
+                          key: const Key('inventoryItemConditionPill'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F2F5),
+
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            item.condition!.label,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      Text(
+                        ageText,
+                        key: const Key('inventoryItemAgeLabel'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            SizedBox(
+              width: 112,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Asking Price',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatCompactPrice(item.askingPriceCents),
+                    key: const Key('inventoryItemAskingPrice'),
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  if (canViewFinancialData && estimatedProfitCents != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _formatProfit(estimatedProfitCents),
+                      key: const Key('inventoryItemEstimatedProfitMetric'),
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: estimatedProfitCents >= 0
+                            ? Colors.green.shade700
+                            : Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InventoryPrimaryActions extends ConsumerWidget {
+  const _InventoryPrimaryActions({
+    required this.item,
+    required this.canDisposeInventory,
+    required this.isUpdatingStatus,
+  });
+
+  final InventoryItem item;
+  final bool canDisposeInventory;
+  final bool isUpdatingStatus;
+
+  Future<void> _showStatusSheet(BuildContext context, WidgetRef ref) async {
+    final selectedStatus = await showModalBottomSheet<InventoryStatus>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final statuses = [
+          InventoryStatus.available,
+          InventoryStatus.inactive,
+          InventoryStatus.broken,
+          if (canDisposeInventory &&
+              item.status != InventoryStatus.sold &&
+              item.status != InventoryStatus.disposed)
+            InventoryStatus.disposed,
+        ];
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Change Status',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current status: ${item.status.label}',
+                  key: const Key('inventoryStatusCurrentLabel'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: _inventoryStatusForeground(item.status),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final status in statuses)
+                  ListTile(
+                    key: ValueKey('inventoryStatusOption-${status.name}'),
+                    enabled: status != item.status,
+                    leading: Icon(
+                      status == item.status
+                          ? Icons.check_circle
+                          : Icons.circle_outlined,
+                      color: _inventoryStatusForeground(status),
+                    ),
+                    title: Text(status.label),
+                    onTap: status == item.status
+                        ? null
+                        : () => Navigator.of(context).pop(status),
+                  ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  key: const Key('inventoryStatusCancelButton'),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selectedStatus == null || !context.mounted) {
+      return;
+    }
+
+    if (selectedStatus == InventoryStatus.disposed) {
+      if (item.id != null) {
+        context.pushNamed(
+          AppRouteNames.disposeInventory,
+          pathParameters: {'itemId': item.id!},
+        );
+      }
+      return;
+    }
+
+    try {
+      final updatedItem = await ref
+          .read(inventoryControllerProvider.notifier)
+          .updateStatus(item: item, status: selectedStatus);
+
+      ref.invalidate(inventoryItemProvider(updatedItem.id!));
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Inventory status changed to ${updatedItem.status.label}.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to change inventory status: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      key: const Key('inventoryItemPrimaryActions'),
+      elevation: 10,
+      color: colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(
+            key: const Key('inventoryItemPrimaryActionRow'),
+            children: [
+              if (item.id != null && item.status == InventoryStatus.available)
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('inventoryItemSellButton'),
+                    onPressed: isUpdatingStatus
+                        ? null
+                        : () {
+                            context.pushNamed(
+                              AppRouteNames.sellInventory,
+                              extra: item,
+                            );
+                          },
+                    icon: const Icon(Icons.sell_outlined, size: 18),
+                    label: const Text('Sell'),
+                  ),
+                ),
+              if (item.id != null && item.status == InventoryStatus.available)
+                const SizedBox(width: 8),
+              if (item.id != null &&
+                  item.status != InventoryStatus.sold &&
+                  item.status != InventoryStatus.disposed)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('inventoryItemAddRepairButton'),
+                    onPressed: isUpdatingStatus
+                        ? null
+                        : () {
+                            context.pushNamed(
+                              AppRouteNames.addRepair,
+                              pathParameters: {'itemId': item.id!},
+                            );
+                          },
+                    icon: const Icon(Icons.build_outlined, size: 18),
+                    label: const Text(
+                      'Repair',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              if (item.id != null &&
+                  item.status != InventoryStatus.sold &&
+                  item.status != InventoryStatus.disposed)
+                const SizedBox(width: 8),
+              if (item.id != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('inventoryItemStatusButton'),
+                    onPressed: isUpdatingStatus
+                        ? null
+                        : () => _showStatusSheet(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                      side: BorderSide(color: colorScheme.primary),
+                    ),
+                    icon: isUpdatingStatus
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.swap_horiz, size: 18),
+                    label: Text(
+                      isUpdatingStatus ? 'Updating...' : 'Status',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -525,50 +995,146 @@ class _InventoryLabelPositionDialogState
 }
 
 class _InventoryPhotosSection extends StatelessWidget {
-  const _InventoryPhotosSection({required this.photoUrls});
+  const _InventoryPhotosSection({required this.item});
 
-  final List<String> photoUrls;
+  final InventoryItem item;
+
+  void _openViewer(
+    BuildContext context,
+    List<String> photoUrls,
+    int initialIndex,
+  ) {
+    if (photoUrls.isEmpty) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) {
+        return _InventoryPhotoViewer(
+          photoUrls: photoUrls,
+          initialIndex: initialIndex,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return _DetailSection(
-      title: 'Photos',
+    final photoUrls = item.photoUrls;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    return Column(
+      key: const Key('inventoryPhotosSection'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: Image.network(
-              photoUrls.first,
-              key: const Key('inventoryPrimaryPhoto'),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const ColoredBox(
-                  color: Color(0xFFE0E0E0),
-                  child: Center(
-                    child: Icon(Icons.broken_image_outlined, size: 40),
+        SizedBox(
+          key: const Key('inventoryPrimaryPhotoFullBleed'),
+          width: screenWidth,
+          child: Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: photoUrls.isEmpty
+                    ? ColoredBox(
+                        key: const Key('inventoryPrimaryPhotoPlaceholder'),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        child: Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 52,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        key: const Key('inventoryPrimaryPhotoTapTarget'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _openViewer(context, photoUrls, 0),
+                        child: Image.network(
+                          photoUrls.first,
+                          key: const Key('inventoryPrimaryPhoto'),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const ColoredBox(
+                              color: Color(0xFFE0E0E0),
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: _InventoryStatusBadge(status: item.status),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              },
-            ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.photo_camera_outlined,
+                          size: 17,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          photoUrls.length.toString(),
+                          key: const Key('inventoryPhotoCountLabel'),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         if (photoUrls.length > 1) ...[
-          const SizedBox(height: 12),
+          const SizedBox.shrink(),
           SizedBox(
-            height: 92,
+            key: const Key('inventoryPhotoThumbnailStrip'),
+            width: screenWidth,
+            height: 96,
             child: ListView.separated(
+              padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               itemCount: photoUrls.length - 1,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              separatorBuilder: (context, index) => const SizedBox.shrink(),
               itemBuilder: (context, index) {
                 final photoIndex = index + 1;
 
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                return GestureDetector(
+                  key: Key('inventoryPhotoThumbnailTapTarget-$photoIndex'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openViewer(context, photoUrls, photoIndex),
                   child: SizedBox(
-                    width: 92,
-                    height: 92,
+                    width: 96,
+                    height: 96,
                     child: Image.network(
                       photoUrls[photoIndex],
                       key: Key('inventoryPhotoThumbnail-$photoIndex'),
@@ -588,13 +1154,171 @@ class _InventoryPhotosSection extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 8),
-        Text(
-          '${photoUrls.length} ${photoUrls.length == 1 ? 'photo' : 'photos'}',
-          key: const Key('inventoryPhotoCountLabel'),
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
       ],
+    );
+  }
+}
+
+class _InventoryPhotoViewer extends StatefulWidget {
+  const _InventoryPhotoViewer({
+    required this.photoUrls,
+    required this.initialIndex,
+  });
+
+  final List<String> photoUrls;
+  final int initialIndex;
+
+  @override
+  State<_InventoryPhotoViewer> createState() => _InventoryPhotoViewerState();
+}
+
+class _InventoryPhotoViewerState extends State<_InventoryPhotoViewer> {
+  late final PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('inventoryPhotoViewer'),
+      color: Colors.black,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              key: const Key('inventoryPhotoViewerPageView'),
+              controller: _pageController,
+              itemCount: widget.photoUrls.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return Center(
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: Image.network(
+                      widget.photoUrls[index],
+                      key: Key('inventoryPhotoViewerImage-$index'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            size: 64,
+                            color: Colors.white70,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                key: const Key('inventoryPhotoViewerCloseButton'),
+                tooltip: 'Close',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 18,
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.68),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} of ${widget.photoUrls.length}',
+                      key: const Key('inventoryPhotoViewerPositionLabel'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Color _inventoryStatusBackground(InventoryStatus status) {
+  return switch (status) {
+    InventoryStatus.available => const Color(0xFFDFF3E4),
+    InventoryStatus.sold => const Color(0xFFDDEBFF),
+    InventoryStatus.inactive => const Color(0xFFFFE9B8),
+    InventoryStatus.broken => const Color(0xFFFFDAD6),
+    InventoryStatus.disposed => const Color(0xFFE6E8EC),
+  };
+}
+
+Color _inventoryStatusForeground(InventoryStatus status) {
+  return switch (status) {
+    InventoryStatus.available => const Color(0xFF146C2E),
+    InventoryStatus.sold => const Color(0xFF174EA6),
+    InventoryStatus.inactive => const Color(0xFF8A5A00),
+    InventoryStatus.broken => const Color(0xFFB3261E),
+    InventoryStatus.disposed => const Color(0xFF4B5563),
+  };
+}
+
+class _InventoryStatusBadge extends StatelessWidget {
+  const _InventoryStatusBadge({required this.status});
+
+  final InventoryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('inventoryItemStatusBadge'),
+      decoration: BoxDecoration(
+        color: _inventoryStatusBackground(status),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 5, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        child: Text(
+          status.label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: _inventoryStatusForeground(status),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -646,7 +1370,7 @@ class _ConsignmentSection extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     key: const Key('recordConsignmentAgreementButton'),
                     onPressed: () {
-                      context.goNamed(
+                      context.pushNamed(
                         AppRouteNames.recordConsignment,
                         pathParameters: {'itemId': itemId},
                       );
@@ -749,6 +1473,70 @@ class _ConsignmentAgreementDetails extends ConsumerWidget {
   }
 }
 
+class _InventoryWarrantySection extends ConsumerWidget {
+  const _InventoryWarrantySection({required this.inventoryItemId});
+
+  final String inventoryItemId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final warrantyAsync = ref.watch(
+      warrantyReplacementDealForInventoryProvider(inventoryItemId),
+    );
+
+    return warrantyAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (warrantyDeal) {
+        if (warrantyDeal == null) {
+          return const SizedBox.shrink();
+        }
+
+        final isReplacement =
+            warrantyDeal.replacementInventoryItemId == inventoryItemId;
+        final relatedInventoryItemId = isReplacement
+            ? warrantyDeal.disposedInventoryItemId
+            : warrantyDeal.replacementInventoryItemId;
+        final relationship = isReplacement
+            ? 'This item was received as a warranty replacement.'
+            : 'This item was replaced under warranty.';
+
+        return _CollapsibleDetailSection(
+          key: const Key('inventoryWarrantySection'),
+          icon: Icons.verified_outlined,
+          title: 'Warranty',
+          summary: relationship,
+          children: [
+            _DetailRow(label: 'Relationship', value: relationship),
+            _DetailRow(
+              label: 'Replacement Date',
+              value: _formatDate(warrantyDeal.replacementDate),
+            ),
+            if (warrantyDeal.notes != null &&
+                warrantyDeal.notes!.trim().isNotEmpty)
+              _DetailRow(label: 'Notes', value: warrantyDeal.notes!.trim()),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('inventoryWarrantyViewItemButton'),
+                onPressed: () {
+                  context.pushNamed(
+                    AppRouteNames.inventoryDetail,
+                    pathParameters: {'itemId': relatedInventoryItemId},
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('View Item'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _InventoryDealSection extends ConsumerWidget {
   const _InventoryDealSection({
     required this.inventoryItemId,
@@ -760,18 +1548,24 @@ class _InventoryDealSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final childDealAsync = ref.watch(
-      dealForChildInventoryItemProvider(inventoryItemId),
+    final lineageDealAsync = ref.watch(
+      dealForLineageInventoryItemProvider(inventoryItemId),
     );
 
-    return childDealAsync.when(
+    return lineageDealAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stackTrace) => const SizedBox.shrink(),
-      data: (childDeal) {
-        if (childDeal != null) {
+      data: (lineageDeal) {
+        if (lineageDeal != null) {
+          final isDirectChild = lineageDeal.childInventoryItemIds.contains(
+            inventoryItemId,
+          );
+
           return _DealLinkSection(
-            dealId: childDeal.id,
-            message: 'This inventory item is a direct child of a Deal.',
+            dealId: lineageDeal.id,
+            message: isDirectChild
+                ? 'This inventory item is a direct child of a Deal.'
+                : 'This inventory item is part of a continuing Deal lineage.',
           );
         }
 
@@ -788,7 +1582,6 @@ class _InventoryDealSection extends ConsumerWidget {
           error: (error, stackTrace) => const SizedBox.shrink(),
           data: (sale) {
             final saleId = sale?.id;
-
             if (saleId == null || saleId.trim().isEmpty) {
               return const SizedBox.shrink();
             }
@@ -819,40 +1612,85 @@ class _InventoryDealSection extends ConsumerWidget {
   }
 }
 
-class _DealLinkSection extends StatelessWidget {
+class _DealLinkSection extends ConsumerWidget {
   const _DealLinkSection({required this.dealId, required this.message});
 
   final String? dealId;
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final id = dealId?.trim() ?? '';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = dealId;
+    final displayNumberAsync = id == null
+        ? const AsyncValue<String?>.data(null)
+        : ref.watch(dealDisplayNumberProvider(id));
 
-    if (id.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final label = displayNumberAsync.maybeWhen(
+      data: (displayNumber) =>
+          displayNumber == null ? 'Deal' : 'Deal #$displayNumber',
+      orElse: () => 'Deal',
+    );
 
-    return _DetailSection(
-      title: 'Deal',
-      children: [
-        Text(message),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const Key('inventoryViewDealButton'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.dealDetail,
-                pathParameters: {'dealId': id},
-              );
-            },
-            icon: const Icon(Icons.handshake_outlined),
-            label: const Text('View Deal'),
-          ),
+    return Card(
+      key: const Key('inventoryDealSection'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.handshake_outlined, color: Color(0xFF6F42C1)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Deal',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: const Color(0xFF657080),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(message, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 5),
+                  if (id == null)
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    )
+                  else
+                    TextButton(
+                      key: const Key('inventoryDealNumberLink'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: () {
+                        context.pushNamed(
+                          AppRouteNames.dealDetail,
+                          pathParameters: {'dealId': id},
+                        );
+                      },
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: const Color(0xFF125FB8),
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -892,10 +1730,7 @@ class _TradeHistorySection extends ConsumerWidget {
       ),
       data: (trades) {
         if (trades.isEmpty) {
-          return const _DetailSection(
-            title: 'Trade History',
-            children: [Text('This inventory item is not linked to a trade.')],
-          );
+          return const SizedBox.shrink(key: Key('inventoryTradeHistoryEmpty'));
         }
 
         return inventoryAsync.when(
@@ -922,9 +1757,12 @@ class _TradeHistorySection extends ConsumerWidget {
               for (final item in items)
                 if (item.id != null) item.id!: item,
             };
-
-            return _DetailSection(
+            return _CollapsibleDetailSection(
+              key: const Key('inventoryTradeHistorySection'),
+              icon: Icons.swap_horiz,
               title: 'Trade History',
+              summary:
+                  '${trades.length} ${trades.length == 1 ? 'trade' : 'trades'}',
               children: [
                 for (var index = 0; index < trades.length; index++) ...[
                   if (index > 0) const Divider(height: 32),
@@ -971,9 +1809,7 @@ class _TradeHistoryEntry extends StatelessWidget {
       children: [
         _DetailRow(
           label: 'Relationship',
-          value: isOutgoing
-              ? 'Sold item in a trade-in sale'
-              : 'Inventory received as a trade-in',
+          value: isOutgoing ? 'Sold in a Trade Sale' : 'Received as Trade-In',
         ),
         _DetailRow(label: 'Trade Date', value: _formatDate(trade.tradeDate)),
         _DetailRow(
@@ -987,25 +1823,67 @@ class _TradeHistoryEntry extends StatelessWidget {
             inventoryItemId: relatedIds[index],
             item: inventoryById[relatedIds[index]],
             canViewFinancialData: canViewFinancialData,
+            roleLabel: isOutgoing ? 'Trade-In Item' : 'Item Sold',
+            showViewButton:
+                relatedIds.length != 1 ||
+                trade.saleTransactionId == null ||
+                trade.saleTransactionId!.trim().isEmpty,
           ),
         ],
         if (trade.saleTransactionId != null &&
             trade.saleTransactionId!.trim().isNotEmpty) ...[
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
-              onPressed: () {
-                context.goNamed(
-                  AppRouteNames.transactionDetail,
-                  pathParameters: {'transactionId': trade.saleTransactionId!},
-                );
-              },
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('View Original Sale'),
+          if (relatedIds.length == 1)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey(
+                      'inventoryTradeViewItemButton-${relatedIds.single}',
+                    ),
+                    onPressed: () {
+                      context.pushNamed(
+                        AppRouteNames.inventoryDetail,
+                        pathParameters: {'itemId': relatedIds.single},
+                      );
+                    },
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('View Item'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
+                    onPressed: () {
+                      context.pushNamed(
+                        AppRouteNames.transactionDetail,
+                        pathParameters: {
+                          'transactionId': trade.saleTransactionId!,
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('Original Sale'),
+                  ),
+                ),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: ValueKey('inventoryTradeViewSaleButton-${trade.id}'),
+                onPressed: () {
+                  context.pushNamed(
+                    AppRouteNames.transactionDetail,
+                    pathParameters: {'transactionId': trade.saleTransactionId!},
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Original Sale'),
+              ),
             ),
-          ),
         ],
       ],
     );
@@ -1017,11 +1895,15 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
     required this.inventoryItemId,
     required this.item,
     required this.canViewFinancialData,
+    required this.roleLabel,
+    this.showViewButton = true,
   });
 
   final String inventoryItemId;
   final InventoryItem? item;
   final bool canViewFinancialData;
+  final String roleLabel;
+  final bool showViewButton;
 
   @override
   Widget build(BuildContext context) {
@@ -1044,7 +1926,7 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _DetailRow(
-          label: 'Inventory Item',
+          label: roleLabel,
           value:
               '${relatedItem.inventoryNumber ?? 'Not assigned'} — $displayName',
         ),
@@ -1056,21 +1938,23 @@ class _RelatedTradeInventoryItem extends StatelessWidget {
               relatedItem.acquisitionValueCents,
             ),
           ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: ValueKey('inventoryTradeViewItemButton-$inventoryItemId'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.inventoryDetail,
-                pathParameters: {'itemId': inventoryItemId},
-              );
-            },
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: const Text('View Inventory Item'),
+        if (showViewButton) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: ValueKey('inventoryTradeViewItemButton-$inventoryItemId'),
+              onPressed: () {
+                context.pushNamed(
+                  AppRouteNames.inventoryDetail,
+                  pathParameters: {'itemId': inventoryItemId},
+                );
+              },
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('View Item'),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1104,13 +1988,15 @@ class _DisposalHistorySection extends ConsumerWidget {
       ),
       data: (disposals) {
         if (disposals.isEmpty) {
-          return const _DetailSection(
-            title: 'Disposal History',
-            children: [Text('This inventory item has not been disposed.')],
+          return const SizedBox.shrink(
+            key: Key('inventoryDisposalHistoryEmpty'),
           );
         }
-        return _DetailSection(
+        return _CollapsibleDetailSection(
+          key: const Key('inventoryDisposalHistorySection'),
+          icon: Icons.delete_outline,
           title: 'Disposal History',
+          summary: disposals.first.reason.label,
           children: [
             for (var index = 0; index < disposals.length; index++) ...[
               if (index > 0) const Divider(height: 32),
@@ -1190,7 +2076,7 @@ class _WarrantyReplacementDealEntry extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   key: ValueKey('createWarrantyReplacementButton-$disposalId'),
                   onPressed: () {
-                    context.goNamed(
+                    context.pushNamed(
                       AppRouteNames.warrantyReplacement,
                       pathParameters: {'disposalId': disposalId},
                     );
@@ -1213,13 +2099,13 @@ class _WarrantyReplacementDealEntry extends ConsumerWidget {
               child: OutlinedButton.icon(
                 key: ValueKey('viewWarrantyReplacementItemButton-${deal.id}'),
                 onPressed: () {
-                  context.goNamed(
+                  context.pushNamed(
                     AppRouteNames.inventoryDetail,
                     pathParameters: {'itemId': deal.replacementInventoryItemId},
                   );
                 },
                 icon: const Icon(Icons.inventory_2_outlined),
-                label: const Text('View Replacement Item'),
+                label: const Text('View Item'),
               ),
             ),
           ],
@@ -1294,8 +2180,17 @@ class _RepairHistoryContent extends StatelessWidget {
 
     final trueCostCents = acquisitionValueCents + totalRepairCostCents;
 
-    return _DetailSection(
+    if (repairs.isEmpty) {
+      return const SizedBox.shrink(key: Key('inventoryRepairHistoryEmpty'));
+    }
+
+    return _CollapsibleDetailSection(
+      key: const Key('inventoryRepairHistorySection'),
+      icon: Icons.build_outlined,
       title: 'Repair History',
+      summary:
+          '${repairs.length} ${repairs.length == 1 ? 'repair' : 'repairs'}'
+          '${canViewFinancialData ? ' - ${CurrencyFormatter.formatCents(totalRepairCostCents)} total' : ''}',
       children: [
         _DetailRow(
           label: 'Number of Repairs',
@@ -1311,17 +2206,14 @@ class _RepairHistoryContent extends StatelessWidget {
             value: CurrencyFormatter.formatCents(trueCostCents),
           ),
         ],
-        const SizedBox(height: 12),
-        if (repairs.isEmpty)
-          const Text('No repairs have been recorded for this item.')
-        else
-          for (var index = 0; index < repairs.length; index++) ...[
-            if (index > 0) const Divider(height: 32),
-            _RepairHistoryEntry(
-              repair: repairs[index],
-              canViewFinancialData: canViewFinancialData,
-            ),
-          ],
+        const SizedBox(height: 8),
+        for (var index = 0; index < repairs.length; index++) ...[
+          if (index > 0) const Divider(height: 24),
+          _RepairHistoryEntry(
+            repair: repairs[index],
+            canViewFinancialData: canViewFinancialData,
+          ),
+        ],
       ],
     );
   }
@@ -1360,7 +2252,7 @@ class _RepairHistoryEntry extends StatelessWidget {
             child: OutlinedButton.icon(
               key: ValueKey('repairHistoryViewButton-$repairId'),
               onPressed: () {
-                context.goNamed(
+                context.pushNamed(
                   AppRouteNames.repairDetail,
                   pathParameters: {'repairId': repairId},
                 );
@@ -1383,93 +2275,50 @@ class _SellerInformationSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final contactId = sellerContactId?.trim() ?? '';
-
     if (contactId.isEmpty) {
-      return const _DetailSection(
-        title: 'Seller Information',
-        children: [_DetailRow(label: 'Seller', value: 'No seller linked')],
+      return const _StaticSummarySection(
+        key: Key('inventorySellerEmpty'),
+        icon: Icons.person_outline,
+        title: 'Seller',
+        summary: 'No seller linked',
       );
     }
 
     final sellerAsync = ref.watch(contactProvider(contactId));
-
     return sellerAsync.when(
-      loading: () => const _DetailSection(
-        title: 'Seller Information',
-        children: [AppLoadingState(message: 'Loading seller information...')],
+      loading: () => const _StaticSummarySection(
+        icon: Icons.person_outline,
+        title: 'Seller',
+        summary: 'Loading seller...',
       ),
-      error: (error, stackTrace) => _DetailSection(
-        title: 'Seller Information',
-        children: [
-          AppErrorState(
-            message: 'Unable to load seller information.',
-            details: error.toString(),
-            onRetry: () {
-              ref.invalidate(contactProvider(contactId));
-            },
-          ),
-        ],
+      error: (error, stackTrace) => _StaticSummarySection(
+        icon: Icons.person_outline,
+        title: 'Seller',
+        summary: 'Unable to load seller information.',
       ),
       data: (seller) {
         if (seller == null) {
-          return const _DetailSection(
-            title: 'Seller Information',
-            children: [
-              Text(
+          return const _StaticSummarySection(
+            icon: Icons.person_outline,
+            title: 'Seller',
+            summary:
                 'A seller is linked to this item, but the Contact record is unavailable.',
-              ),
-            ],
           );
         }
 
-        return _SellerInformationContent(
-          sellerId: contactId,
-          sellerName: seller.name,
-          sellerPhone: seller.phone,
-          sellerEmail: seller.email,
+        return _SellerSummarySection(
+          key: const Key('inventorySellerSection'),
+          icon: Icons.person_outline,
+          title: 'Seller',
+          summary: seller.name,
+          onSummaryTap: () {
+            context.pushNamed(
+              AppRouteNames.contactDetail,
+              pathParameters: {'contactId': contactId},
+            );
+          },
         );
       },
-    );
-  }
-}
-
-class _SellerInformationContent extends StatelessWidget {
-  const _SellerInformationContent({
-    required this.sellerId,
-    required this.sellerName,
-    required this.sellerPhone,
-    required this.sellerEmail,
-  });
-
-  final String sellerId;
-  final String sellerName;
-  final String? sellerPhone;
-  final String? sellerEmail;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailSection(
-      title: 'Seller Information',
-      children: [
-        _DetailRow(label: 'Seller', value: sellerName),
-        _DetailRow(label: 'Phone', value: _displayOptionalText(sellerPhone)),
-        _DetailRow(label: 'Email', value: _displayOptionalText(sellerEmail)),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const Key('inventoryItemViewSellerButton'),
-            onPressed: () {
-              context.goNamed(
-                AppRouteNames.contactDetail,
-                pathParameters: {'contactId': sellerId},
-              );
-            },
-            icon: const Icon(Icons.person_outline),
-            label: const Text('View Seller'),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1525,7 +2374,7 @@ class _SaleInformationSection extends ConsumerWidget {
   }
 }
 
-class _SaleInformationCardContent extends StatelessWidget {
+class _SaleInformationCardContent extends ConsumerWidget {
   const _SaleInformationCardContent({
     required this.sale,
     required this.canViewFinancialData,
@@ -1535,51 +2384,61 @@ class _SaleInformationCardContent extends StatelessWidget {
   final bool canViewFinancialData;
 
   @override
-  Widget build(BuildContext context) {
-    final acquisitionValue = sale.acquisitionValueCents;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactId = sale.buyerContactId?.trim() ?? '';
+    final buyerAsync = contactId.isEmpty
+        ? const AsyncValue<dynamic>.data(null)
+        : ref.watch(contactProvider(contactId));
+    final buyerName = buyerAsync.maybeWhen(
+      data: (buyer) {
+        if (buyer != null) {
+          return buyer.name;
+        }
+        return contactId.isEmpty
+            ? 'No buyer linked'
+            : 'A buyer is linked to this sale, but the Contact record is unavailable.';
+      },
+      orElse: () => 'Loading buyer...',
+    );
+    final buyerIsAvailable = buyerAsync.maybeWhen(
+      data: (buyer) => buyer != null,
+      orElse: () => false,
+    );
     final profit = sale.profitCents;
+    final price = _formatCompactPrice(sale.salePriceCents);
+    final profitText = canViewFinancialData && profit != null
+        ? ' (${_formatProfit(profit)})'
+        : '';
+    final summary =
+        '${_formatDate(sale.saleDate)}  $buyerName  $price$profitText';
 
-    return _DetailSection(
+    return _CollapsibleDetailSection(
+      key: const Key('inventorySaleInformationSection'),
+      icon: Icons.sell_outlined,
       title: 'Sale Information',
-      children: [
-        _DetailRow(label: 'Sale Date', value: _formatDate(sale.saleDate)),
-        _DetailRow(label: 'Payment Method', value: sale.paymentMethod.label),
-        _SaleBuyerInformation(buyerContactId: sale.buyerContactId),
-        _DetailRow(
-          label: 'Sale Price',
-          value: CurrencyFormatter.formatCents(sale.salePriceCents),
-        ),
-        if (canViewFinancialData) ...[
-          _DetailRow(
-            label: 'Cost at Time of Sale',
-            value: acquisitionValue == null
-                ? 'Not available'
-                : CurrencyFormatter.formatCents(acquisitionValue),
-          ),
-          _DetailRow(
-            label: 'Profit',
-            value: profit == null
-                ? 'Not available'
-                : CurrencyFormatter.formatCents(profit),
-          ),
-          _DetailRow(
-            label: 'Gross Margin',
-            value: sale.grossMargin == null
-                ? 'Not available'
-                : '${(sale.grossMargin! * 100).toStringAsFixed(1)}%',
-          ),
-        ],
-        if (sale.notes != null && sale.notes!.trim().isNotEmpty)
-          _DetailRow(label: 'Sale Notes', value: sale.notes!),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
+      summary: summary,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 8,
+        children: [
+          if (contactId.isNotEmpty && buyerIsAvailable)
+            OutlinedButton.icon(
+              key: const Key('inventoryItemViewBuyerButton'),
+              onPressed: () {
+                context.pushNamed(
+                  AppRouteNames.contactDetail,
+                  pathParameters: {'contactId': contactId},
+                );
+              },
+              icon: const Icon(Icons.person_outline),
+              label: const Text('View Buyer'),
+            ),
+          OutlinedButton.icon(
             key: const Key('inventoryItemViewTransactionButton'),
             onPressed: sale.id == null
                 ? null
                 : () {
-                    context.goNamed(
+                    context.pushNamed(
                       AppRouteNames.transactionDetail,
                       pathParameters: {'transactionId': sale.id!},
                     );
@@ -1587,87 +2446,273 @@ class _SaleInformationCardContent extends StatelessWidget {
             icon: const Icon(Icons.receipt_long_outlined),
             label: const Text('View Transaction'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollapsibleDetailSection extends StatefulWidget {
+  const _CollapsibleDetailSection({
+    required this.icon,
+    required this.title,
+    this.child,
+    this.children,
+    this.summary,
+    super.key,
+  }) : assert(
+         (child == null) != (children == null),
+         'Provide exactly one of child or children.',
+       );
+
+  final IconData icon;
+  final String title;
+  final String? summary;
+  final Widget? child;
+  final List<Widget>? children;
+
+  @override
+  State<_CollapsibleDetailSection> createState() =>
+      _CollapsibleDetailSectionState();
+}
+
+class _CollapsibleDetailSectionState extends State<_CollapsibleDetailSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary?.trim();
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    widget.icon,
+                    size: 19,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          key: ValueKey(
+                            'inventoryCollapsibleTitle-${widget.title}',
+                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: const Color(0xFF082A4A),
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        if (summary != null && summary.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                child: _expanded
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 9),
+                        child:
+                            widget.child ??
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: widget.children!,
+                            ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _SellerSummarySection extends StatelessWidget {
+  const _SellerSummarySection({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.onSummaryTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String summary;
+  final VoidCallback onSummaryTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: colorScheme.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    key: const Key('inventorySellerTitle'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: const Color(0xFF082A4A),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  InkWell(
+                    key: const Key('inventorySellerContactLink'),
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: onSummaryTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StaticSummarySection extends StatelessWidget {
+  const _StaticSummarySection({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    key: ValueKey('inventoryStaticTitle-$title'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: const Color(0xFF082A4A),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThreeValueSummary extends StatelessWidget {
+  const _ThreeValueSummary({required this.values});
+
+  final List<(String, String)> values;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < values.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  values[i].$1,
+                  key: ValueKey('inventoryExpandedFieldLabel-${values[i].$1}'),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: const Color(0xFF082A4A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(values[i].$2),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _SaleBuyerInformation extends ConsumerWidget {
-  const _SaleBuyerInformation({required this.buyerContactId});
-
-  final String? buyerContactId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final contactId = buyerContactId?.trim() ?? '';
-
-    if (contactId.isEmpty) {
-      return const _DetailRow(label: 'Buyer', value: 'No buyer linked');
-    }
-
-    final buyerAsync = ref.watch(contactProvider(contactId));
-
-    return buyerAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 6),
-        child: AppLoadingState(message: 'Loading buyer information...'),
-      ),
-      error: (error, stackTrace) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: AppErrorState(
-          message: 'Unable to load buyer information.',
-          details: error.toString(),
-          onRetry: () {
-            ref.invalidate(contactProvider(contactId));
-          },
-        ),
-      ),
-      data: (buyer) {
-        if (buyer == null) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              'A buyer is linked to this sale, but the Contact record is unavailable.',
-            ),
-          );
-        }
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _DetailRow(label: 'Buyer', value: buyer.name),
-              _DetailRow(
-                label: 'Buyer Phone',
-                value: _displayOptionalText(buyer.phone),
-              ),
-              _DetailRow(
-                label: 'Buyer Email',
-                value: _displayOptionalText(buyer.email),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const Key('inventoryItemViewBuyerButton'),
-                  onPressed: () {
-                    context.goNamed(
-                      AppRouteNames.contactDetail,
-                      pathParameters: {'contactId': contactId},
-                    );
-                  },
-                  icon: const Icon(Icons.person_outline),
-                  label: const Text('View Buyer'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+String _singleLineSummary(String value) {
+  return value.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 class _DetailSection extends StatelessWidget {
@@ -1680,12 +2725,17 @@ class _DetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 7),
             ...children,
           ],
         ),
@@ -1703,59 +2753,126 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 190,
-            child: Text(label, style: Theme.of(context).textTheme.labelLarge),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Text(value)),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final labelWidth = constraints.maxWidth < 420 ? 132.0 : 190.0;
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: labelWidth,
+                child: Text(
+                  label,
+                  key: ValueKey('inventoryDetailRowLabel-$label'),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: const Color(0xFF082A4A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(value)),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-List<Widget> _categorySpecificRows(InventoryItem item) {
-  return switch (item.category) {
-    InventoryCategory.bat => [
-      _DetailRow(
-        label: 'Bat Length',
-        value: _formatOptionalMeasurement(item.lengthInches, 'in'),
-      ),
-      _DetailRow(
-        label: 'Bat Weight',
-        value: _formatOptionalMeasurement(item.weightOunces, 'oz'),
-      ),
-      _DetailRow(
-        label: 'Drop',
-        value: item.drop == null ? 'Not specified' : _formatNumber(item.drop!),
-      ),
-      _DetailRow(
-        label: 'Certification',
-        value: _displayOptionalText(item.certification),
-      ),
-    ],
-    InventoryCategory.glove => [
-      _DetailRow(
-        label: 'Glove Size',
-        value: _formatOptionalMeasurement(item.gloveSizeInches, 'in'),
-      ),
-      _DetailRow(
-        label: 'Hand Orientation',
-        value: _displayOptionalText(item.handOrientation),
-      ),
-    ],
-    InventoryCategory.catchersGear => [
-      _DetailRow(
-        label: "Catcherâ€™s Gear Size",
-        value: _displayOptionalText(item.catchersGearSize),
-      ),
-    ],
-    InventoryCategory.helmet || InventoryCategory.other => const [],
+String? _compactItemSpecifications(InventoryItem item) {
+  final values = <String>[];
+
+  switch (item.category) {
+    case InventoryCategory.bat:
+      final length = item.lengthInches == null
+          ? null
+          : '${_formatNumber(item.lengthInches!)}"';
+      final weight = item.weightOunces == null
+          ? null
+          : '${_formatNumber(item.weightOunces!)} oz';
+
+      if (length != null || weight != null) {
+        values.add([?length, ?weight].join(' / '));
+      }
+      if (item.drop != null) {
+        values.add(_formatNumber(item.drop!));
+      }
+      if (item.certification != null && item.certification!.trim().isNotEmpty) {
+        values.add(item.certification!.trim());
+      }
+    case InventoryCategory.glove:
+      if (item.gloveSizeInches != null) {
+        values.add('${_formatNumber(item.gloveSizeInches!)}"');
+      }
+      if (item.handOrientation != null &&
+          item.handOrientation!.trim().isNotEmpty) {
+        values.add(item.handOrientation!.trim());
+      }
+    case InventoryCategory.catchersGear:
+      if (item.catchersGearSize != null &&
+          item.catchersGearSize!.trim().isNotEmpty) {
+        values.add(item.catchersGearSize!.trim());
+      }
+    case InventoryCategory.helmet:
+      if (item.helmetSize != null && item.helmetSize!.trim().isNotEmpty) {
+        values.add(item.helmetSize!.trim());
+      }
+    case InventoryCategory.other:
+      break;
+  }
+
+  return values.isEmpty ? null : values.join(' * ');
+}
+
+String _formatCompactPrice(int? cents) {
+  if (cents == null) {
+    return r'$---';
+  }
+
+  final dollars = cents / 100;
+  return '\$${dollars.toStringAsFixed(0)}';
+}
+
+String _formatProfit(int cents) {
+  final dollars = (cents.abs() / 100).toStringAsFixed(0);
+  final sign = cents >= 0 ? '+' : '-';
+  return '$sign\$$dollars';
+}
+
+String _inventoryAgeLabel(InventoryItem item) {
+  final start = item.purchaseDate;
+  if (start == null) {
+    return 'Age unavailable';
+  }
+
+  final now = DateTime.now();
+  final startDate = DateTime(start.year, start.month, start.day);
+  final nowDate = DateTime(now.year, now.month, now.day);
+  final days = nowDate.difference(startDate).inDays;
+
+  return '${days < 0 ? 0 : days} days';
+}
+
+Color _inventoryCategoryColor(InventoryCategory category) {
+  return switch (category) {
+    InventoryCategory.bat => Colors.blue.shade700,
+    InventoryCategory.glove => Colors.orange.shade800,
+    InventoryCategory.catchersGear => Colors.purple.shade700,
+    InventoryCategory.helmet => Colors.indigo.shade900,
+    InventoryCategory.other => Colors.blueGrey.shade600,
+  };
+}
+
+IconData _inventoryCategoryIcon(InventoryCategory category) {
+  return switch (category) {
+    InventoryCategory.bat => Icons.sports_baseball,
+    InventoryCategory.glove => Icons.sports_outlined,
+    InventoryCategory.catchersGear => Icons.shield_outlined,
+    InventoryCategory.helmet => Icons.sports_motorsports_outlined,
+    InventoryCategory.other => Icons.inventory_2_outlined,
   };
 }
 
@@ -1767,10 +2884,6 @@ String _displayOptionalText(String? value) {
 
 String _formatOptionalMoney(int? cents) {
   return cents == null ? 'Not specified' : CurrencyFormatter.formatCents(cents);
-}
-
-String _formatOptionalMeasurement(double? value, String unit) {
-  return value == null ? 'Not specified' : '${_formatNumber(value)} $unit';
 }
 
 String _formatNumber(double value) {

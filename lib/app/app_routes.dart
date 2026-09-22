@@ -9,11 +9,15 @@ abstract final class AppRoutes {
   static const String editContact = '/contacts/:contactId/edit';
   static const String transactions = '/transactions';
   static const String transactionDetail = '/transactions/:transactionId';
+  static const String tradeDetail = '/trades/:tradeId';
+  static const String disposalDetail = '/disposals/:disposalId';
+  static const String consignmentDetail = '/consignments/:consignmentId';
   static const String dealDetail = '/deals/:dealId';
   static const String reports = '/reports';
   static const String more = '/more';
   static const String search = '/search';
   static const String settings = '/settings';
+  static const String inventoryLocations = '/settings/inventory-locations';
   static const String userAccess = '/settings/user-access';
 
   static const String buyInventory = '/inventory/buy';
@@ -40,11 +44,15 @@ abstract final class AppRouteNames {
   static const String editContact = 'editContact';
   static const String transactions = 'transactions';
   static const String transactionDetail = 'transactionDetail';
+  static const String tradeDetail = 'tradeDetail';
+  static const String disposalDetail = 'disposalDetail';
+  static const String consignmentDetail = 'consignmentDetail';
   static const String dealDetail = 'dealDetail';
   static const String reports = 'reports';
   static const String more = 'more';
   static const String search = 'search';
   static const String settings = 'settings';
+  static const String inventoryLocations = 'inventoryLocations';
   static const String userAccess = 'userAccess';
 
   static const String buyInventory = 'buyInventory';

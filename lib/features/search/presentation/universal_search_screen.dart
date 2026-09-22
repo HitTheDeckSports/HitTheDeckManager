@@ -100,6 +100,7 @@ UniversalSearchEntry _inventoryEntry(InventoryItem item) {
     id: item.id!,
     title: title,
     subtitle: item.inventoryNumber ?? item.category.label,
+    imageUrl: item.photoUrls.isEmpty ? null : item.photoUrls.first,
     searchText: [
       item.inventoryNumber,
       item.brand,
@@ -298,26 +299,65 @@ class _UniversalSearchScreenState extends ConsumerState<UniversalSearchScreen> {
   void _openResult(BuildContext context, UniversalSearchEntry entry) {
     switch (entry.type) {
       case UniversalSearchResultType.inventory:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.inventoryDetail,
           pathParameters: {'itemId': entry.id},
         );
       case UniversalSearchResultType.contact:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.contactDetail,
           pathParameters: {'contactId': entry.id},
         );
       case UniversalSearchResultType.transaction:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.transactionDetail,
           pathParameters: {'transactionId': entry.id},
         );
       case UniversalSearchResultType.deal:
-        context.goNamed(
+        context.pushNamed(
           AppRouteNames.dealDetail,
           pathParameters: {'dealId': entry.id},
         );
     }
+  }
+}
+
+class _SearchResultLeading extends StatelessWidget {
+  const _SearchResultLeading({required this.entry, required this.fallbackIcon});
+
+  final UniversalSearchEntry entry;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = entry.imageUrl?.trim();
+    final hasImage =
+        entry.type == UniversalSearchResultType.inventory &&
+        imageUrl != null &&
+        imageUrl.isNotEmpty;
+
+    if (!hasImage) {
+      return Icon(fallbackIcon);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        key: ValueKey('universalSearchResultImage-${entry.id}'),
+        width: 48,
+        height: 48,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Center(child: Icon(fallbackIcon)),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -359,7 +399,10 @@ class _SearchResultSection extends StatelessWidget {
             Card(
               child: ListTile(
                 key: ValueKey('universalSearchResult-${type.name}-${entry.id}'),
-                leading: Icon(_icon),
+                leading: _SearchResultLeading(
+                  entry: entry,
+                  fallbackIcon: _icon,
+                ),
                 title: Text(entry.title),
                 subtitle: entry.subtitle == null ? null : Text(entry.subtitle!),
                 trailing: const Icon(Icons.chevron_right),

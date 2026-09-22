@@ -7,6 +7,12 @@ class InventoryFilterCriteria {
     this.brand,
     this.condition,
     this.status,
+    this.selectedCategories = const <InventoryCategory>{},
+    this.selectedBrands = const <String>{},
+    this.selectedConditions = const <InventoryCondition>{},
+    this.selectedStatuses = const <InventoryStatus>{},
+    this.selectedLocationIds = const <String>{},
+    this.includeUnassignedLocation = false,
     this.purchaseDateFrom,
     this.purchaseDateTo,
     this.minimumAcquisitionValueCents,
@@ -19,8 +25,16 @@ class InventoryFilterCriteria {
 
   final InventoryCategory? category;
   final String? brand;
+  // Singular fields are retained for compatibility with existing callers.
+  // New UI code uses selectedConditions / selectedStatuses for multi-select.
   final InventoryCondition? condition;
   final InventoryStatus? status;
+  final Set<InventoryCategory> selectedCategories;
+  final Set<String> selectedBrands;
+  final Set<InventoryCondition> selectedConditions;
+  final Set<InventoryStatus> selectedStatuses;
+  final Set<String> selectedLocationIds;
+  final bool includeUnassignedLocation;
   final DateTime? purchaseDateFrom;
   final DateTime? purchaseDateTo;
   final int? minimumAcquisitionValueCents;
@@ -30,11 +44,19 @@ class InventoryFilterCriteria {
   final int? minimumDaysInInventory;
   final int? maximumDaysInInventory;
 
+  bool get hasLocationFilter =>
+      selectedLocationIds.isNotEmpty || includeUnassignedLocation;
+
   bool get isActive =>
       category != null ||
+      selectedCategories.isNotEmpty ||
       (brand != null && brand!.trim().isNotEmpty) ||
+      selectedBrands.isNotEmpty ||
       condition != null ||
+      selectedConditions.isNotEmpty ||
       status != null ||
+      selectedStatuses.isNotEmpty ||
+      hasLocationFilter ||
       purchaseDateFrom != null ||
       purchaseDateTo != null ||
       minimumAcquisitionValueCents != null ||
@@ -45,10 +67,11 @@ class InventoryFilterCriteria {
       maximumDaysInInventory != null;
 
   int get activeCount => [
-    category,
-    brand?.trim().isEmpty == false ? brand : null,
-    condition,
-    status,
+    category != null || selectedCategories.isNotEmpty ? true : null,
+    (brand?.trim().isEmpty == false) || selectedBrands.isNotEmpty ? true : null,
+    condition != null || selectedConditions.isNotEmpty ? true : null,
+    status != null || selectedStatuses.isNotEmpty ? true : null,
+    hasLocationFilter ? true : null,
     purchaseDateFrom,
     purchaseDateTo,
     minimumAcquisitionValueCents,
@@ -64,6 +87,12 @@ class InventoryFilterCriteria {
     Object? brand = _unset,
     Object? condition = _unset,
     Object? status = _unset,
+    Object? selectedCategories = _unset,
+    Object? selectedBrands = _unset,
+    Object? selectedConditions = _unset,
+    Object? selectedStatuses = _unset,
+    Object? selectedLocationIds = _unset,
+    bool? includeUnassignedLocation,
     Object? purchaseDateFrom = _unset,
     Object? purchaseDateTo = _unset,
     Object? minimumAcquisitionValueCents = _unset,
@@ -84,6 +113,29 @@ class InventoryFilterCriteria {
       status: identical(status, _unset)
           ? this.status
           : status as InventoryStatus?,
+      selectedCategories: identical(selectedCategories, _unset)
+          ? this.selectedCategories
+          : Set<InventoryCategory>.unmodifiable(
+              selectedCategories as Set<InventoryCategory>,
+            ),
+      selectedBrands: identical(selectedBrands, _unset)
+          ? this.selectedBrands
+          : Set<String>.unmodifiable(selectedBrands as Set<String>),
+      selectedConditions: identical(selectedConditions, _unset)
+          ? this.selectedConditions
+          : Set<InventoryCondition>.unmodifiable(
+              selectedConditions as Set<InventoryCondition>,
+            ),
+      selectedStatuses: identical(selectedStatuses, _unset)
+          ? this.selectedStatuses
+          : Set<InventoryStatus>.unmodifiable(
+              selectedStatuses as Set<InventoryStatus>,
+            ),
+      selectedLocationIds: identical(selectedLocationIds, _unset)
+          ? this.selectedLocationIds
+          : Set<String>.unmodifiable(selectedLocationIds as Set<String>),
+      includeUnassignedLocation:
+          includeUnassignedLocation ?? this.includeUnassignedLocation,
       purchaseDateFrom: identical(purchaseDateFrom, _unset)
           ? this.purchaseDateFrom
           : purchaseDateFrom as DateTime?,
@@ -130,24 +182,60 @@ final class InventoryFilter {
 
     return List<InventoryItem>.unmodifiable(
       items.where((item) {
-        if (criteria.category != null && item.category != criteria.category) {
+        if (criteria.selectedCategories.isNotEmpty) {
+          if (!criteria.selectedCategories.contains(item.category)) {
+            return false;
+          }
+        } else if (criteria.category != null &&
+            item.category != criteria.category) {
           return false;
         }
 
-        final brand = criteria.brand?.trim();
-        if (brand != null &&
-            brand.isNotEmpty &&
-            item.brand.trim().toLowerCase() != brand.toLowerCase()) {
-          return false;
+        if (criteria.selectedBrands.isNotEmpty) {
+          final normalizedBrands = criteria.selectedBrands
+              .map((value) => value.trim().toLowerCase())
+              .where((value) => value.isNotEmpty)
+              .toSet();
+          if (!normalizedBrands.contains(item.brand.trim().toLowerCase())) {
+            return false;
+          }
+        } else {
+          final brand = criteria.brand?.trim();
+          if (brand != null &&
+              brand.isNotEmpty &&
+              item.brand.trim().toLowerCase() != brand.toLowerCase()) {
+            return false;
+          }
         }
 
-        if (criteria.condition != null &&
+        if (criteria.selectedConditions.isNotEmpty) {
+          if (item.condition == null ||
+              !criteria.selectedConditions.contains(item.condition)) {
+            return false;
+          }
+        } else if (criteria.condition != null &&
             item.condition != criteria.condition) {
           return false;
         }
 
-        if (criteria.status != null && item.status != criteria.status) {
+        if (criteria.selectedStatuses.isNotEmpty) {
+          if (!criteria.selectedStatuses.contains(item.status)) {
+            return false;
+          }
+        } else if (criteria.status != null && item.status != criteria.status) {
           return false;
+        }
+
+        if (criteria.hasLocationFilter) {
+          final locationId = item.locationId?.trim();
+          final isUnassigned = locationId == null || locationId.isEmpty;
+          final locationMatches = isUnassigned
+              ? criteria.includeUnassignedLocation
+              : criteria.selectedLocationIds.contains(locationId);
+
+          if (!locationMatches) {
+            return false;
+          }
         }
 
         final purchaseDate = item.purchaseDate == null

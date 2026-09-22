@@ -39,6 +39,10 @@ class ContactFormController extends Notifier<ContactFormState> {
     state = state.copyWith(photoUrl: photoUrl);
   }
 
+  void setIsActive(bool isActive) {
+    state = state.copyWith(isActive: isActive);
+  }
+
   void loadContact(Contact contact) {
     state = ContactFormState.fromContact(contact);
   }

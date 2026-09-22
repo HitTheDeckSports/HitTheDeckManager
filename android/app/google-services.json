@@ -22,6 +22,22 @@
           }
         },
         {
+          "client_id": "88697282371-rn4pnjhli1uvim42rql39s08975aspv0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hitthedecksports.manager",
+            "certificate_hash": "111fa9d7bea8ba67ab86a785b23230c01647749a"
+          }
+        },
+        {
+          "client_id": "88697282371-sfq9jf5ku6lajtuu3go02pbnpautk61q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hitthedecksports.manager",
+            "certificate_hash": "73d4ac70fb91e55fc44328adf7e09ad34230e27c"
+          }
+        },
+        {
           "client_id": "88697282371-5k7aq093spo9l0dlme6118ml0s8s9jlf.apps.googleusercontent.com",
           "client_type": 3
         }

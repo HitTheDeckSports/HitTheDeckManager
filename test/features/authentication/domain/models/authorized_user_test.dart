@@ -25,21 +25,10 @@ void main() {
       expect(user.isAdmin, isTrue);
     });
 
-    test('normal user is neither owner nor admin', () {
-      const user = AuthorizedUser(
-        email: 'user@example.com',
-        role: AuthorizedUserRole.user,
-        active: true,
-      );
-
-      expect(user.isOwner, isFalse);
-      expect(user.isAdmin, isFalse);
-    });
-
     test('copyWith changes only supplied values', () {
       const original = AuthorizedUser(
-        email: 'user@example.com',
-        role: AuthorizedUserRole.user,
+        email: 'admin@example.com',
+        role: AuthorizedUserRole.admin,
         active: true,
       );
 
@@ -50,16 +39,16 @@ void main() {
       expect(updated.active, isFalse);
     });
 
-    test('equal users compare as equal', () {
+    test('equal admins compare as equal', () {
       const first = AuthorizedUser(
-        email: 'user@example.com',
-        role: AuthorizedUserRole.user,
+        email: 'admin@example.com',
+        role: AuthorizedUserRole.admin,
         active: true,
       );
 
       const second = AuthorizedUser(
-        email: 'user@example.com',
-        role: AuthorizedUserRole.user,
+        email: 'admin@example.com',
+        role: AuthorizedUserRole.admin,
         active: true,
       );
 
@@ -67,16 +56,16 @@ void main() {
       expect(first.hashCode, second.hashCode);
     });
 
-    test('different users do not compare as equal', () {
+    test('different admins do not compare as equal', () {
       const first = AuthorizedUser(
         email: 'first@example.com',
-        role: AuthorizedUserRole.user,
+        role: AuthorizedUserRole.admin,
         active: true,
       );
 
       const second = AuthorizedUser(
         email: 'second@example.com',
-        role: AuthorizedUserRole.user,
+        role: AuthorizedUserRole.admin,
         active: true,
       );
 

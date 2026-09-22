@@ -2,8 +2,10 @@ class Deal {
   const Deal({
     required this.parentSaleTransactionId,
     required this.childInventoryItemIds,
+    this.lineageInventoryItemIds = const [],
     this.id,
     this.notes,
+    this.createdAt,
   });
 
   final String? id;
@@ -20,22 +22,50 @@ class Deal {
   /// evolve without changing existing Deal records.
   final List<String> childInventoryItemIds;
 
+  /// Inventory items that remain inside this Deal's visual/transaction scope.
+  ///
+  /// Direct trade-in children belong here, and warranty replacements may extend
+  /// the same Deal lineage. When one of these items is sold and receives a new
+  /// trade-in, that sale creates a nested Deal instead of extending this list.
+  /// Ancestor financial analysis follows nested Deals recursively.
+  ///
+  /// Legacy Deal records may not contain this field. An empty stored/model
+  /// value therefore falls back to [childInventoryItemIds].
+  final List<String> lineageInventoryItemIds;
+
+  List<String> get effectiveLineageInventoryItemIds =>
+      lineageInventoryItemIds.isEmpty
+      ? childInventoryItemIds
+      : lineageInventoryItemIds;
+
   final String? notes;
+
+  /// Firestore creation timestamp.
+  ///
+  /// Used to derive the business-facing Deal number (YYYY-NNN) without ever
+  /// exposing the Firebase document ID in the UI.
+  final DateTime? createdAt;
 
   bool get isValid {
     final parentId = parentSaleTransactionId.trim();
     final childIds = _normalizedIds(childInventoryItemIds);
+    final lineageIds = _normalizedIds(effectiveLineageInventoryItemIds);
 
     return parentId.isNotEmpty &&
         childIds.isNotEmpty &&
-        childIds.length == childIds.toSet().length;
+        childIds.length == childIds.toSet().length &&
+        lineageIds.isNotEmpty &&
+        lineageIds.length == lineageIds.toSet().length &&
+        childIds.every(lineageIds.contains);
   }
 
   Deal copyWith({
     Object? id = _unset,
     String? parentSaleTransactionId,
     List<String>? childInventoryItemIds,
+    List<String>? lineageInventoryItemIds,
     Object? notes = _unset,
+    Object? createdAt = _unset,
   }) {
     return Deal(
       id: identical(id, _unset) ? this.id : id as String?,
@@ -43,7 +73,12 @@ class Deal {
           parentSaleTransactionId ?? this.parentSaleTransactionId,
       childInventoryItemIds:
           childInventoryItemIds ?? this.childInventoryItemIds,
+      lineageInventoryItemIds:
+          lineageInventoryItemIds ?? this.lineageInventoryItemIds,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
+      createdAt: identical(createdAt, _unset)
+          ? this.createdAt
+          : createdAt as DateTime?,
     );
   }
 
@@ -54,7 +89,12 @@ class Deal {
             other.id == id &&
             other.parentSaleTransactionId == parentSaleTransactionId &&
             _listsEqual(other.childInventoryItemIds, childInventoryItemIds) &&
-            other.notes == notes;
+            _listsEqual(
+              other.lineageInventoryItemIds,
+              lineageInventoryItemIds,
+            ) &&
+            other.notes == notes &&
+            other.createdAt == createdAt;
   }
 
   @override
@@ -63,7 +103,9 @@ class Deal {
       id,
       parentSaleTransactionId,
       Object.hashAll(childInventoryItemIds),
+      Object.hashAll(lineageInventoryItemIds),
       notes,
+      createdAt,
     );
   }
 }

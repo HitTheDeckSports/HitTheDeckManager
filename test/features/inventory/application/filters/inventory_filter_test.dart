@@ -16,6 +16,7 @@ void main() {
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 20000,
       askingPriceCents: 35000,
+      locationId: 'showroom',
       purchaseDate: DateTime(2026, 7, 1),
     ),
     InventoryItem(
@@ -28,6 +29,7 @@ void main() {
       acquisitionType: AcquisitionType.purchased,
       acquisitionValueCents: 10000,
       askingPriceCents: 22500,
+      locationId: 'warehouse',
       purchaseDate: DateTime(2026, 8, 10),
     ),
     const InventoryItem(
@@ -52,6 +54,28 @@ void main() {
     expect(results, hasLength(3));
   });
 
+  test('filters by multiple selected categories', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(
+        selectedCategories: {InventoryCategory.bat, InventoryCategory.glove},
+      ),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'glove-1', 'bat-2']);
+  });
+
+  test('filters by multiple selected brands case-insensitively', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(selectedBrands: {'EASTON', 'combat'}),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'bat-2']);
+  });
+
   test('filters by category brand condition and status', () {
     final results = InventoryFilter.apply(
       items,
@@ -65,6 +89,48 @@ void main() {
     );
 
     expect(results.map((item) => item.id), ['bat-1']);
+  });
+
+  test('filters by multiple selected conditions', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(
+        selectedConditions: {
+          InventoryCondition.newItem,
+          InventoryCondition.likeNew,
+        },
+      ),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'glove-1']);
+  });
+
+  test('filters by multiple selected statuses', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(
+        selectedStatuses: {InventoryStatus.available, InventoryStatus.inactive},
+      ),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'bat-2']);
+  });
+
+  test('each categorical multi-select counts as one active filter', () {
+    const criteria = InventoryFilterCriteria(
+      selectedCategories: {InventoryCategory.bat, InventoryCategory.glove},
+      selectedBrands: {'Easton', 'Combat'},
+      selectedConditions: {
+        InventoryCondition.newItem,
+        InventoryCondition.likeNew,
+      },
+      selectedStatuses: {InventoryStatus.available, InventoryStatus.inactive},
+    );
+
+    expect(criteria.isActive, isTrue);
+    expect(criteria.activeCount, 4);
   });
 
   test('filters by inclusive purchase date range', () {
@@ -131,6 +197,41 @@ void main() {
     );
 
     expect(results.map((item) => item.id), ['glove-1']);
+  });
+
+  test('filters by one or more selected locations', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(
+        selectedLocationIds: {'showroom', 'warehouse'},
+      ),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'glove-1']);
+  });
+
+  test('location filter can include unassigned inventory', () {
+    final results = InventoryFilter.apply(
+      items,
+      const InventoryFilterCriteria(
+        selectedLocationIds: {'showroom'},
+        includeUnassignedLocation: true,
+      ),
+      asOf: DateTime(2026, 8, 21),
+    );
+
+    expect(results.map((item) => item.id), ['bat-1', 'bat-2']);
+  });
+
+  test('location selection counts as one active filter', () {
+    const criteria = InventoryFilterCriteria(
+      selectedLocationIds: {'showroom', 'warehouse'},
+      includeUnassignedLocation: true,
+    );
+
+    expect(criteria.isActive, isTrue);
+    expect(criteria.activeCount, 1);
   });
 
   test('activeCount reflects configured filters', () {

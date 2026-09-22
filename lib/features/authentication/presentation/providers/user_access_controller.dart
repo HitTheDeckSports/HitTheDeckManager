@@ -56,4 +56,20 @@ class UserAccessController extends AsyncNotifier<void> {
       Error.throwWithStackTrace(result.error!, result.stackTrace!);
     }
   }
+
+  Future<void> removeUser(String email) async {
+    state = const AsyncLoading();
+
+    final repository = ref.read(authorizationRepositoryProvider);
+
+    final result = await AsyncValue.guard(
+      () => repository.removeAuthorizedUser(email),
+    );
+
+    state = result;
+
+    if (result.hasError) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+  }
 }

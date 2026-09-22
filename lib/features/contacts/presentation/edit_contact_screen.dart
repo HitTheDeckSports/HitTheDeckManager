@@ -52,19 +52,30 @@ class EditContactScreen extends ConsumerWidget {
           subtitle: 'Update ${contact.name}’s contact information.',
           submitLabel: 'Save Changes',
           initialContact: contact,
-          onSaved: (savedContact) {
+          onSaved: (savedContact) async {
             final savedContactId = savedContact.id;
 
             if (savedContactId == null || savedContactId.isEmpty) {
               return;
             }
 
-            ref.invalidate(contactProvider(savedContactId));
-
-            context.goNamed(
-              AppRouteNames.contactDetail,
-              pathParameters: {'contactId': savedContactId},
+            ref.invalidate(contactsProvider);
+            final refreshedContact = await ref.refresh(
+              contactProvider(savedContactId).future,
             );
+
+            if (refreshedContact == null || !context.mounted) {
+              return;
+            }
+
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(
+                AppRouteNames.contactDetail,
+                pathParameters: {'contactId': savedContactId},
+              );
+            }
           },
         );
       },

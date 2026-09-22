@@ -45,8 +45,9 @@ final authenticatedSessionProvider = StreamProvider<AuthenticatedSession?>((
 
 /// Streams the full authorized-user list.
 ///
-/// Firestore security rules only allow the permanent owner to read this
-/// collection.
+/// Version 1.0 allows both the Owner and active Admins to view this list.
+/// Firestore rules separately restrict changes to existing Admin profiles
+/// to the permanent Owner.
 final authorizedUsersProvider = StreamProvider<List<AuthorizedUser>>((ref) {
   final repository = ref.watch(authorizationRepositoryProvider);
 

@@ -27,7 +27,7 @@ const _testMetrics = DashboardMetrics(
 );
 
 void main() {
-  testWidgets('Dashboard shows approved quick actions without Sell', (
+  testWidgets('Dashboard matches compact reference-driven hierarchy', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -35,69 +35,63 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
+    expect(find.text('Dashboard'), findsNothing);
+    expect(
+      find.text('A live overview of your current inventory.'),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
+    expect(find.text('OVERVIEW'), findsOneWidget);
+    expect(find.byKey(const Key('dashboardScanQrButton')), findsOneWidget);
+    expect(find.text('Scan QR'), findsNothing);
+    expect(find.byKey(const Key('dashboardInventoryButton')), findsNothing);
+    expect(find.text('INVENTORY'), findsNothing);
     expect(
       find.byKey(const Key('dashboardAddInventoryButton')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('dashboardScanQrButton')), findsOneWidget);
-
-    expect(find.text('Add Inventory'), findsOneWidget);
-    expect(find.text('Scan QR'), findsOneWidget);
-
-    expect(find.text('Sell Inventory'), findsNothing);
-    expect(find.text('Sell'), findsNothing);
+    expect(find.text('ADD INVENTORY'), findsOneWidget);
   });
 
-  testWidgets('Dashboard displays approved eight primary cards', (
+  testWidgets('Dashboard shows the approved inventory overview metrics', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
     addTearDown(router.dispose);
 
     await _pumpDashboard(tester, router: router);
-
-    expect(find.byKey(const Key('dashboardRevenueCard')), findsOneWidget);
-    expect(find.text('Revenue'), findsOneWidget);
-    expect(find.text(r'$500.00'), findsOneWidget);
-
-    expect(find.byKey(const Key('dashboardCostCard')), findsOneWidget);
-    expect(find.text('Cost'), findsOneWidget);
-    expect(find.text(r'$300.00'), findsOneWidget);
-
-    expect(find.byKey(const Key('dashboardProfitCard')), findsOneWidget);
-    expect(find.text('Profit'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsOneWidget);
-
-    expect(find.byKey(const Key('dashboardMarginCard')), findsOneWidget);
-    expect(find.text('Gross Margin'), findsOneWidget);
-    expect(find.text('40.0%'), findsOneWidget);
-
-    expect(
-      find.byKey(const Key('dashboardInventoryValueCard')),
-      findsOneWidget,
-    );
-    expect(find.text('Open Inventory Value'), findsOneWidget);
-    expect(find.text(r'$290.00'), findsOneWidget);
-
-    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsOneWidget);
-    expect(find.text('Open Inventory Cost'), findsOneWidget);
-    expect(find.text(r'$180.00'), findsOneWidget);
 
     expect(
       find.byKey(const Key('dashboardInventoryCountCard')),
       findsOneWidget,
     );
-    expect(find.text('Inventory Count'), findsOneWidget);
+    expect(find.text('TOTAL INVENTORY'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('Items'), findsOneWidget);
+
+    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsOneWidget);
+    expect(find.text('MONEY INVESTED'), findsOneWidget);
+    expect(find.text(r'$180.00'), findsOneWidget);
+    expect(find.text('Total Cost'), findsOneWidget);
+
+    expect(
+      find.byKey(const Key('dashboardInventoryValueCard')),
+      findsOneWidget,
+    );
+    expect(find.text('INVENTORY VALUE'), findsOneWidget);
+    expect(find.text(r'$290.00'), findsOneWidget);
+    expect(find.text('Current Value'), findsNothing);
 
     expect(
       find.byKey(const Key('dashboardPotentialProfitCard')),
       findsOneWidget,
     );
-    expect(find.text('Current Inventory Potential Profit'), findsOneWidget);
+    expect(find.text('POTENTIAL PROFIT'), findsOneWidget);
     expect(find.text(r'$110.00'), findsOneWidget);
+    expect(find.text('Potential Profit'), findsNothing);
   });
 
-  testWidgets('Dashboard displays the approved Quick Snapshot', (
+  testWidgets('Dashboard overview cards use the compact height', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -105,49 +99,71 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    expect(find.text('Quick Snapshot'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const Key('dashboardInventoryCountCard')))
+          .height,
+      136,
+    );
+  });
+
+  testWidgets('Dashboard compact spacing keeps lower sections tight', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    final quickStatsTop = tester
+        .getTopLeft(find.byKey(const Key('dashboardQuickStatsPanel')))
+        .dy;
+    final overviewBottom = tester
+        .getBottomLeft(find.byKey(const Key('dashboardPotentialProfitCard')))
+        .dy;
+    final addInventoryTop = tester
+        .getTopLeft(find.byKey(const Key('dashboardAddInventoryButton')))
+        .dy;
+    final quickStatsBottom = tester
+        .getBottomLeft(find.byKey(const Key('dashboardQuickStatsPanel')))
+        .dy;
+
+    expect(quickStatsTop - overviewBottom, 10);
+    expect(addInventoryTop - quickStatsBottom, 10);
+  });
+  testWidgets('Dashboard quick stats remain one four-column row', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    expect(find.byKey(const Key('dashboardQuickStatsPanel')), findsOneWidget);
+    expect(find.byKey(const Key('dashboardQuickStatsRow')), findsOneWidget);
+    expect(find.text('QUICK STATS'), findsOneWidget);
 
     expect(
       find.byKey(const Key('dashboardAvailableItemsCard')),
       findsOneWidget,
     );
-    expect(find.text('Available Items'), findsOneWidget);
+    expect(find.text('Available'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
 
     expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
-    expect(find.text('Units Sold'), findsOneWidget);
+    expect(find.text('Sold MTD'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
 
-    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
-    expect(find.text('Average Days in Inventory'), findsOneWidget);
-    expect(find.text('26'), findsOneWidget);
-    expect(find.text('days'), findsOneWidget);
-
     expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
-    expect(find.text('Broken Items'), findsOneWidget);
+    expect(find.text('Needs Repair'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
+
+    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
+    expect(find.text('Avg. Days in Inventory'), findsOneWidget);
+    expect(find.text('26'), findsOneWidget);
   });
 
-  testWidgets('Dashboard date selector uses narrow layout on a phone width', (
-    WidgetTester tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(360, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    final router = _createRouter();
-    addTearDown(router.dispose);
-
-    await _pumpDashboard(tester, router: router);
-
-    expect(
-      find.byKey(const Key('dashboardDateRangeNarrowLayout')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('dashboardDateRangeWideLayout')), findsNothing);
-    expect(find.byKey(const Key('dashboardDateRangeSelector')), findsOneWidget);
-    expect(find.text('Performance Period'), findsOneWidget);
-  });
-  testWidgets('Dashboard defaults date-range selector to Month to Date', (
+  testWidgets('Dashboard omits report-only performance controls and cards', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -155,33 +171,12 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    expect(find.byKey(const Key('dashboardDateRangeSelector')), findsOneWidget);
-    expect(
-      find.byKey(const Key('dashboardPerformancePeriodLabel')),
-      findsOneWidget,
-    );
-    expect(find.text('Month to Date'), findsWidgets);
+    expect(find.byKey(const Key('dashboardDateRangeSelector')), findsNothing);
+    expect(find.text('Performance Period'), findsNothing);
+    expect(find.text('Gross Margin'), findsNothing);
   });
 
-  testWidgets('Dashboard date-range selector updates preset selection', (
-    WidgetTester tester,
-  ) async {
-    final router = _createRouter();
-    addTearDown(router.dispose);
-
-    await _pumpDashboard(tester, router: router);
-
-    final selector = find.byKey(const Key('dashboardDateRangeSelector'));
-    await tester.ensureVisible(selector);
-    await tester.pumpAndSettle();
-    await tester.tap(selector);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Last 7 Days').last);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Last 7 Days'), findsOneWidget);
-  });
-  testWidgets('ordinary User does not see Dashboard financial metrics', (
+  testWidgets('restricted permissions hide cost and potential profit', (
     WidgetTester tester,
   ) async {
     final router = _createRouter();
@@ -193,29 +188,18 @@ void main() {
       permissions: const AppPermissions.none(),
     );
 
-    expect(find.byKey(const Key('dashboardRevenueCard')), findsNothing);
-    expect(find.byKey(const Key('dashboardCostCard')), findsNothing);
-    expect(find.byKey(const Key('dashboardProfitCard')), findsNothing);
-    expect(find.byKey(const Key('dashboardMarginCard')), findsNothing);
-    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsNothing);
-    expect(find.byKey(const Key('dashboardPotentialProfitCard')), findsNothing);
-
-    expect(
-      find.byKey(const Key('dashboardAvailableItemsCard')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('dashboardUnitsSoldCard')), findsOneWidget);
-    expect(find.byKey(const Key('dashboardAverageDaysCard')), findsOneWidget);
-    expect(find.byKey(const Key('dashboardBrokenItemsCard')), findsOneWidget);
-    expect(
-      find.byKey(const Key('dashboardInventoryValueCard')),
-      findsOneWidget,
-    );
     expect(
       find.byKey(const Key('dashboardInventoryCountCard')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('dashboardInventoryValueCard')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboardInventoryCostCard')), findsNothing);
+    expect(find.byKey(const Key('dashboardPotentialProfitCard')), findsNothing);
   });
+
   testWidgets('Dashboard Add Inventory action navigates correctly', (
     WidgetTester tester,
   ) async {
@@ -224,10 +208,19 @@ void main() {
 
     await _pumpDashboard(tester, router: router);
 
-    await tester.tap(find.byKey(const Key('dashboardAddInventoryButton')));
+    final addInventoryButton = find.byKey(
+      const Key('dashboardAddInventoryButton'),
+    );
+    await tester.ensureVisible(addInventoryButton);
+    await tester.pumpAndSettle();
+    await tester.tap(addInventoryButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Add Inventory destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
   });
 
   testWidgets('Dashboard Scan QR action navigates correctly', (
@@ -242,6 +235,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Scanner destination'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dashboardOverviewHeading')), findsOneWidget);
   });
 }
 

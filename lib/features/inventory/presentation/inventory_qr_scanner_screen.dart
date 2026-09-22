@@ -107,7 +107,7 @@ class _InventoryQrScannerScreenState
             return;
           }
 
-          context.goNamed(
+          context.pushReplacementNamed(
             AppRouteNames.inventoryDetail,
             pathParameters: {'itemId': itemId},
           );

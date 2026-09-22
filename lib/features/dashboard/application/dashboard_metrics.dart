@@ -100,6 +100,7 @@ final class DashboardMetrics {
 
     var openInventoryValueCents = 0;
     var openInventoryCostCents = 0;
+    var openPotentialProfitCents = 0;
     var inventoryCount = 0;
     var availableItems = 0;
     var brokenItems = 0;
@@ -128,7 +129,17 @@ final class DashboardMetrics {
           ? 0
           : repairCostByInventoryItemId[item.id!] ?? 0;
 
-      openInventoryCostCents += item.acquisitionValueCents + repairCostCents;
+      final investedCostCents =
+          (item.acquisitionType == AcquisitionType.consignment
+              ? 0
+              : item.acquisitionValueCents) +
+          repairCostCents;
+      openInventoryCostCents += investedCostCents;
+
+      if (item.acquisitionType != AcquisitionType.consignment) {
+        openPotentialProfitCents +=
+            (item.askingPriceCents ?? 0) - investedCostCents;
+      }
 
       final purchaseDate = item.purchaseDate;
       if (purchaseDate != null) {
@@ -142,9 +153,6 @@ final class DashboardMetrics {
         agedInventoryCount += 1;
       }
     }
-
-    final openPotentialProfitCents =
-        openInventoryValueCents - openInventoryCostCents;
 
     final averageDaysInInventory = agedInventoryCount == 0
         ? 0

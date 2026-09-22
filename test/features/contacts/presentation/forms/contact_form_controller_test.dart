@@ -21,6 +21,7 @@ void main() {
       expect(state.address, isEmpty);
       expect(state.notes, isEmpty);
       expect(state.photoUrl, isNull);
+      expect(state.isActive, isTrue);
     });
 
     test('updates form fields', () {
@@ -35,6 +36,7 @@ void main() {
       controller.setAddress('100 Main Street');
       controller.setNotes('Repeat customer.');
       controller.setPhotoUrl('contact-photo.jpg');
+      controller.setIsActive(false);
 
       final state = container.read(contactFormControllerProvider);
 
@@ -44,6 +46,7 @@ void main() {
       expect(state.address, '100 Main Street');
       expect(state.notes, 'Repeat customer.');
       expect(state.photoUrl, 'contact-photo.jpg');
+      expect(state.isActive, isFalse);
     });
 
     test('loads an existing contact for editing', () {
@@ -60,6 +63,7 @@ void main() {
         address: '100 Main Street',
         notes: 'Repeat customer.',
         photoUrl: 'contact-photo.jpg',
+        isActive: false,
       );
 
       controller.loadContact(contact);
@@ -74,6 +78,7 @@ void main() {
       expect(state.address, '100 Main Street');
       expect(state.notes, 'Repeat customer.');
       expect(state.photoUrl, 'contact-photo.jpg');
+      expect(state.isActive, isFalse);
     });
 
     test('returns null and preserves state when form is invalid', () async {
@@ -153,6 +158,7 @@ void main() {
         id: 'contact-1',
         name: 'Taylor Morgan',
         phone: '555-111-1111',
+        photoUrl: 'old-contact-photo.jpg',
       );
 
       final repository = InMemoryContactRepository(
@@ -172,6 +178,7 @@ void main() {
       controller.setName('Taylor A. Morgan');
       controller.setPhone('555-222-2222');
       controller.setEmail('taylor@example.com');
+      controller.setPhotoUrl('new-contact-photo.jpg');
 
       final updatedContact = await controller.submit();
 
@@ -180,10 +187,12 @@ void main() {
       expect(updatedContact?.name, 'Taylor A. Morgan');
       expect(updatedContact?.phone, '555-222-2222');
       expect(updatedContact?.email, 'taylor@example.com');
+      expect(updatedContact?.photoUrl, 'new-contact-photo.jpg');
 
       final storedContact = await repository.getContact('contact-1');
 
       expect(storedContact, updatedContact);
+      expect(storedContact?.photoUrl, 'new-contact-photo.jpg');
 
       final resetState = container.read(contactFormControllerProvider);
 

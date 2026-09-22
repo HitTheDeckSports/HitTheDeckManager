@@ -11,6 +11,7 @@ class ContactFormState {
     this.address = '',
     this.notes = '',
     this.photoUrl,
+    this.isActive = true,
   });
 
   final String? contactId;
@@ -20,6 +21,7 @@ class ContactFormState {
   final String address;
   final String notes;
   final String? photoUrl;
+  final bool isActive;
 
   bool get isEditing => contactId != null;
 
@@ -32,6 +34,7 @@ class ContactFormState {
       address: _emptyToNull(address),
       notes: _emptyToNull(notes),
       photoUrl: _emptyToNull(photoUrl),
+      isActive: isActive,
     );
 
     return contact.isValid ? contact : null;
@@ -45,6 +48,7 @@ class ContactFormState {
     String? address,
     String? notes,
     Object? photoUrl = _unset,
+    bool? isActive,
   }) {
     return ContactFormState(
       contactId: identical(contactId, _unset)
@@ -58,6 +62,7 @@ class ContactFormState {
       photoUrl: identical(photoUrl, _unset)
           ? this.photoUrl
           : photoUrl as String?,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -70,6 +75,7 @@ class ContactFormState {
       address: contact.address ?? '',
       notes: contact.notes ?? '',
       photoUrl: contact.photoUrl,
+      isActive: contact.isActive,
     );
   }
 }

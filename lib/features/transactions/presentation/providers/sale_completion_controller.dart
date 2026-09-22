@@ -116,6 +116,7 @@ class SaleCompletionController extends AsyncNotifier<void> {
     SaleTransaction? savedSale;
     TradeTransaction? savedTrade;
     Deal? savedDeal;
+    var createdNewDeal = false;
     ConsignmentTransaction? updatedConsignment;
     final createdTradeInItems = <InventoryItem>[];
 
@@ -192,6 +193,7 @@ class SaleCompletionController extends AsyncNotifier<void> {
             notes: 'Automatically created from trade-in sale.',
           ),
         );
+        createdNewDeal = true;
       }
 
       ref.invalidate(inventoryItemsProvider);
@@ -199,13 +201,33 @@ class SaleCompletionController extends AsyncNotifier<void> {
       ref.invalidate(inventoryItemProvider(itemId));
       ref.invalidate(saleTransactionsProvider);
       ref.invalidate(tradeTransactionsProvider);
+
+      // Inventory Detail reads the family provider below rather than the
+      // broad trade stream. Refresh every inventory item that directly
+      // participated in the new trade so lifetime Trade History immediately
+      // reflects both incoming and outgoing participation.
+      if (savedTrade != null) {
+        for (final inventoryId in {
+          ...savedTrade.outgoingInventoryItemIds,
+          ...savedTrade.incomingInventoryItemIds,
+        }) {
+          ref.invalidate(tradesForInventoryItemProvider(inventoryId));
+        }
+      }
+
       ref.invalidate(consignmentTransactionsProvider);
       ref.invalidate(consignmentForInventoryItemProvider(itemId));
       ref.invalidate(dealsProvider);
 
+      if (savedDeal != null) {
+        for (final inventoryId in savedDeal.effectiveLineageInventoryItemIds) {
+          ref.invalidate(dealForLineageInventoryItemProvider(inventoryId));
+        }
+      }
+
       return SaleCompletionResult(sale: savedSale, soldItem: updatedItem);
     } catch (error, stackTrace) {
-      if (savedDeal?.id != null) {
+      if (createdNewDeal && savedDeal?.id != null) {
         try {
           await dealRepository.deleteDeal(savedDeal!.id!);
         } catch (_) {}

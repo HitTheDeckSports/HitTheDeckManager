@@ -8,115 +8,103 @@ import '../../../shared/presentation/widgets/app_empty_state.dart';
 import '../../../shared/presentation/widgets/app_error_state.dart';
 import '../../../shared/presentation/widgets/app_loading_state.dart';
 import '../../../shared/presentation/widgets/app_page.dart';
-import '../../inventory/domain/models/inventory_item.dart';
+import '../../authentication/presentation/providers/app_permissions_provider.dart';
+import '../../inventory/domain/models/inventory_enums.dart';
 import '../../inventory/presentation/providers/inventory_providers.dart';
 import '../domain/models/repair_transaction.dart';
 import 'providers/repair_transaction_controller.dart';
 import 'providers/transaction_providers.dart';
+import 'widgets/inventory_summary_card.dart';
 
 class RepairDetailScreen extends ConsumerWidget {
   const RepairDetailScreen({required this.repairId, super.key});
-
   final String repairId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repairAsync = ref.watch(repairTransactionProvider(repairId));
+    final async = ref.watch(repairTransactionProvider(repairId));
 
-    return repairAsync.when(
+    return async.when(
       loading: () => const AppPage(
         title: 'Repair Details',
+        showHeader: false,
+        compact: true,
         child: AppLoadingState(message: 'Loading repair details...'),
       ),
       error: (error, stackTrace) => AppPage(
         title: 'Repair Details',
+        showHeader: false,
+        compact: true,
         child: AppErrorState(
           message: 'Unable to load the repair.',
           details: error.toString(),
-          onRetry: () {
-            ref.invalidate(repairTransactionProvider(repairId));
-          },
+          onRetry: () => ref.invalidate(repairTransactionProvider(repairId)),
         ),
       ),
-      data: (repair) {
-        if (repair == null) {
-          return const AppPage(
-            title: 'Repair Details',
-            child: AppEmptyState(
-              icon: Icons.build_circle_outlined,
-              title: 'Repair not found.',
-              message:
-                  'The repair may have been removed or is no longer available.',
-            ),
-          );
-        }
-
-        return _RepairDetailContent(repair: repair);
-      },
+      data: (repair) => repair == null
+          ? const AppPage(
+              title: 'Repair Details',
+              showHeader: false,
+              compact: true,
+              child: AppEmptyState(
+                icon: Icons.build_circle_outlined,
+                title: 'Repair not found.',
+                message:
+                    'The repair may have been removed or is no longer available.',
+              ),
+            )
+          : _RepairBody(repair: repair),
     );
   }
 }
 
-class _RepairDetailContent extends ConsumerWidget {
-  const _RepairDetailContent({required this.repair});
-
+class _RepairBody extends ConsumerWidget {
+  const _RepairBody({required this.repair});
   final RepairTransaction repair;
 
-  Future<void> _deleteRepair(BuildContext context, WidgetRef ref) async {
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete Repair?'),
-          content: const Text(
-            'This permanently removes the repair record and reduces the item’s total repair cost and true cost.',
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Repair?'),
+        content: const Text(
+          'This permanently removes the repair record and reduces the item’s total repair cost and true cost.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('repairDeleteCancelButton'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              key: const Key('repairDeleteCancelButton'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const Key('repairDeleteConfirmButton'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-              child: const Text('Delete Repair'),
-            ),
-          ],
-        );
-      },
+          FilledButton(
+            key: const Key('repairDeleteConfirmButton'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete Repair'),
+          ),
+        ],
+      ),
     );
 
-    if (confirmed != true || !context.mounted) {
-      return;
-    }
+    if (confirmed != true || !context.mounted) return;
 
     try {
       await ref
           .read(repairTransactionControllerProvider.notifier)
           .deleteRepair(repair);
-
-      if (!context.mounted) {
-        return;
-      }
-
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Repair was deleted successfully.')),
       );
-
-      context.goNamed(
-        AppRouteNames.inventoryDetail,
-        pathParameters: {'itemId': repair.inventoryItemId},
-      );
-    } catch (error) {
-      if (!context.mounted) {
-        return;
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': repair.inventoryItemId},
+        );
       }
-
+    } catch (error) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to delete repair: $error')),
       );
@@ -125,219 +113,197 @@ class _RepairDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inventoryItemAsync = ref.watch(
-      inventoryItemProvider(repair.inventoryItemId),
-    );
-
-    final controllerState = ref.watch(repairTransactionControllerProvider);
-
-    final isDeleting = controllerState.isLoading;
+    final itemAsync = ref.watch(inventoryItemProvider(repair.inventoryItemId));
+    final permissions = ref.watch(currentAppPermissionsProvider);
+    final controller = ref.watch(repairTransactionControllerProvider);
+    final deleting = controller.isLoading;
 
     return AppPage(
       title: 'Repair Details',
-      subtitle: _formatDate(repair.repairDate),
-      actions: [
-        OutlinedButton.icon(
-          key: const Key('repairEditButton'),
-          onPressed: isDeleting
-              ? null
-              : () {
-                  context.goNamed(
-                    AppRouteNames.editRepair,
-                    pathParameters: {'repairId': repair.id!},
-                  );
-                },
-          icon: const Icon(Icons.edit_outlined),
-          label: const Text('Edit Repair'),
-        ),
-        FilledButton.icon(
-          key: const Key('repairDeleteButton'),
-          onPressed: isDeleting
-              ? null
-              : () {
-                  _deleteRepair(context, ref);
-                },
-          icon: isDeleting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.delete_outline),
-          label: Text(isDeleting ? 'Deleting Repair...' : 'Delete Repair'),
-        ),
-      ],
+      showHeader: false,
+      compact: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _RepairDetailSection(
-            title: 'Repair Information',
+          itemAsync.when(
+            loading: () => const _LoadingCard(),
+            error: (error, stackTrace) => const _MissingInventoryCard(),
+            data: (item) => item == null
+                ? const _MissingInventoryCard()
+                : InventorySummaryCard.full(
+                    key: const Key('repairViewInventoryItemButton'),
+                    item: item,
+                    contextLabel: 'Repair',
+                    contextDate: _date(repair.repairDate),
+                    statusLabel: item.status.label,
+                    onTap: item.id == null
+                        ? null
+                        : () => context.pushNamed(
+                            AppRouteNames.inventoryDetail,
+                            pathParameters: {'itemId': item.id!},
+                          ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          _Section(
+            icon: Icons.build_outlined,
+            title: 'Repair Details',
             children: [
-              _RepairDetailRow(
-                label: 'Repair Date',
-                value: _formatDate(repair.repairDate),
-              ),
-              _RepairDetailRow(
-                label: 'Repair Cost',
-                value: CurrencyFormatter.formatCents(repair.costCents),
-              ),
-              _RepairDetailRow(label: 'Description', value: repair.description),
-              _RepairDetailRow(
-                label: 'Notes',
-                value: _displayOptionalText(repair.notes),
-              ),
+              _Row(label: 'Repair Date', value: _date(repair.repairDate)),
+              if (permissions.canViewFinancialData) ...[
+                const Divider(),
+                _Row(
+                  label: 'Repair Cost',
+                  value: CurrencyFormatter.formatCents(repair.costCents),
+                ),
+              ],
+              const Divider(),
+              _Row(label: 'Description', value: repair.description),
+              if ((repair.notes ?? '').trim().isNotEmpty) ...[
+                const Divider(),
+                _Row(label: 'Notes', value: repair.notes!.trim()),
+              ],
             ],
           ),
-          const SizedBox(height: 24),
-          inventoryItemAsync.when(
-            loading: () => const _RepairDetailSection(
-              title: 'Inventory Item',
-              children: [AppLoadingState(message: 'Loading inventory item...')],
-            ),
-            error: (error, stackTrace) => _RepairDetailSection(
-              title: 'Inventory Item',
+          if (permissions.canViewFinancialData) ...[
+            const SizedBox(height: 12),
+            Row(
               children: [
-                AppErrorState(
-                  message: 'Unable to load the inventory item.',
-                  details: error.toString(),
-                  onRetry: () {
-                    ref.invalidate(
-                      inventoryItemProvider(repair.inventoryItemId),
-                    );
-                  },
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('repairEditButton'),
+                    onPressed: deleting || repair.id == null
+                        ? null
+                        : () => context.pushNamed(
+                            AppRouteNames.editRepair,
+                            pathParameters: {'repairId': repair.id!},
+                          ),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Repair'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('repairDeleteButton'),
+                    onPressed: deleting ? null : () => _delete(context, ref),
+                    icon: deleting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline),
+                    label: Text(deleting ? 'Deleting...' : 'Delete Repair'),
+                  ),
                 ),
               ],
             ),
-            data: (item) {
-              if (item == null) {
-                return const _RepairDetailSection(
-                  title: 'Inventory Item',
-                  children: [
-                    Text(
-                      'The inventory item linked to this repair is unavailable.',
-                    ),
-                  ],
-                );
-              }
-
-              return _RepairInventoryItemSection(item: item);
-            },
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _RepairInventoryItemSection extends StatelessWidget {
-  const _RepairInventoryItemSection({required this.item});
-
-  final InventoryItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final itemId = item.id;
-
-    final model = item.model?.trim();
-
-    final displayName = model == null || model.isEmpty
-        ? item.brand
-        : '${item.brand} $model';
-
-    return _RepairDetailSection(
-      title: 'Inventory Item',
-      children: [
-        _RepairDetailRow(
-          label: 'Inventory Number',
-          value: item.inventoryNumber ?? 'Not assigned',
-        ),
-        _RepairDetailRow(label: 'Item', value: displayName),
-        if (itemId != null) ...[
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const Key('repairViewInventoryItemButton'),
-              onPressed: () {
-                context.goNamed(
-                  AppRouteNames.inventoryDetail,
-                  pathParameters: {'itemId': itemId},
-                );
-              },
-              icon: const Icon(Icons.inventory_2_outlined),
-              label: const Text('View Inventory Item'),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _RepairDetailSection extends StatelessWidget {
-  const _RepairDetailSection({required this.title, required this.children});
-
+class _Section extends StatelessWidget {
+  const _Section({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+  final IconData icon;
   final String title;
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            ...children,
-          ],
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          color: const Color(0xFF082A4A),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 9),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(children: children),
+        ),
+      ],
+    ),
+  );
 }
 
-class _RepairDetailRow extends StatelessWidget {
-  const _RepairDetailRow({required this.label, required this.value});
-
+class _Row extends StatelessWidget {
+  const _Row({required this.label, required this.value});
   final String label;
   final String value;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 170,
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Text(value)),
-        ],
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Text(label, style: const TextStyle(color: Color(0xFF5F6D7E))),
       ),
-    );
-  }
+      const SizedBox(width: 12),
+      Flexible(
+        child: Text(
+          value,
+          textAlign: TextAlign.end,
+          style: const TextStyle(
+            color: Color(0xFF082A4A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
-String _formatDate(DateTime date) {
-  final month = date.month.toString().padLeft(2, '0');
+class _MissingInventoryCard extends StatelessWidget {
+  const _MissingInventoryCard();
 
-  final day = date.day.toString().padLeft(2, '0');
-
-  return '$month/$day/${date.year}';
+  @override
+  Widget build(BuildContext context) => const Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Text(
+        'The inventory item linked to this repair is unavailable.',
+        textAlign: TextAlign.center,
+      ),
+    ),
+  );
 }
 
-String _displayOptionalText(String? value) {
-  final trimmedValue = value?.trim() ?? '';
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
 
-  return trimmedValue.isEmpty ? 'Not specified' : trimmedValue;
+  @override
+  Widget build(BuildContext context) => const Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: EdgeInsets.all(20),
+      child: Center(child: CircularProgressIndicator()),
+    ),
+  );
 }
+
+String _date(DateTime d) =>
+    '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';

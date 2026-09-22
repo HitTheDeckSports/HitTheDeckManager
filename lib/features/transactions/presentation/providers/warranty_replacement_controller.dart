@@ -6,6 +6,8 @@ import '../../../inventory/presentation/providers/inventory_providers.dart';
 import '../../domain/models/disposal_reason.dart';
 import '../../domain/models/disposal_transaction.dart';
 import '../../domain/models/warranty_replacement_deal.dart';
+import '../../domain/models/warranty_replacement_inventory_draft.dart';
+import 'deal_providers.dart';
 import 'transaction_providers.dart';
 import 'warranty_replacement_providers.dart';
 
@@ -32,6 +34,53 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
         disposedItem: disposedItem,
         replacementDate: replacementDate,
         notes: notes,
+        replacementInventory: _legacyReplacementInventory(
+          disposedItem: disposedItem,
+          replacementDate: replacementDate,
+          notes: notes,
+        ),
+      ),
+    );
+
+    state = result.when(
+      data: (_) => const AsyncData(null),
+      error: AsyncError.new,
+      loading: () => const AsyncLoading(),
+    );
+
+    if (result.hasError) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+
+    return result.requireValue;
+  }
+
+  Future<WarrantyReplacementDeal> createReplacementFromDraft({
+    required DisposalTransaction disposal,
+    required InventoryItem disposedItem,
+    required DateTime replacementDate,
+    required WarrantyReplacementInventoryDraft replacementDraft,
+    String? notes,
+  }) async {
+    if (!replacementDraft.isValid) {
+      throw StateError(replacementDraft.validationErrors.join(' '));
+    }
+
+    final replacementInventory = replacementDraft.toInventoryItem(
+      carriedAcquisitionType: disposedItem.acquisitionType,
+      carriedAcquisitionValueCents: disposedItem.acquisitionValueCents,
+      replacementDate: replacementDate,
+    );
+
+    state = const AsyncLoading();
+
+    final result = await AsyncValue.guard(
+      () => _createReplacement(
+        disposal: disposal,
+        disposedItem: disposedItem,
+        replacementDate: replacementDate,
+        notes: notes,
+        replacementInventory: replacementInventory,
       ),
     );
 
@@ -53,6 +102,7 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
     required InventoryItem disposedItem,
     required DateTime replacementDate,
     required String? notes,
+    required InventoryItem replacementInventory,
   }) async {
     final disposalId = disposal.id;
     final disposedItemId = disposedItem.id;
@@ -83,44 +133,29 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
 
     final inventoryRepository = ref.read(inventoryRepositoryProvider);
     final transactionRepository = ref.read(transactionRepositoryProvider);
-    final dealRepository = ref.read(warrantyReplacementDealRepositoryProvider);
+    final warrantyDealRepository = ref.read(
+      warrantyReplacementDealRepositoryProvider,
+    );
+    final lineageDealRepository = ref.read(dealRepositoryProvider);
+
+    final existingLineageDeal = await lineageDealRepository
+        .getDealForLineageInventoryItem(disposedItemId);
 
     InventoryItem? replacementItem;
-    WarrantyReplacementDeal? savedDeal;
+    WarrantyReplacementDeal? savedWarrantyDeal;
     DisposalTransaction? updatedDisposal;
+    var lineageDealUpdated = false;
 
     try {
       replacementItem = await inventoryRepository.createInventoryItem(
-        InventoryItem(
-          category: disposedItem.category,
-          brand: disposedItem.brand,
-          model: disposedItem.model,
-          acquisitionType: disposedItem.acquisitionType,
-          acquisitionValueCents: disposedItem.acquisitionValueCents,
-          condition: InventoryCondition.newItem,
-          status: InventoryStatus.available,
-          purchaseDate: replacementDate,
-          newValueCents: disposedItem.newValueCents,
-          askingPriceCents: disposedItem.askingPriceCents,
-          minimumPriceCents: disposedItem.minimumPriceCents,
-          sellerContactId: disposedItem.sellerContactId,
-          notes: _replacementNotes(disposedItem, notes),
-          lengthInches: disposedItem.lengthInches,
-          weightOunces: disposedItem.weightOunces,
-          drop: disposedItem.drop,
-          certification: disposedItem.certification,
-          gloveSizeInches: disposedItem.gloveSizeInches,
-          handOrientation: disposedItem.handOrientation,
-          catchersGearSize: disposedItem.catchersGearSize,
-          photoUrls: disposedItem.photoUrls,
-        ),
+        replacementInventory,
       );
 
       updatedDisposal = await transactionRepository.updateDisposal(
         disposal.copyWith(replacementInventoryItemId: replacementItem.id),
       );
 
-      savedDeal = await dealRepository.createDeal(
+      savedWarrantyDeal = await warrantyDealRepository.createDeal(
         WarrantyReplacementDeal(
           disposalTransactionId: disposalId,
           disposedInventoryItemId: disposedItemId,
@@ -129,6 +164,21 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
           notes: _optionalText(notes),
         ),
       );
+
+      if (existingLineageDeal != null) {
+        final replacementId = replacementItem.id!;
+        final extendedLineage = <String>{
+          ...existingLineageDeal.effectiveLineageInventoryItemIds,
+          replacementId,
+        }.toList(growable: false);
+
+        await lineageDealRepository.updateDeal(
+          existingLineageDeal.copyWith(
+            lineageInventoryItemIds: extendedLineage,
+          ),
+        );
+        lineageDealUpdated = true;
+      }
 
       ref.invalidate(inventoryItemsProvider);
       ref.invalidate(inventoryItemProvider(disposedItemId));
@@ -144,11 +194,27 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
         warrantyReplacementDealForInventoryProvider(replacementItem.id!),
       );
 
-      return savedDeal;
+      if (existingLineageDeal != null) {
+        ref.invalidate(dealsProvider);
+        for (final inventoryId in {
+          ...existingLineageDeal.effectiveLineageInventoryItemIds,
+          replacementItem.id!,
+        }) {
+          ref.invalidate(dealForLineageInventoryItemProvider(inventoryId));
+        }
+      }
+
+      return savedWarrantyDeal;
     } catch (error, stackTrace) {
-      if (savedDeal?.id != null) {
+      if (lineageDealUpdated && existingLineageDeal != null) {
         try {
-          await dealRepository.deleteDeal(savedDeal!.id!);
+          await lineageDealRepository.updateDeal(existingLineageDeal);
+        } catch (_) {}
+      }
+
+      if (savedWarrantyDeal?.id != null) {
+        try {
+          await warrantyDealRepository.deleteDeal(savedWarrantyDeal!.id!);
         } catch (_) {}
       }
 
@@ -167,6 +233,37 @@ class WarrantyReplacementController extends AsyncNotifier<void> {
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
+}
+
+InventoryItem _legacyReplacementInventory({
+  required InventoryItem disposedItem,
+  required DateTime replacementDate,
+  required String? notes,
+}) {
+  return InventoryItem(
+    category: disposedItem.category,
+    brand: disposedItem.brand,
+    model: disposedItem.model,
+    acquisitionType: disposedItem.acquisitionType,
+    acquisitionValueCents: disposedItem.acquisitionValueCents,
+    condition: InventoryCondition.newItem,
+    status: InventoryStatus.available,
+    purchaseDate: replacementDate,
+    newValueCents: disposedItem.newValueCents,
+    askingPriceCents: disposedItem.askingPriceCents,
+    minimumPriceCents: disposedItem.minimumPriceCents,
+    sellerContactId: disposedItem.sellerContactId,
+    notes: _replacementNotes(disposedItem, notes),
+    lengthInches: disposedItem.lengthInches,
+    weightOunces: disposedItem.weightOunces,
+    drop: disposedItem.drop,
+    certification: disposedItem.certification,
+    gloveSizeInches: disposedItem.gloveSizeInches,
+    handOrientation: disposedItem.handOrientation,
+    catchersGearSize: disposedItem.catchersGearSize,
+    helmetSize: disposedItem.helmetSize,
+    photoUrls: disposedItem.photoUrls,
+  );
 }
 
 String _replacementNotes(InventoryItem disposedItem, String? notes) {

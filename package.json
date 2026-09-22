@@ -9,7 +9,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:firestore-rules": "firebase emulators:exec --project demo-hit-the-deck-manager --only firestore \"node firebase_tests/firestore.rules.test.js\"",
+    "test:storage-rules": "firebase emulators:exec --project demo-hit-the-deck-manager --only firestore,storage \"node firebase_tests/storage.rules.test.js\"",
+    "test:security-rules": "npm run test:firestore-rules && npm run test:storage-rules"
   },
   "repository": {
     "type": "git",

@@ -18,6 +18,10 @@ void main() {
         'inventory-1',
         'inventory-2',
       ]);
+      expect(normalized.lineageInventoryItemIds, const [
+        'inventory-1',
+        'inventory-2',
+      ]);
       expect(normalized.notes, 'Trade-in Deal');
     });
 
@@ -58,21 +62,30 @@ void main() {
         'inventory-1',
         'inventory-2',
       ]);
+      expect(data['lineageInventoryItemIds'], const [
+        'inventory-1',
+        'inventory-2',
+      ]);
       expect(data['notes'], 'Trade-in Deal');
     });
 
-    test('preserves one-level Deal relationship model', () {
+    test('preserves direct children while storing recursive lineage', () {
       const deal = Deal(
         parentSaleTransactionId: 'sale-parent',
         childInventoryItemIds: ['child-1', 'child-2'],
+        lineageInventoryItemIds: ['child-1', 'child-2', 'grandchild-1'],
       );
 
       final data = FirestoreDealMapper.toFirestore(deal);
 
-      expect(data.containsKey('parentDealId'), isFalse);
-      expect(data.containsKey('grandchildInventoryItemIds'), isFalse);
       expect(data['parentSaleTransactionId'], 'sale-parent');
-      expect(data['childInventoryItemIds'], hasLength(2));
+      expect(data['childInventoryItemIds'], const ['child-1', 'child-2']);
+      expect(data['lineageInventoryItemIds'], const [
+        'child-1',
+        'child-2',
+        'grandchild-1',
+      ]);
+      expect(data.containsKey('parentDealId'), isFalse);
     });
   });
 }

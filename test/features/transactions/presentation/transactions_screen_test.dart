@@ -3,26 +3,48 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
-import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
-import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
-import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
-import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
-import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
-import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
-import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
-import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/data/repositories/in_memory_transaction_repository.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/deal_status.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/sale_transaction.dart';
+import 'package:hit_the_deck_manager/features/transactions/domain/models/transaction_enums.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_ledger_provider.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/transaction_detail_screen.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/transactions_screen.dart';
 
 void main() {
-  testWidgets('displays the empty transactions state', (
-    WidgetTester tester,
+  testWidgets('Transactions keeps type choices off page until selector opens', (
+    tester,
   ) async {
-    final repository = InMemoryTransactionRepository();
-    final inventoryRepository = InMemoryInventoryRepository();
+    final sale = SaleTransaction(
+      id: 'sale-filter-test',
+      inventoryItemId: 'item-filter-test',
+      salePriceCents: 25000,
+      saleDate: DateTime(2026, 9, 9),
+      paymentMethod: PaymentMethod.cash,
+      acquisitionValueCents: 10000,
+    );
+    const item = InventoryItem(
+      id: 'item-filter-test',
+      inventoryNumber: 'BAT-2609-0099',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.sold,
+    );
 
+    final repository = InMemoryTransactionRepository(initialSales: [sale]);
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: const [item],
+    );
     addTearDown(repository.dispose);
     addTearDown(inventoryRepository.dispose);
 
@@ -36,23 +58,40 @@ void main() {
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    expect(find.text('Transactions'), findsOneWidget);
-    expect(find.text('No transactions yet.'), findsOneWidget);
+    expect(find.byKey(const Key('transactionsFilterButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('transactionsMinimumAmountField')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('transactionsMaximumAmountField')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-sale')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('transactionsFilterButton')));
+    await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'Completed sales and other business transactions will appear here.',
-      ),
+      find.byKey(const Key('transactionsMinimumAmountField')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('transactionsMaximumAmountField')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionsTypeFilter-sale')),
       findsOneWidget,
     );
   });
 
-  testWidgets('Deals do not appear as Transactions', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('displays the empty transactions state', (tester) async {
     final repository = InMemoryTransactionRepository();
     final inventoryRepository = InMemoryInventoryRepository();
     addTearDown(repository.dispose);
@@ -62,28 +101,88 @@ void main() {
       ProviderScope(
         overrides: [
           transactionRepositoryProvider.overrideWithValue(repository),
-          dealsProvider.overrideWith(
-            (ref) => Stream.value(const [
-              Deal(
-                id: 'deal-1',
-                parentSaleTransactionId: 'sale-1',
-                childInventoryItemIds: ['item-1'],
-              ),
-            ]),
-          ),
+          dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
     );
-
     await tester.pumpAndSettle();
+
+    expect(find.text('Transactions'), findsNothing);
     expect(find.text('No transactions yet.'), findsOneWidget);
-    expect(find.byKey(const Key('transactionsDealsSection')), findsNothing);
-    expect(find.textContaining('Deals ('), findsNothing);
   });
-  testWidgets('displays recorded sales with newest transaction first', (
-    WidgetTester tester,
+
+  testWidgets('Deals appear as first-class business events', (tester) async {
+    final repository = InMemoryTransactionRepository();
+    final inventoryRepository = InMemoryInventoryRepository();
+    addTearDown(repository.dispose);
+    addTearDown(inventoryRepository.dispose);
+
+    const rootItem = InventoryItem(
+      id: 'root-item',
+      inventoryNumber: 'BAT-2609-0001',
+      category: InventoryCategory.bat,
+      brand: 'Root Bat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.sold,
+    );
+    const childItem = InventoryItem(
+      id: 'child-item',
+      inventoryNumber: 'BAT-2609-0002',
+      category: InventoryCategory.bat,
+      brand: 'Trade Bat',
+      acquisitionType: AcquisitionType.traded,
+      acquisitionValueCents: 8000,
+      status: InventoryStatus.available,
+    );
+    final deal = Deal(
+      id: 'deal-1',
+      parentSaleTransactionId: 'sale-1',
+      childInventoryItemIds: const ['child-item'],
+      createdAt: DateTime(2026, 9, 10),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(repository),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+          dealsProvider.overrideWith((ref) => Stream.value([deal])),
+          dealLedgerSummariesProvider.overrideWith(
+            (ref) async => [
+              DealLedgerSummary(
+                deal: deal,
+                displayNumber: '2026-001',
+                status: DealStatus.open,
+                currentProfitCents: 2500,
+                date: DateTime(2026, 9, 10),
+                rootItem: rootItem,
+                relatedInventoryItems: const [childItem],
+              ),
+            ],
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('dealLedgerCard-deal-1')), findsOneWidget);
+    expect(find.text('Deal #2026-001'), findsOneWidget);
+    expect(find.textContaining('Open'), findsOneWidget);
+    expect(find.textContaining('BAT-2609-0002'), findsOneWidget);
+    expect(
+      find.text('Open \u2022 BAT-2609-0001 \u2192 BAT-2609-0002'),
+      findsOneWidget,
+    );
+    expect(find.text('CURRENT PROFIT'), findsOneWidget);
+    expect(find.text(r'+$25.00'), findsOneWidget);
+  });
+
+  testWidgets('displays compact sales with visible values newest first', (
+    tester,
   ) async {
     final olderSale = SaleTransaction(
       id: 'sale-1',
@@ -91,17 +190,14 @@ void main() {
       salePriceCents: 32500,
       saleDate: DateTime(2026, 8, 3),
       paymentMethod: PaymentMethod.cash,
-      notes: 'Older sale.',
       acquisitionValueCents: 20000,
     );
-
     final newerSale = SaleTransaction(
       id: 'sale-2',
       inventoryItemId: 'item-2',
       salePriceCents: 35000,
       saleDate: DateTime(2026, 8, 4),
       paymentMethod: PaymentMethod.paypal,
-      notes: 'Newest sale.',
       acquisitionValueCents: 20000,
     );
 
@@ -115,7 +211,6 @@ void main() {
       acquisitionValueCents: 20000,
       status: InventoryStatus.sold,
     );
-
     const newerItem = InventoryItem(
       id: 'item-2',
       inventoryNumber: 'GLV-2608-0001',
@@ -130,11 +225,9 @@ void main() {
     final repository = InMemoryTransactionRepository(
       initialSales: [olderSale, newerSale],
     );
-
     final inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [olderItem, newerItem],
     );
-
     addTearDown(repository.dispose);
     addTearDown(inventoryRepository.dispose);
 
@@ -148,91 +241,72 @@ void main() {
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    expect(find.text('Sales (2)'), findsOneWidget);
-    expect(find.text('Sale'), findsNWidgets(2));
-
-    expect(find.text('08/03/2026'), findsOneWidget);
-    expect(find.text('08/04/2026'), findsOneWidget);
-
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
-
-    expect(find.text('GLV-2608-0001 — Wilson A2000'), findsOneWidget);
-
-    expect(find.text('item-1'), findsNothing);
-    expect(find.text('item-2'), findsNothing);
-
-    expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('PayPal'), findsOneWidget);
-
-    expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$350.00'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$125.00'), findsOneWidget);
-    expect(find.text(r'$150.00'), findsOneWidget);
-
-    expect(find.text('38.5%'), findsOneWidget);
-    expect(find.text('42.9%'), findsOneWidget);
-
-    expect(find.text('Older sale.'), findsOneWidget);
-    expect(find.text('Newest sale.'), findsOneWidget);
+    expect(find.text('2 transactions'), findsOneWidget);
+    expect(find.byKey(const Key('transactionsSearchField')), findsOneWidget);
+    expect(find.byKey(const Key('transactionsFilterButton')), findsOneWidget);
+    expect(find.text(r'+$350.00'), findsOneWidget);
+    expect(find.text(r'+$325.00'), findsOneWidget);
+    expect(find.text('GLV-2608-0001'), findsOneWidget);
+    expect(find.text('Wilson A2000 • PayPal sale'), findsOneWidget);
+    expect(find.text('BAT-2608-0001'), findsOneWidget);
+    expect(find.text('Combat Spec H1 • Cash sale'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('transactionTypePill-sale')),
+      findsNWidgets(2),
+    );
 
     final newerCard = find.byKey(const ValueKey('sale-2'));
-
     final olderCard = find.byKey(const ValueKey('sale-1'));
-
-    expect(newerCard, findsOneWidget);
-    expect(olderCard, findsOneWidget);
-
     expect(
       tester.getTopLeft(newerCard).dy,
       lessThan(tester.getTopLeft(olderCard).dy),
     );
   });
-  testWidgets('handles a missing related inventory record', (
-    WidgetTester tester,
+
+  testWidgets('purchased inventory appears as a purchase ledger event', (
+    tester,
   ) async {
-    final sale = SaleTransaction(
-      id: 'sale-1',
-      inventoryItemId: 'missing-item',
-      salePriceCents: 32500,
-      saleDate: DateTime(2026, 8, 3),
-      paymentMethod: PaymentMethod.cash,
-      acquisitionValueCents: 20000,
+    final repository = InMemoryTransactionRepository();
+    final purchasedItem = InventoryItem(
+      id: 'purchase-item',
+      inventoryNumber: 'BAT-2609-0042',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 17500,
+      purchaseDate: DateTime(2026, 9, 8),
     );
-
-    final transactionRepository = InMemoryTransactionRepository(
-      initialSales: [sale],
+    final inventoryRepository = InMemoryInventoryRepository(
+      initialItems: [purchasedItem],
     );
-
-    final inventoryRepository = InMemoryInventoryRepository();
-
-    addTearDown(transactionRepository.dispose);
+    addTearDown(repository.dispose);
     addTearDown(inventoryRepository.dispose);
-
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          transactionRepositoryProvider.overrideWithValue(
-            transactionRepository,
-          ),
+          transactionRepositoryProvider.overrideWithValue(repository),
           dealsProvider.overrideWith((ref) => Stream.value(const [])),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         ],
         child: const MaterialApp(home: Scaffold(body: TransactionsScreen())),
       ),
     );
-
     await tester.pumpAndSettle();
-
-    expect(find.text('Inventory record unavailable'), findsOneWidget);
-
-    expect(find.text('missing-item'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('purchaseInventoryCard-purchase-item')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('transactionTypePill-purchase')),
+      findsOneWidget,
+    );
+    expect(find.text(r'-$175.00'), findsOneWidget);
   });
-  testWidgets('tapping a transaction opens its detail screen', (
-    WidgetTester tester,
-  ) async {
+
+  testWidgets('tapping a sale opens its detail screen', (tester) async {
     final sale = SaleTransaction(
       id: 'sale-1',
       inventoryItemId: 'item-1',
@@ -241,7 +315,6 @@ void main() {
       paymentMethod: PaymentMethod.cash,
       acquisitionValueCents: 20000,
     );
-
     const item = InventoryItem(
       id: 'item-1',
       inventoryNumber: 'BAT-2608-0001',
@@ -256,11 +329,9 @@ void main() {
     final transactionRepository = InMemoryTransactionRepository(
       initialSales: [sale],
     );
-
     final inventoryRepository = InMemoryInventoryRepository(
       initialItems: const [item],
     );
-
     addTearDown(transactionRepository.dispose);
     addTearDown(inventoryRepository.dispose);
 
@@ -270,24 +341,20 @@ void main() {
         GoRoute(
           path: AppRoutes.transactions,
           name: AppRouteNames.transactions,
-          builder: (context, state) {
-            return const Scaffold(body: TransactionsScreen());
-          },
+          builder: (context, state) =>
+              const Scaffold(body: TransactionsScreen()),
         ),
         GoRoute(
           path: AppRoutes.transactionDetail,
           name: AppRouteNames.transactionDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: TransactionDetailScreen(
-                transactionId: state.pathParameters['transactionId']!,
-              ),
-            );
-          },
+          builder: (context, state) => Scaffold(
+            body: TransactionDetailScreen(
+              transactionId: state.pathParameters['transactionId']!,
+            ),
+          ),
         ),
       ],
     );
-
     addTearDown(router.dispose);
 
     await tester.pumpWidget(
@@ -302,22 +369,16 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    final transactionCard = find.byKey(
-      const ValueKey('transactionCard-sale-1'),
+    await tester.tap(find.byKey(const ValueKey('transactionCard-sale-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sale Transaction'), findsNothing);
+    expect(
+      find.byKey(const Key('saleTransactionDetailsSection')),
+      findsOneWidget,
     );
-
-    expect(transactionCard, findsOneWidget);
-
-    await tester.tap(transactionCard);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Sale Transaction'), findsOneWidget);
-
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
-
     expect(find.text(r'$325.00'), findsAtLeastNWidgets(1));
   });
 }

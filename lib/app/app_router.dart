@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/authentication/domain/models/authorized_user.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/contacts/presentation/contact_detail_screen.dart';
+import '../features/inventory/domain/models/inventory_item.dart';
 import '../features/inventory/presentation/inventory_qr_scanner_screen.dart';
 import '../features/contacts/presentation/contacts_screen.dart';
 import '../features/contacts/presentation/create_contact_screen.dart';
@@ -11,6 +11,7 @@ import '../features/contacts/presentation/edit_contact_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
 import '../features/inventory/presentation/inventory_item_detail_screen.dart';
+import '../features/inventory/presentation/inventory_locations_screen.dart';
 import '../features/reports/presentation/report_screen.dart';
 import '../features/search/presentation/universal_search_screen.dart';
 import '../features/settings/presentation/more_screen.dart';
@@ -24,6 +25,7 @@ import '../features/transactions/presentation/warranty_replacement_screen.dart';
 import '../features/transactions/presentation/edit_repair_screen.dart';
 import '../features/transactions/presentation/transactions_screen.dart';
 import '../features/transactions/presentation/transaction_detail_screen.dart';
+import '../features/transactions/presentation/transaction_event_detail_screens.dart';
 import '../features/inventory/presentation/buy_inventory_screen.dart';
 import '../features/inventory/presentation/edit_inventory_screen.dart';
 import '../features/inventory/presentation/sell_inventory_screen.dart';
@@ -69,17 +71,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return AppRoutes.dashboard;
       }
 
-      final isOrdinaryUser =
-          session.authorization.role == AuthorizedUserRole.user;
-      final isRestrictedRoute =
-          state.name == AppRouteNames.reports ||
-          state.name == AppRouteNames.disposeInventory ||
-          state.name == AppRouteNames.userAccess;
-
-      if (isOrdinaryUser && isRestrictedRoute) {
-        return AppRoutes.dashboard;
-      }
-
       return null;
     },
     routes: [
@@ -116,7 +107,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.sellInventory,
             name: AppRouteNames.sellInventory,
-            builder: (context, state) => const SellInventoryScreen(),
+            builder: (context, state) {
+              final extra = state.extra;
+
+              return SellInventoryScreen(
+                initialItem: extra is InventoryItem ? extra : null,
+              );
+            },
           ),
           GoRoute(
             path: AppRoutes.inventoryEdit,
@@ -287,6 +284,49 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             },
           ),
           GoRoute(
+            path: AppRoutes.tradeDetail,
+            name: AppRouteNames.tradeDetail,
+            builder: (context, state) {
+              final tradeId = state.pathParameters['tradeId'];
+
+              if (tradeId == null || tradeId.isEmpty) {
+                throw StateError('Trade detail route requires a trade ID.');
+              }
+
+              return TradeDetailScreen(tradeId: tradeId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.disposalDetail,
+            name: AppRouteNames.disposalDetail,
+            builder: (context, state) {
+              final disposalId = state.pathParameters['disposalId'];
+
+              if (disposalId == null || disposalId.isEmpty) {
+                throw StateError(
+                  'Disposal detail route requires a disposal ID.',
+                );
+              }
+
+              return DisposalDetailScreen(disposalId: disposalId);
+            },
+          ),
+          GoRoute(
+            path: AppRoutes.consignmentDetail,
+            name: AppRouteNames.consignmentDetail,
+            builder: (context, state) {
+              final consignmentId = state.pathParameters['consignmentId'];
+
+              if (consignmentId == null || consignmentId.isEmpty) {
+                throw StateError(
+                  'Consignment detail route requires a consignment ID.',
+                );
+              }
+
+              return ConsignmentDetailScreen(consignmentId: consignmentId);
+            },
+          ),
+          GoRoute(
             path: AppRoutes.dealDetail,
             name: AppRouteNames.dealDetail,
             builder: (context, state) {
@@ -318,6 +358,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.settings,
             name: AppRouteNames.settings,
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.inventoryLocations,
+            name: AppRouteNames.inventoryLocations,
+            builder: (context, state) => const InventoryLocationsScreen(),
           ),
           GoRoute(
             path: AppRoutes.userAccess,

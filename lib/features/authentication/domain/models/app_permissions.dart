@@ -33,7 +33,6 @@ class AppPermissions {
     return switch (role) {
       AuthorizedUserRole.owner => const AppPermissions.ownerOrAdmin(),
       AuthorizedUserRole.admin => const AppPermissions.ownerOrAdmin(),
-      AuthorizedUserRole.user => const AppPermissions.none(),
     };
   }
 }

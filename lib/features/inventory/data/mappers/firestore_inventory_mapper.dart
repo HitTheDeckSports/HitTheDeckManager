@@ -24,6 +24,7 @@ abstract final class FirestoreInventoryMapper {
       'askingPriceCents': item.askingPriceCents,
       'minimumPriceCents': item.minimumPriceCents,
       'sellerContactId': item.sellerContactId,
+      'locationId': item.locationId,
       'notes': item.notes,
       'lengthInches': item.lengthInches,
       'weightOunces': item.weightOunces,
@@ -32,6 +33,7 @@ abstract final class FirestoreInventoryMapper {
       'gloveSizeInches': item.gloveSizeInches,
       'handOrientation': item.handOrientation,
       'catchersGearSize': item.catchersGearSize,
+      'helmetSize': item.helmetSize,
       'photoUrls': item.photoUrls,
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -79,6 +81,7 @@ abstract final class FirestoreInventoryMapper {
       askingPriceCents: _intValue(data['askingPriceCents']),
       minimumPriceCents: _intValue(data['minimumPriceCents']),
       sellerContactId: _stringOrNull(data['sellerContactId']),
+      locationId: _stringOrNull(data['locationId']),
       notes: _stringOrNull(data['notes']),
       lengthInches: _doubleValue(data['lengthInches']),
       weightOunces: _doubleValue(data['weightOunces']),
@@ -87,6 +90,7 @@ abstract final class FirestoreInventoryMapper {
       gloveSizeInches: _doubleValue(data['gloveSizeInches']),
       handOrientation: _stringOrNull(data['handOrientation']),
       catchersGearSize: _stringOrNull(data['catchersGearSize']),
+      helmetSize: _stringOrNull(data['helmetSize']),
       photoUrls: _stringList(data['photoUrls']),
     );
   }

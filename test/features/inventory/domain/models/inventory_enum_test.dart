@@ -34,7 +34,7 @@ void main() {
     test('returns the correct user-facing labels', () {
       expect(InventoryStatus.available.label, 'Available');
       expect(InventoryStatus.sold.label, 'Sold');
-      expect(InventoryStatus.inactive.label, 'Inactive');
+      expect(InventoryStatus.inactive.label, 'On Hold');
       expect(InventoryStatus.broken.label, 'Broken');
       expect(InventoryStatus.disposed.label, 'Disposed');
     });

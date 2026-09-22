@@ -2,135 +2,445 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/theme/app_theme.dart';
+import '../features/authentication/presentation/providers/app_permissions_provider.dart';
 import '../features/authentication/presentation/providers/authentication_controller.dart';
 import 'app_routes.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.child, super.key});
-
   final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentLocation = GoRouterState.of(context).uri.path;
+    final permissions = ref.watch(currentAppPermissionsProvider);
+    final canAccessReports = permissions.canAccessReports;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final useNavigationRail = constraints.maxWidth >= 900;
-
         if (useNavigationRail) {
           return Scaffold(
+            appBar: _buildAppBar(context, currentLocation),
             body: Row(
               children: [
                 NavigationRail(
-                  selectedIndex: _selectedIndex(currentLocation),
-                  onDestinationSelected: (index) {
-                    _navigateToIndex(context, index);
-                  },
+                  selectedIndex: _selectedIndex(
+                    currentLocation,
+                    canAccessReports: canAccessReports,
+                  ),
+                  onDestinationSelected: (index) => _navigateToIndex(
+                    context,
+                    index,
+                    canAccessReports: canAccessReports,
+                  ),
                   labelType: NavigationRailLabelType.all,
                   leading: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Icon(Icons.sports_baseball, size: 32),
+                    child: _BrandMark(compact: true),
                   ),
                   trailing: Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          key: const Key('globalSearchRailButton'),
-                          tooltip: 'Search',
-                          icon: const Icon(Icons.search),
-                          onPressed: () => context.go(AppRoutes.search),
-                        ),
-                        IconButton(
-                          tooltip: 'Sign out',
-                          icon: const Icon(Icons.logout),
-                          onPressed: () => _signOut(context, ref),
-                        ),
-                      ],
+                    child: IconButton(
+                      key: const Key('globalSignOutRailButton'),
+                      tooltip: 'Sign out',
+                      icon: const Icon(Icons.logout),
+                      onPressed: () => _signOut(context, ref),
                     ),
                   ),
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Dashboard'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.inventory_2_outlined),
-                      selectedIcon: Icon(Icons.inventory_2),
-                      label: Text('Inventory'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.receipt_long_outlined),
-                      selectedIcon: Icon(Icons.receipt_long),
-                      label: Text('Transactions'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.people_outline),
-                      selectedIcon: Icon(Icons.people),
-                      label: Text('Contacts'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.more_horiz),
-                      selectedIcon: Icon(Icons.more_horiz),
-                      label: Text('More'),
-                    ),
-                  ],
+                  destinations: _railDestinations(
+                    canAccessReports: canAccessReports,
+                  ),
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: child),
+                Expanded(
+                  child: _mainNavigationSwipeBody(
+                    context,
+                    currentLocation,
+                    canAccessReports: canAccessReports,
+                  ),
+                ),
               ],
             ),
           );
         }
 
         return Scaffold(
-          body: child,
-          floatingActionButton: FloatingActionButton.small(
-            key: const Key('globalSearchFloatingButton'),
-            tooltip: 'Search',
-            onPressed: () => context.go(AppRoutes.search),
-            child: const Icon(Icons.search),
+          appBar: _buildAppBar(context, currentLocation),
+          body: _mainNavigationSwipeBody(
+            context,
+            currentLocation,
+            canAccessReports: canAccessReports,
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex(currentLocation),
-            onDestinationSelected: (index) {
-              _navigateToIndex(context, index);
-            },
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+          bottomNavigationBar: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppTheme.surface,
+              border: Border(top: BorderSide(color: Color(0xFFE4E8EE))),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x16062A4D),
+                  blurRadius: 12,
+                  offset: Offset(0, -3),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: NavigationBar(
+                selectedIndex: _selectedIndex(
+                  currentLocation,
+                  canAccessReports: canAccessReports,
+                ),
+                onDestinationSelected: (index) => _navigateToIndex(
+                  context,
+                  index,
+                  canAccessReports: canAccessReports,
+                ),
+                destinations: _navigationDestinations(
+                  canAccessReports: canAccessReports,
+                ),
               ),
-              NavigationDestination(
-                icon: Icon(Icons.inventory_2_outlined),
-                selectedIcon: Icon(Icons.inventory_2),
-                label: 'Inventory',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long),
-                label: 'Transactions',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'Contacts',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.more_horiz),
-                selectedIcon: Icon(Icons.more_horiz),
-                label: 'More',
-              ),
-            ],
+            ),
           ),
         );
       },
     );
   }
+
+  Widget _mainNavigationSwipeBody(
+    BuildContext context,
+    String currentLocation, {
+    required bool canAccessReports,
+  }) {
+    final routes = <String>[
+      AppRoutes.dashboard,
+      AppRoutes.inventory,
+      AppRoutes.transactions,
+      AppRoutes.contacts,
+      if (canAccessReports) AppRoutes.reports,
+    ];
+    final currentIndex = routes.indexOf(currentLocation);
+
+    if (currentIndex < 0) {
+      return child;
+    }
+
+    var horizontalDistance = 0.0;
+
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && currentIndex > 0) {
+          context.go(routes[currentIndex - 1]);
+        }
+      },
+      child: GestureDetector(
+        key: const Key('mainNavigationSwipeArea'),
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) {
+          horizontalDistance = 0;
+        },
+        onHorizontalDragUpdate: (details) {
+          horizontalDistance += details.delta.dx;
+        },
+        onHorizontalDragEnd: (details) {
+          const minimumDistance = 72.0;
+          const minimumVelocity = 300.0;
+          final velocity = details.primaryVelocity ?? 0;
+          final swipedTowardNext =
+              horizontalDistance <= -minimumDistance ||
+              velocity <= -minimumVelocity;
+          final swipedTowardPrevious =
+              horizontalDistance >= minimumDistance ||
+              velocity >= minimumVelocity;
+
+          if (swipedTowardNext && currentIndex < routes.length - 1) {
+            context.go(routes[currentIndex + 1]);
+          } else if (swipedTowardPrevious && currentIndex > 0) {
+            context.go(routes[currentIndex - 1]);
+          }
+        },
+        child: child,
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    String currentLocation,
+  ) {
+    final detailId = _inventoryDetailItemId(currentLocation);
+    final editId = _inventoryEditItemId(currentLocation);
+    final transactionDetailId = _transactionDetailId(currentLocation);
+    final isTransactionFamilyDetail = _isTransactionFamilyDetail(
+      currentLocation,
+    );
+    final isBuy = currentLocation == AppRoutes.buyInventory;
+    final isSell = currentLocation == AppRoutes.sellInventory;
+    final secondary = _secondaryContext(currentLocation);
+
+    final contextual =
+        detailId != null ||
+        editId != null ||
+        transactionDetailId != null ||
+        isTransactionFamilyDetail ||
+        isBuy ||
+        isSell ||
+        secondary != null;
+
+    VoidCallback? backAction;
+    Key? backKey;
+    String? tooltip;
+
+    if (detailId != null) {
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.inventory));
+      backKey = const Key('inventoryDetailHeaderBackButton');
+      tooltip = 'Back';
+    } else if (editId != null) {
+      backAction = () => _backOrFallback(
+        context,
+        () => context.goNamed(
+          AppRouteNames.inventoryDetail,
+          pathParameters: {'itemId': editId},
+        ),
+      );
+      backKey = const Key('inventoryEditHeaderBackButton');
+      tooltip = 'Back';
+    } else if (transactionDetailId != null || isTransactionFamilyDetail) {
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.transactions));
+      backKey = const Key('transactionDetailHeaderBackButton');
+      tooltip = 'Back';
+    } else if (isBuy || isSell) {
+      backAction = () =>
+          _backOrFallback(context, () => context.go(AppRoutes.inventory));
+      backKey = const Key('inventoryWorkflowHeaderBackButton');
+      tooltip = 'Back';
+    } else if (secondary != null) {
+      backAction = () =>
+          _backOrFallback(context, () => context.go(secondary.fallback));
+      backKey = const Key('contextualHeaderBackButton');
+      tooltip = 'Back';
+    }
+
+    return AppBar(
+      backgroundColor: AppTheme.navyDark,
+      foregroundColor: Colors.white,
+      toolbarHeight: 74,
+      centerTitle: contextual,
+      titleSpacing: contextual ? 0 : 16,
+      leadingWidth: contextual ? 64 : null,
+      leading: contextual
+          ? IconButton(
+              key: backKey,
+              tooltip: tooltip,
+              icon: const Icon(Icons.arrow_back),
+              onPressed: backAction,
+            )
+          : null,
+      title: const _BrandMark(),
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(3),
+        child: SizedBox(
+          height: 3,
+          child: ColoredBox(color: AppTheme.primaryRed),
+        ),
+      ),
+      actions: detailId != null
+          ? [
+              IconButton(
+                key: const Key('inventoryDetailHeaderEditButton'),
+                tooltip: 'Edit inventory item',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => context.pushNamed(
+                  AppRouteNames.inventoryEdit,
+                  pathParameters: {'itemId': detailId},
+                ),
+              ),
+              const SizedBox(width: 6),
+            ]
+          : contextual
+          ? const [SizedBox(width: 54)]
+          : [
+              IconButton(
+                key: const Key('globalSearchHeaderButton'),
+                tooltip: 'Search',
+                icon: const Icon(Icons.search),
+                onPressed: () => context.push(AppRoutes.search),
+              ),
+              IconButton(
+                key: const Key('globalSettingsHeaderButton'),
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => context.push(AppRoutes.settings),
+              ),
+              const SizedBox(width: 6),
+            ],
+    );
+  }
+
+  void _backOrFallback(BuildContext context, VoidCallback fallback) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    fallback();
+  }
+
+  String? _inventoryDetailItemId(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2 || s.first != 'inventory') {
+      return null;
+    }
+    const reserved = {'buy', 'sell', 'scan'};
+    return reserved.contains(s[1]) ? null : s[1];
+  }
+
+  String? _inventoryEditItemId(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 3 || s.first != 'inventory' || s[2] != 'edit') {
+      return null;
+    }
+    return s[1];
+  }
+
+  String? _transactionDetailId(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2 || s.first != 'transactions') {
+      return null;
+    }
+    return s[1];
+  }
+
+  bool _isTransactionFamilyDetail(String location) {
+    final s = Uri.parse(location).pathSegments;
+    if (s.length != 2) {
+      return false;
+    }
+
+    return const {
+      'repairs',
+      'trades',
+      'disposals',
+      'consignments',
+      'deals',
+    }.contains(s.first);
+  }
+
+  _SecondaryContext? _secondaryContext(String location) {
+    final s = Uri.parse(location).pathSegments;
+
+    if (location == AppRoutes.inventoryScanner) {
+      return const _SecondaryContext(AppRoutes.inventory);
+    }
+    if (location == AppRoutes.createContact) {
+      return const _SecondaryContext(AppRoutes.contacts);
+    }
+    if (location == AppRoutes.search) {
+      return const _SecondaryContext(AppRoutes.dashboard);
+    }
+    if (location == AppRoutes.inventoryLocations ||
+        location == AppRoutes.userAccess) {
+      return const _SecondaryContext(AppRoutes.settings);
+    }
+
+    if (s.length == 2 && s.first == 'contacts' && s[1] != 'new') {
+      return const _SecondaryContext(AppRoutes.contacts);
+    }
+    if (s.length == 3 && s.first == 'contacts' && s[2] == 'edit') {
+      return _SecondaryContext('/contacts/${s[1]}');
+    }
+
+    if (s.length == 4 &&
+        s.first == 'inventory' &&
+        s[2] == 'repairs' &&
+        s[3] == 'new') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 3 && s.first == 'inventory' && s[2] == 'dispose') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 4 &&
+        s.first == 'inventory' &&
+        s[2] == 'consignment' &&
+        s[3] == 'new') {
+      return _SecondaryContext('/inventory/${s[1]}');
+    }
+    if (s.length == 3 && s.first == 'repairs' && s[2] == 'edit') {
+      return _SecondaryContext('/repairs/${s[1]}');
+    }
+    if (s.length == 3 &&
+        s.first == 'disposals' &&
+        s[2] == 'warranty-replacement') {
+      return _SecondaryContext('/disposals/${s[1]}');
+    }
+
+    return null;
+  }
+
+  List<NavigationDestination> _navigationDestinations({
+    required bool canAccessReports,
+  }) => [
+    const NavigationDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: 'Dashboard',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: 'Inventory',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: 'Transactions',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.people_outline),
+      selectedIcon: Icon(Icons.people),
+      label: 'Contacts',
+    ),
+    if (canAccessReports)
+      const NavigationDestination(
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: 'Reports',
+      ),
+  ];
+
+  List<NavigationRailDestination> _railDestinations({
+    required bool canAccessReports,
+  }) => [
+    const NavigationRailDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: Text('Dashboard'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: Text('Inventory'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: Text('Transactions'),
+    ),
+    const NavigationRailDestination(
+      icon: Icon(Icons.people_outline),
+      selectedIcon: Icon(Icons.people),
+      label: Text('Contacts'),
+    ),
+    if (canAccessReports)
+      const NavigationRailDestination(
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: Text('Reports'),
+      ),
+  ];
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
@@ -139,46 +449,100 @@ class AppShell extends ConsumerWidget {
       if (!context.mounted) {
         return;
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to sign out. Please try again.')),
       );
     }
   }
 
-  int _selectedIndex(String location) {
+  int _selectedIndex(String location, {required bool canAccessReports}) {
     if (location.startsWith(AppRoutes.inventory)) {
       return 1;
     }
-
-    if (location.startsWith(AppRoutes.transactions)) {
+    if (location.startsWith(AppRoutes.transactions) ||
+        _isTransactionFamilyDetail(location)) {
       return 2;
     }
-
     if (location.startsWith(AppRoutes.contacts)) {
       return 3;
     }
-
-    if (location.startsWith(AppRoutes.more) ||
-        location.startsWith(AppRoutes.reports) ||
-        location.startsWith(AppRoutes.settings) ||
-        location.startsWith(AppRoutes.search)) {
+    if (canAccessReports && location.startsWith(AppRoutes.reports)) {
       return 4;
     }
-
     return 0;
   }
 
-  void _navigateToIndex(BuildContext context, int index) {
+  void _navigateToIndex(
+    BuildContext context,
+    int index, {
+    required bool canAccessReports,
+  }) {
     final route = switch (index) {
       0 => AppRoutes.dashboard,
       1 => AppRoutes.inventory,
       2 => AppRoutes.transactions,
       3 => AppRoutes.contacts,
-      4 => AppRoutes.more,
+      4 when canAccessReports => AppRoutes.reports,
       _ => AppRoutes.dashboard,
     };
-
     context.go(route);
+  }
+}
+
+class _SecondaryContext {
+  const _SecondaryContext(this.fallback);
+  final String fallback;
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({this.compact = false});
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return const Icon(
+        Icons.sports_baseball,
+        color: AppTheme.primaryRed,
+        size: 34,
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.sports_baseball, color: Colors.white, size: 35),
+        const SizedBox(width: 9),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text(
+              'HIT THE DECK',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                letterSpacing: 0.4,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'MANAGER',
+              style: TextStyle(
+                color: AppTheme.primaryRed,
+                fontSize: 13,
+                height: 1.0,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
 import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/app/app_shell.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
@@ -71,31 +74,333 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Combat Spec H1'), findsOneWidget);
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
     expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
 
-    expect(find.text('Basic Information'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemQuickInfoGrid')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Category')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoValue-Category')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Location')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoValue-Location')),
+      findsOneWidget,
+    );
     expect(find.text('Bat'), findsOneWidget);
-    expect(find.text('Purchased'), findsOneWidget);
-    expect(find.text('Like New'), findsOneWidget);
-    expect(find.text('Available'), findsOneWidget);
+    expect(find.text('Purchased'), findsAtLeastNWidgets(1));
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoLabel-Acquired')),
+      findsOneWidget,
+    );
+    expect(find.text('Like New'), findsAtLeastNWidgets(1));
+    expect(find.text('Available'), findsAtLeastNWidgets(1));
     expect(find.text('08/02/2026'), findsOneWidget);
 
-    expect(find.text('Pricing'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsNWidgets(2));
+    expect(find.text('Additional Pricing'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
+    final pricingSection = find.byKey(
+      const Key('inventoryAdditionalPricingSection'),
+    );
+    await tester.ensureVisible(pricingSection);
+    await tester.pumpAndSettle();
+    await tester.tap(pricingSection);
+    await tester.pumpAndSettle();
     expect(find.text(r'$499.99'), findsOneWidget);
-    expect(find.text(r'$325.00'), findsOneWidget);
+    expect(find.text(r'$325'), findsOneWidget);
+    expect(find.text('Asking Price'), findsAtLeastNWidgets(1));
     expect(find.text(r'$275.00'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryItemSummaryCard')), findsOneWidget);
 
-    expect(find.text('Item Details'), findsOneWidget);
-    expect(find.text('32 in'), findsOneWidget);
-    expect(find.text('29 oz'), findsOneWidget);
-    expect(find.text('-3'), findsOneWidget);
-    expect(find.text('BBCOR'), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryItemEstimatedProfitMetric')),
+      findsOneWidget,
+    );
+    expect(find.text(r'+$125'), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryPrimaryPhotoPlaceholder')),
+      findsOneWidget,
+    );
+
+    expect(find.textContaining('32"'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('29 oz'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('-3'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('BBCOR'), findsAtLeastNWidgets(1));
     expect(find.text('Limited-edition bat.'), findsOneWidget);
   });
 
-  testWidgets('displays saved inventory photos on the detail screen', (
+  testWidgets('empty lower detail sections use compact presentation', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'compact-item',
+      inventoryNumber: 'BAT-2608-0101',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'compact-item'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryAdditionalPricingSection')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventorySellerEmpty')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryRepairHistoryEmpty')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryDisposalHistoryEmpty')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inventoryTradeHistoryEmpty')), findsOneWidget);
+  });
+  testWidgets('collapsed lower section titles remain visible', (
+    WidgetTester tester,
+  ) async {
+    final item = InventoryItem(
+      id: 'title-test-item',
+      inventoryNumber: 'BAT-2608-0999',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      newValueCents: 49900,
+      askingPriceCents: 30000,
+      minimumPriceCents: 18000,
+      notes: 'Title visibility test note.',
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'title-test-item'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Additional Pricing'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
+    expect(find.text('Repair History'), findsNothing);
+
+    expect(
+      find.byKey(const ValueKey('inventoryCollapsibleTitle-Notes')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('inventoryCollapsibleTitle-Additional Pricing'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryStaticTitle-Seller')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('inventoryStaticTitle-Repair History')),
+      findsNothing,
+    );
+  });
+  testWidgets('expanded pricing labels remain visibly styled', (
+    WidgetTester tester,
+  ) async {
+    final item = InventoryItem(
+      id: 'pricing-label-test',
+      inventoryNumber: 'BAT-2608-0998',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      newValueCents: 49900,
+      askingPriceCents: 30000,
+      minimumPriceCents: 18000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'pricing-label-test'),
+    );
+    await tester.pumpAndSettle();
+
+    final pricingSection = find.byKey(
+      const Key('inventoryAdditionalPricingSection'),
+    );
+    await tester.ensureVisible(pricingSection);
+    await tester.tap(pricingSection);
+    await tester.pumpAndSettle();
+
+    for (final label in const ['Price New', 'Asking Price', 'Min Price']) {
+      final finder = find.byKey(ValueKey('inventoryExpandedFieldLabel-$label'));
+      expect(finder, findsOneWidget);
+      final text = tester.widget<Text>(finder);
+      expect(text.style?.color, const Color(0xFF082A4A));
+    }
+  });
+
+  testWidgets('primary actions remain fixed in one visible row', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'fixed-action-test',
+      inventoryNumber: 'BAT-2608-0997',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+      status: InventoryStatus.available,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'fixed-action-test'),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(const Key('inventoryItemPrimaryActionRow'));
+    final sell = find.byKey(const Key('inventoryItemSellButton'));
+    final repair = find.byKey(const Key('inventoryItemAddRepairButton'));
+    final status = find.byKey(const Key('inventoryItemStatusButton'));
+
+    expect(row, findsOneWidget);
+    expect(sell, findsOneWidget);
+    expect(repair, findsOneWidget);
+    expect(status, findsOneWidget);
+
+    final sellRect = tester.getRect(sell);
+    final repairRect = tester.getRect(repair);
+    final statusRect = tester.getRect(status);
+
+    expect((sellRect.center.dy - repairRect.center.dy).abs(), lessThan(2));
+    expect((repairRect.center.dy - statusRect.center.dy).abs(), lessThan(2));
+
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(sellRect.bottom, lessThanOrEqualTo(screenHeight));
+    expect(repairRect.bottom, lessThanOrEqualTo(screenHeight));
+    expect(statusRect.bottom, lessThanOrEqualTo(screenHeight));
+  });
+  testWidgets('quick-info QR action opens QR dialog', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'qr-item',
+      inventoryNumber: 'BAT-2608-0099',
+      category: InventoryCategory.bat,
+      brand: 'Easton',
+      model: 'Hype Fire',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 10000,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'qr-item'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoAction-QR Code')),
+      findsOneWidget,
+    );
+
+    final qrAction = find.byKey(
+      const ValueKey('inventoryQuickInfoAction-QR Code'),
+    );
+    await tester.ensureVisible(qrAction);
+    await tester.pumpAndSettle();
+    await tester.tap(qrAction);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('BAT-2608-0099'), findsAtLeastNWidgets(1));
+  });
+  testWidgets('displays saved helmet size', (WidgetTester tester) async {
+    const item = InventoryItem(
+      id: 'helmet-1',
+      inventoryNumber: 'HLM-2608-0001',
+      category: InventoryCategory.helmet,
+      brand: 'Easton',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 8000,
+      helmetSize: 'L/XL',
+    );
+    final repository = InMemoryInventoryRepository(initialItems: [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'helmet-1'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('L/XL'), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('ordinary User does not see inventory cost or profit', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'ordinary-user-item',
+      inventoryNumber: 'BAT-2608-0200',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+    final transactionRepository = InMemoryTransactionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentAppPermissionsProvider.overrideWithValue(
+            const AppPermissions.none(),
+          ),
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: InventoryItemDetailScreen(itemId: 'ordinary-user-item'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(r'$325'), findsAtLeastNWidgets(1));
+    expect(find.text('Acquisition Value'), findsNothing);
+    expect(find.text('Total Cost'), findsNothing);
+    expect(find.text('Est. Profit'), findsNothing);
+    expect(find.text('True Cost'), findsNothing);
+    expect(find.byKey(const Key('inventoryItemTotalCostMetric')), findsNothing);
+    expect(
+      find.byKey(const Key('inventoryItemEstimatedProfitMetric')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('saved inventory photos open and swipe in the photo viewer', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -120,10 +425,160 @@ void main() {
 
     await tester.pump();
 
-    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('Photos'), findsNothing);
     expect(find.byKey(const Key('inventoryPrimaryPhoto')), findsOneWidget);
     expect(find.byKey(const Key('inventoryPhotoThumbnail-1')), findsOneWidget);
-    expect(find.text('2 photos'), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoCountLabel')), findsOneWidget);
+    expect(find.text('2'), findsAtLeastNWidgets(1));
+    expect(find.byKey(const Key('inventoryItemStatusBadge')), findsOneWidget);
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsNothing);
+    final fullBleed = find.byKey(const Key('inventoryPrimaryPhotoFullBleed'));
+    expect(fullBleed, findsOneWidget);
+    final screenWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getSize(fullBleed).width, closeTo(screenWidth, 0.5));
+    final thumbnailStrip = find.byKey(
+      const Key('inventoryPhotoThumbnailStrip'),
+    );
+    expect(thumbnailStrip, findsOneWidget);
+    expect(tester.getSize(thumbnailStrip).width, closeTo(screenWidth, 0.5));
+    expect(tester.getTopLeft(thumbnailStrip).dx, closeTo(0, 0.5));
+    final primaryBottom = tester.getBottomLeft(fullBleed).dy;
+    final stripTop = tester.getTopLeft(thumbnailStrip).dy;
+    expect(stripTop, closeTo(primaryBottom, 0.5));
+
+    await tester.tap(
+      find.byKey(const Key('inventoryPrimaryPhotoTapTarget')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsOneWidget);
+    expect(find.text('1 of 2'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('inventoryPhotoViewerPageView')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 of 2'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('inventoryPhotoViewerCloseButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('inventoryPhotoThumbnailTapTarget-1')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryPhotoViewer')), findsOneWidget);
+    expect(find.text('2 of 2'), findsOneWidget);
+  });
+
+  testWidgets('Sell Item opens a sale for the selected inventory item', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'item-sell-action',
+      inventoryNumber: 'BAT-2608-0101',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      model: 'Spec H1',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      askingPriceCents: 32500,
+      status: InventoryStatus.available,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+    final transactionRepository = InMemoryTransactionRepository();
+
+    final router = GoRouter(
+      initialLocation: '/inventory/item-sell-action',
+      routes: [
+        GoRoute(
+          path: AppRoutes.sellInventory,
+          name: AppRouteNames.sellInventory,
+          builder: (context, state) {
+            final selectedItem = state.extra as InventoryItem?;
+            return Scaffold(
+              body: Text('Selling ${selectedItem?.inventoryNumber}'),
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) {
+            return Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryRepositoryProvider.overrideWithValue(repository),
+          transactionRepositoryProvider.overrideWithValue(
+            transactionRepository,
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('inventoryItemPrimaryActions')),
+      findsOneWidget,
+    );
+    final sellButton = find.byKey(const Key('inventoryItemSellButton'));
+    expect(sellButton, findsOneWidget);
+
+    await tester.ensureVisible(sellButton);
+    await tester.pumpAndSettle();
+    await tester.tap(sellButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selling BAT-2608-0101'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('inventoryItemPrimaryActions')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sold inventory does not display the Sell Item action', (
+    WidgetTester tester,
+  ) async {
+    const item = InventoryItem(
+      id: 'sold-item-actions',
+      inventoryNumber: 'BAT-2608-0102',
+      category: InventoryCategory.bat,
+      brand: 'Combat',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 20000,
+      status: InventoryStatus.sold,
+    );
+    final repository = InMemoryInventoryRepository(initialItems: const [item]);
+
+    await tester.pumpWidget(
+      createTestApp(repository: repository, itemId: 'sold-item-actions'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventoryItemSellButton')), findsNothing);
   });
 
   testWidgets('opens inventory QR code from the QR action', (
@@ -147,11 +602,19 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('inventoryItemQrButton')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inventoryQuickInfoAction-QR Code')),
+      findsOneWidget,
+    );
 
     expect(find.byKey(const Key('inventoryQrCode')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    final qrButton = find.byKey(
+      const ValueKey('inventoryQuickInfoAction-QR Code'),
+    );
+    await tester.ensureVisible(qrButton);
+    await tester.pumpAndSettle();
+    await tester.tap(qrButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inventoryQrDialog')), findsOneWidget);
@@ -189,7 +652,12 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('inventoryItemQrButton')));
+    final qrButton = find.byKey(
+      const ValueKey('inventoryQuickInfoAction-QR Code'),
+    );
+    await tester.ensureVisible(qrButton);
+    await tester.pumpAndSettle();
+    await tester.tap(qrButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('inventoryPrintLabelButton')), findsOneWidget);
@@ -262,11 +730,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Rawlings Heart of the Hide'), findsOneWidget);
+    expect(find.text('Rawlings Heart of the Hide'), findsAtLeastNWidgets(1));
     expect(find.text('Glove'), findsOneWidget);
     expect(find.text('Traded'), findsOneWidget);
-    expect(find.text('11.5 in'), findsOneWidget);
-    expect(find.text('Right Hand Throw'), findsOneWidget);
+    expect(find.textContaining('11.5"'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('Right Hand Throw'), findsAtLeastNWidgets(1));
 
     expect(find.text('Bat Length'), findsNothing);
     expect(find.text('Bat Weight'), findsNothing);
@@ -312,33 +780,51 @@ void main() {
     );
 
     final repository = InMemoryInventoryRepository(initialItems: [item]);
-
     addTearDown(repository.dispose);
 
     final router = GoRouter(
       initialLocation: '/inventory/item-1',
       routes: [
-        GoRoute(
-          path: AppRoutes.inventoryDetail,
-          name: AppRouteNames.inventoryDetail,
-          builder: (context, state) {
-            return Scaffold(
-              body: InventoryItemDetailScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.inventoryEdit,
-          name: AppRouteNames.inventoryEdit,
-          builder: (context, state) {
-            return Scaffold(
-              body: EditInventoryScreen(
-                itemId: state.pathParameters['itemId']!,
-              ),
-            );
-          },
+        ShellRoute(
+          builder: (context, state, child) => AppShell(child: child),
+          routes: [
+            GoRoute(
+              path: AppRoutes.inventory,
+              name: AppRouteNames.inventory,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Inventory destination')),
+            ),
+            GoRoute(
+              path: AppRoutes.inventoryDetail,
+              name: AppRouteNames.inventoryDetail,
+              builder: (context, state) {
+                return InventoryItemDetailScreen(
+                  itemId: state.pathParameters['itemId']!,
+                );
+              },
+            ),
+            GoRoute(
+              path: AppRoutes.inventoryEdit,
+              name: AppRouteNames.inventoryEdit,
+              builder: (context, state) {
+                return EditInventoryScreen(
+                  itemId: state.pathParameters['itemId']!,
+                );
+              },
+            ),
+            GoRoute(
+              path: AppRoutes.search,
+              name: AppRouteNames.search,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Search destination')),
+            ),
+            GoRoute(
+              path: AppRoutes.settings,
+              name: AppRouteNames.settings,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('Settings destination')),
+            ),
+          ],
         ),
       ],
     );
@@ -354,8 +840,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final editButton = find.byKey(const Key('inventoryItemEditButton'));
-
+    final editButton = find.byKey(const Key('inventoryDetailHeaderEditButton'));
     expect(editButton, findsOneWidget);
 
     await tester.tap(editButton);
@@ -367,11 +852,9 @@ void main() {
     final brandField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryBrandField')),
     );
-
     final modelField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryModelField')),
     );
-
     final acquisitionValueField = tester.widget<TextFormField>(
       find.byKey(const Key('buyInventoryAcquisitionValueField')),
     );
@@ -381,9 +864,7 @@ void main() {
     expect(acquisitionValueField.initialValue, '200.00');
 
     expect(find.byKey(const Key('buyInventoryLengthField')), findsOneWidget);
-
     expect(find.byKey(const Key('buyInventoryWeightField')), findsOneWidget);
-
     expect(find.byKey(const Key('buyInventoryDropField')), findsOneWidget);
   });
   testWidgets('changes and persists inventory status', (
@@ -418,20 +899,39 @@ void main() {
     final statusButton = find.byKey(const Key('inventoryItemStatusButton'));
 
     expect(statusButton, findsOneWidget);
-    expect(find.text('Available'), findsOneWidget);
+    expect(find.text('Available'), findsAtLeastNWidgets(1));
 
+    await tester.ensureVisible(statusButton);
+    await tester.pumpAndSettle();
     await tester.tap(statusButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Inactive'), findsOneWidget);
+    expect(find.text('On Hold'), findsOneWidget);
     expect(find.text('Broken'), findsOneWidget);
     expect(find.text('Sold'), findsNothing);
-    expect(find.text('Disposed'), findsNothing);
+    expect(find.text('Disposed'), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventoryStatusCancelButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('inventoryStatusCurrentLabel')),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.text('Inactive'));
+    final cancelButton = find.byKey(const Key('inventoryStatusCancelButton'));
+    await tester.ensureVisible(cancelButton);
+    await tester.pumpAndSettle();
+    await tester.tap(cancelButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Change Status'), findsNothing);
+
+    await tester.tap(statusButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('On Hold'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Inventory status changed to Inactive.'), findsOneWidget);
+    expect(find.text('Inventory status changed to On Hold.'), findsOneWidget);
 
     final storedItem = await repository.getInventoryItem('item-1');
 
@@ -494,14 +994,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sale Information'), findsOneWidget);
-    expect(find.text('08/03/2026'), findsOneWidget);
-    expect(find.text('Venmo'), findsOneWidget);
-    expect(find.text(r'$325.00'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
-    expect(find.text(r'$125.00'), findsOneWidget);
-    expect(find.text('38.5%'), findsOneWidget);
-    expect(find.text('Sold during tournament.'), findsOneWidget);
+    expect(find.textContaining('08/03/2026'), findsOneWidget);
+    expect(find.textContaining(r'$325'), findsOneWidget);
+    expect(find.textContaining(r'+$125'), findsOneWidget);
+    expect(find.text('Venmo'), findsNothing);
+    expect(find.text('Sold during tournament.'), findsNothing);
 
+    final saleSection = find.byKey(
+      const Key('inventorySaleInformationSection'),
+    );
+    await tester.ensureVisible(saleSection);
+    await tester.pumpAndSettle();
+    await tester.tap(saleSection);
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('inventoryItemViewTransactionButton')),
       findsOneWidget,
@@ -685,6 +1190,14 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    final saleSection = find.byKey(
+      const Key('inventorySaleInformationSection'),
+    );
+    await tester.ensureVisible(saleSection);
+    await tester.pumpAndSettle();
+    await tester.tap(saleSection);
+    await tester.pumpAndSettle();
+
     final viewTransactionButton = find.byKey(
       const Key('inventoryItemViewTransactionButton'),
     );
@@ -697,11 +1210,26 @@ void main() {
     await tester.tap(viewTransactionButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sale Transaction'), findsOneWidget);
-    expect(find.text('Transaction Summary'), findsOneWidget);
-
-    expect(find.text('BAT-2608-0001 — Combat Spec H1'), findsOneWidget);
-
+    final transactionHero = find.byKey(const Key('saleTransactionItemHero'));
+    expect(transactionHero, findsOneWidget);
+    expect(
+      find.byKey(const Key('saleTransactionDetailsSection')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: transactionHero,
+        matching: find.text('BAT-2608-0001'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: transactionHero,
+        matching: find.text('Combat Spec H1'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Navigation test sale.'), findsOneWidget);
   });
   testWidgets('item without a seller displays no seller linked', (
@@ -740,7 +1268,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
     expect(find.text('No seller linked'), findsOneWidget);
 
     expect(
@@ -794,15 +1322,20 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
+    final sellerTitleFinder = find.byKey(const Key('inventorySellerTitle'));
+    expect(sellerTitleFinder, findsOneWidget);
+    final sellerTitle = tester.widget<Text>(sellerTitleFinder);
+    expect(sellerTitle.style?.color, const Color(0xFF082A4A));
+    expect(sellerTitle.style?.fontWeight, FontWeight.w900);
     expect(find.text('Taylor Morgan'), findsOneWidget);
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('555-123-4567'), findsNothing);
+    expect(find.text('taylor@example.com'), findsNothing);
 
-    expect(
-      find.byKey(const Key('inventoryItemViewSellerButton')),
-      findsOneWidget,
-    );
+    final sellerSection = find.byKey(const Key('inventorySellerSection'));
+    await tester.ensureVisible(sellerSection);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('inventorySellerContactLink')), findsOneWidget);
   });
   testWidgets('missing linked seller displays warning', (
     WidgetTester tester,
@@ -840,7 +1373,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seller Information'), findsOneWidget);
+    expect(find.text('Seller'), findsOneWidget);
 
     expect(
       find.text(
@@ -854,7 +1387,7 @@ void main() {
       findsNothing,
     );
   });
-  testWidgets('View Seller opens the linked contact detail screen', (
+  testWidgets('Seller name opens the linked contact detail screen', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -930,22 +1463,19 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final viewSellerButton = find.byKey(
-      const Key('inventoryItemViewSellerButton'),
-    );
+    final sellerLink = find.byKey(const Key('inventorySellerContactLink'));
+    expect(sellerLink, findsOneWidget);
 
-    expect(viewSellerButton, findsOneWidget);
-
-    await tester.ensureVisible(viewSellerButton);
+    await tester.ensureVisible(sellerLink);
     await tester.pumpAndSettle();
 
-    await tester.tap(viewSellerButton);
+    await tester.tap(sellerLink);
     await tester.pumpAndSettle();
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.byKey(const Key('contactIdentityCard')), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('(555) 123-4567'), findsAtLeastNWidgets(1));
+    expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Inventory seller.'), findsOneWidget);
   });
@@ -1004,7 +1534,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sale Information'), findsOneWidget);
-    expect(find.text('No buyer linked'), findsOneWidget);
+    expect(find.textContaining('No buyer linked'), findsOneWidget);
 
     expect(find.byKey(const Key('inventoryItemViewBuyerButton')), findsNothing);
   });
@@ -1073,10 +1603,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sale Information'), findsOneWidget);
-    expect(find.text('Taylor Morgan'), findsOneWidget);
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.textContaining('Taylor Morgan'), findsOneWidget);
+    expect(find.text('555-123-4567'), findsNothing);
+    expect(find.text('taylor@example.com'), findsNothing);
 
+    final saleSection = find.byKey(
+      const Key('inventorySaleInformationSection'),
+    );
+    await tester.ensureVisible(saleSection);
+    await tester.pumpAndSettle();
+    await tester.tap(saleSection);
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('inventoryItemViewBuyerButton')),
       findsOneWidget,
@@ -1140,7 +1677,7 @@ void main() {
     expect(find.text('Sale Information'), findsOneWidget);
 
     expect(
-      find.text(
+      find.textContaining(
         'A buyer is linked to this sale, but the Contact record is unavailable.',
       ),
       findsOneWidget,
@@ -1242,6 +1779,14 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    final saleSection = find.byKey(
+      const Key('inventorySaleInformationSection'),
+    );
+    await tester.ensureVisible(saleSection);
+    await tester.pumpAndSettle();
+    await tester.tap(saleSection);
+    await tester.pumpAndSettle();
+
     final viewBuyerButton = find.byKey(
       const Key('inventoryItemViewBuyerButton'),
     );
@@ -1254,14 +1799,14 @@ void main() {
     await tester.tap(viewBuyerButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.byKey(const Key('contactIdentityCard')), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('(555) 123-4567'), findsAtLeastNWidgets(1));
+    expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat buyer.'), findsOneWidget);
   });
-  testWidgets('Add Repair opens repair form for the selected item', (
+  testWidgets('Repair opens repair form for the selected item', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -1345,10 +1890,8 @@ void main() {
       findsOneWidget,
     );
 
-    expect(
-      find.text('BAT-2608-0001 — Combat Spec H1'),
-      findsAtLeastNWidgets(1),
-    );
+    expect(find.text('BAT-2608-0001'), findsAtLeastNWidgets(1));
+    expect(find.text('Combat Spec H1'), findsAtLeastNWidgets(1));
 
     expect(find.byKey(const Key('addRepairCostField')), findsOneWidget);
 
@@ -1356,7 +1899,7 @@ void main() {
 
     expect(find.byKey(const Key('addRepairSubmitButton')), findsOneWidget);
   });
-  testWidgets('displays empty repair history and current true cost', (
+  testWidgets('hides empty repair history and keeps current true cost', (
     WidgetTester tester,
   ) async {
     const item = InventoryItem(
@@ -1395,18 +1938,17 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Repair History'), findsOneWidget);
-    expect(find.text('Number of Repairs'), findsOneWidget);
-    expect(find.text('Total Repair Cost'), findsOneWidget);
-    expect(find.text('True Cost'), findsOneWidget);
-
+    expect(find.text('Repair History'), findsNothing);
     expect(
       find.text('No repairs have been recorded for this item.'),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('inventoryRepairHistoryEmpty')),
       findsOneWidget,
     );
 
-    expect(find.text(r'$0.00'), findsOneWidget);
-    expect(find.text(r'$200.00'), findsNWidgets(2));
+    expect(find.text(r'$200.00'), findsAtLeastNWidgets(1));
   });
   testWidgets('displays repair history newest first with total and true cost', (
     WidgetTester tester,
@@ -1475,9 +2017,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Repair History'), findsOneWidget);
+    final repairSection = find.byKey(
+      const Key('inventoryRepairHistorySection'),
+    );
+    await tester.ensureVisible(repairSection);
+    await tester.pumpAndSettle();
+    await tester.tap(repairSection);
+    await tester.pumpAndSettle();
     expect(find.text('2'), findsAtLeastNWidgets(1));
     expect(find.text(r'$70.00'), findsOneWidget);
-    expect(find.text(r'$270.00'), findsOneWidget);
+    expect(find.text(r'$270.00'), findsAtLeastNWidgets(1));
 
     expect(
       find.byKey(const ValueKey('repairHistoryEntry-repair-1')),

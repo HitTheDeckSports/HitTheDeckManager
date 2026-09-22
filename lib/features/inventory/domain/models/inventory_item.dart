@@ -18,6 +18,7 @@ class InventoryItem {
     this.askingPriceCents,
     this.minimumPriceCents,
     this.sellerContactId,
+    this.locationId,
     this.notes,
     this.lengthInches,
     this.weightOunces,
@@ -26,6 +27,7 @@ class InventoryItem {
     this.gloveSizeInches,
     this.handOrientation,
     this.catchersGearSize,
+    this.helmetSize,
     this.photoUrls = const [],
   });
 
@@ -55,6 +57,11 @@ class InventoryItem {
   /// Identifier of the contact who sold, traded, or consigned the item.
   final String? sellerContactId;
 
+  /// Stable identifier of the managed inventory location.
+  ///
+  /// Null means the item is currently unassigned.
+  final String? locationId;
+
   final String? notes;
 
   // Bat-specific fields.
@@ -74,6 +81,9 @@ class InventoryItem {
 
   // Catcher's gear-specific fields.
   final String? catchersGearSize;
+
+  // Helmet-specific fields.
+  final String? helmetSize;
 
   /// References to item photos. The application supports up to 10 photos.
   final List<String> photoUrls;
@@ -147,6 +157,7 @@ class InventoryItem {
     Object? askingPriceCents = _unset,
     Object? minimumPriceCents = _unset,
     Object? sellerContactId = _unset,
+    Object? locationId = _unset,
     Object? notes = _unset,
     Object? lengthInches = _unset,
     Object? weightOunces = _unset,
@@ -155,6 +166,7 @@ class InventoryItem {
     Object? gloveSizeInches = _unset,
     Object? handOrientation = _unset,
     Object? catchersGearSize = _unset,
+    Object? helmetSize = _unset,
     List<String>? photoUrls,
   }) {
     return InventoryItem(
@@ -187,6 +199,9 @@ class InventoryItem {
       sellerContactId: identical(sellerContactId, _unset)
           ? this.sellerContactId
           : sellerContactId as String?,
+      locationId: identical(locationId, _unset)
+          ? this.locationId
+          : locationId as String?,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
       lengthInches: identical(lengthInches, _unset)
           ? this.lengthInches
@@ -207,6 +222,9 @@ class InventoryItem {
       catchersGearSize: identical(catchersGearSize, _unset)
           ? this.catchersGearSize
           : catchersGearSize as String?,
+      helmetSize: identical(helmetSize, _unset)
+          ? this.helmetSize
+          : helmetSize as String?,
       photoUrls: photoUrls ?? this.photoUrls,
     );
   }

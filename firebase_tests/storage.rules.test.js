@@ -6,17 +6,57 @@ const {
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
 
+const { doc, setDoc } = require('firebase/firestore');
 const {
-  doc,
-  setDoc,
-} = require('firebase/firestore');
-
-const {
+  deleteObject,
+  getBytes,
   ref,
   uploadBytes,
 } = require('firebase/storage');
 
 const projectId = 'demo-hit-the-deck-manager';
+
+const rootOwnerEmail = 'sales.hitthedecksports@gmail.com';
+const adminEmail = 'admin@example.com';
+const inactiveAdminEmail = 'inactive-admin@example.com';
+const legacyUserEmail = 'legacy-user@example.com';
+const unauthorizedEmail = 'unauthorized@example.com';
+
+function authContext(testEnv, uid, email) {
+  return testEnv.authenticatedContext(uid, {
+    email,
+    email_verified: true,
+  });
+}
+
+async function seedAccessRecords(testEnv) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+
+    await setDoc(doc(db, 'authorized_users', adminEmail), {
+      email: adminEmail,
+      active: true,
+      role: 'admin',
+    });
+
+    await setDoc(doc(db, 'authorized_users', inactiveAdminEmail), {
+      email: inactiveAdminEmail,
+      active: false,
+      role: 'admin',
+    });
+
+    // Simulate a stale pre-Owner/Admin role record.
+    await setDoc(doc(db, 'authorized_users', legacyUserEmail), {
+      email: legacyUserEmail,
+      active: true,
+      role: 'user',
+    });
+  });
+}
+
+function imageBytes() {
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+}
 
 async function main() {
   const testEnv = await initializeTestEnvironment({
@@ -32,124 +72,118 @@ async function main() {
   try {
     await testEnv.clearFirestore();
     await testEnv.clearStorage();
-
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await setDoc(
-        doc(
-          context.firestore(),
-          'authorized_users',
-          'authorized@example.com',
-        ),
-        {
-          active: true,
-          role: 'user',
-        },
-      );
-    });
+    await seedAccessRecords(testEnv);
 
     const unauthenticated = testEnv.unauthenticatedContext();
-
-    const authorized = testEnv.authenticatedContext(
-      'authorized-user',
-      {
-        email: 'authorized@example.com',
-        email_verified: true,
-      },
+    const rootOwner = authContext(testEnv, 'root-owner', rootOwnerEmail);
+    const admin = authContext(testEnv, 'admin-user', adminEmail);
+    const inactiveAdmin = authContext(
+      testEnv,
+      'inactive-admin-user',
+      inactiveAdminEmail,
     );
-
-    const unauthorized = testEnv.authenticatedContext(
+    const legacyUser = authContext(
+      testEnv,
+      'legacy-user',
+      legacyUserEmail,
+    );
+    const unauthorized = authContext(
+      testEnv,
       'unauthorized-user',
-      {
-        email: 'unauthorized@example.com',
-        email_verified: true,
-      },
+      unauthorizedEmail,
     );
 
-    const image = new Uint8Array([1, 2, 3, 4]);
-
-    await assertFails(
-      uploadBytes(
-        ref(
-          unauthenticated.storage(),
-          'inventory/test-item/photo.jpg',
-        ),
-        image,
-        {
-          contentType: 'image/jpeg',
-        },
-      ),
+    const ownerPhoto = ref(
+      rootOwner.storage(),
+      'inventory/item-owner/photo.jpg',
     );
 
     await assertSucceeds(
-      uploadBytes(
-        ref(
-          authorized.storage(),
-          'inventory/test-item/photo.jpg',
+      uploadBytes(ownerPhoto, imageBytes(), { contentType: 'image/jpeg' }),
+    );
+
+    await assertSucceeds(getBytes(ownerPhoto));
+    await assertSucceeds(
+      getBytes(
+        ref(admin.storage(), 'inventory/item-owner/photo.jpg'),
+      ),
+    );
+
+    for (const context of [
+      unauthenticated,
+      unauthorized,
+      inactiveAdmin,
+      legacyUser,
+    ]) {
+      await assertFails(
+        getBytes(
+          ref(context.storage(), 'inventory/item-owner/photo.jpg'),
         ),
-        image,
-        {
-          contentType: 'image/jpeg',
-        },
+      );
+    }
+
+    const adminInventoryPhoto = ref(
+      admin.storage(),
+      'inventory/item-admin/photo.jpg',
+    );
+    const adminContactPhoto = ref(
+      admin.storage(),
+      'contacts/contact-admin/photo.jpg',
+    );
+
+    await assertSucceeds(
+      uploadBytes(adminInventoryPhoto, imageBytes(), {
+        contentType: 'image/jpeg',
+      }),
+    );
+
+    await assertSucceeds(
+      uploadBytes(adminContactPhoto, imageBytes(), {
+        contentType: 'image/jpeg',
+      }),
+    );
+
+    await assertFails(
+      uploadBytes(
+        ref(legacyUser.storage(), 'inventory/legacy/photo.jpg'),
+        imageBytes(),
+        { contentType: 'image/jpeg' },
       ),
     );
 
     await assertFails(
       uploadBytes(
-        ref(
-          unauthorized.storage(),
-          'inventory/test-item/photo.jpg',
-        ),
-        image,
-        {
-          contentType: 'image/jpeg',
-        },
+        ref(admin.storage(), 'inventory/item-admin/not-image.txt'),
+        new Uint8Array([1, 2, 3]),
+        { contentType: 'text/plain' },
       ),
     );
 
     await assertFails(
       uploadBytes(
-        ref(
-          authorized.storage(),
-          'inventory/test-item/file.txt',
-        ),
-        image,
-        {
-          contentType: 'text/plain',
-        },
-      ),
-    );
-
-    const tooLarge = new Uint8Array(
-      (5 * 1024 * 1024) + 1,
-    );
-
-    await assertFails(
-      uploadBytes(
-        ref(
-          authorized.storage(),
-          'inventory/test-item/too-large.jpg',
-        ),
-        tooLarge,
-        {
-          contentType: 'image/jpeg',
-        },
+        ref(admin.storage(), 'inventory/item-admin/too-large.jpg'),
+        new Uint8Array(5 * 1024 * 1024 + 1),
+        { contentType: 'image/jpeg' },
       ),
     );
 
     await assertFails(
       uploadBytes(
-        ref(
-          authorized.storage(),
-          'unexpected/path/photo.jpg',
-        ),
-        image,
-        {
-          contentType: 'image/jpeg',
-        },
+        ref(admin.storage(), 'other/private.jpg'),
+        imageBytes(),
+        { contentType: 'image/jpeg' },
       ),
     );
 
-    console.log('Storage security rules tests passed.');
+    await assertFails(
+      deleteObject(
+        ref(legacyUser.storage(), 'inventory/item-admin/photo.jpg'),
+      ),
+    );
+
+    await assertSucceeds(deleteObject(adminInventoryPhoto));
+
+    console.log('Storage Owner/Admin security rules tests passed.');
   } finally {
     await testEnv.cleanup();
   }

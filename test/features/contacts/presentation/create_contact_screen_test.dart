@@ -169,10 +169,10 @@ void main() {
     expect(savedContact.address, '100 Main Street');
     expect(savedContact.notes, 'Repeat customer.');
 
-    expect(find.text('Contact Details'), findsOneWidget);
+    expect(find.text('Relationship Summary'), findsOneWidget);
     expect(find.text('Taylor Morgan'), findsAtLeastNWidgets(1));
-    expect(find.text('555-123-4567'), findsOneWidget);
-    expect(find.text('taylor@example.com'), findsOneWidget);
+    expect(find.text('(555) 123-4567'), findsAtLeastNWidgets(1));
+    expect(find.text('taylor@example.com'), findsAtLeastNWidgets(1));
     expect(find.text('100 Main Street'), findsOneWidget);
     expect(find.text('Repeat customer.'), findsOneWidget);
   });

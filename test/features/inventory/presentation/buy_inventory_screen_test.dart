@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hit_the_deck_manager/app/app_routes.dart';
+import 'package:hit_the_deck_manager/features/authentication/domain/models/app_permissions.dart';
+import 'package:hit_the_deck_manager/features/authentication/presentation/providers/app_permissions_provider.dart';
+import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_location_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/data/repositories/in_memory_inventory_repository.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_enums.dart';
+import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_location.dart';
 import 'package:hit_the_deck_manager/features/inventory/domain/models/inventory_item.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/forms/buy_inventory_form_controller.dart';
+import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_location_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/providers/inventory_providers.dart';
 import 'package:hit_the_deck_manager/features/inventory/presentation/buy_inventory_screen.dart';
 import 'package:hit_the_deck_manager/features/contacts/data/repositories/in_memory_contact_repository.dart';
@@ -14,16 +21,33 @@ import 'package:hit_the_deck_manager/features/contacts/presentation/providers/co
 void main() {
   late InMemoryInventoryRepository inventoryRepository;
   late InMemoryContactRepository contactRepository;
+  late InMemoryInventoryLocationRepository locationRepository;
   late ProviderContainer container;
 
   setUp(() {
     inventoryRepository = InMemoryInventoryRepository();
     contactRepository = InMemoryContactRepository();
+    locationRepository = InMemoryInventoryLocationRepository(
+      initialLocations: const [
+        InventoryLocation(id: 'main-rack', name: 'Main Rack'),
+        InventoryLocation(
+          id: 'old-display',
+          name: 'Old Display',
+          active: false,
+        ),
+      ],
+    );
 
     container = ProviderContainer(
       overrides: [
         inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
         contactRepositoryProvider.overrideWithValue(contactRepository),
+        inventoryLocationRepositoryProvider.overrideWithValue(
+          locationRepository,
+        ),
+        currentAppPermissionsProvider.overrideWithValue(
+          const AppPermissions.ownerOrAdmin(),
+        ),
       ],
     );
   });
@@ -32,12 +56,22 @@ void main() {
     container.dispose();
     await inventoryRepository.dispose();
     await contactRepository.dispose();
+    await locationRepository.dispose();
   });
 
   Widget createTestApp() {
     return UncontrolledProviderScope(
       container: container,
       child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+    );
+  }
+
+  Widget createEditTestApp(InventoryItem item) {
+    return UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+      ),
     );
   }
 
@@ -53,6 +87,7 @@ void main() {
     expect(find.text('Brand'), findsOneWidget);
     expect(find.text('Model'), findsOneWidget);
     expect(find.text('Acquisition Type'), findsOneWidget);
+    expect(find.text('Location'), findsOneWidget);
     expect(find.text('Acquisition Value'), findsOneWidget);
     expect(find.text('Condition'), findsOneWidget);
     expect(find.text('Purchase Date'), findsOneWidget);
@@ -82,6 +117,7 @@ void main() {
       find.byKey(const Key('buyInventoryAcquisitionValueField')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('buyInventoryLocationField')), findsOneWidget);
     expect(find.byKey(const Key('buyInventoryConditionField')), findsOneWidget);
     expect(
       find.byKey(const Key('buyInventoryPurchaseDateField')),
@@ -104,6 +140,65 @@ void main() {
     );
     expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
     expect(find.byKey(const Key('buyInventorySubmitButton')), findsOneWidget);
+  });
+  testWidgets('location selector shows active locations and Unassigned', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('buyInventoryLocationField'));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unassigned').last, findsOneWidget);
+    expect(find.text('Main Rack').last, findsOneWidget);
+    expect(find.text('Old Display (Inactive)'), findsNothing);
+  });
+
+  testWidgets('selecting a location updates the inventory form state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('buyInventoryLocationField'));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Rack').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(buyInventoryFormControllerProvider).locationId,
+      'main-rack',
+    );
+  });
+
+  testWidgets('editing preserves an inactive assigned location', (
+    WidgetTester tester,
+  ) async {
+    const existingItem = InventoryItem(
+      id: 'item-with-old-location',
+      inventoryNumber: 'BAT-2608-0200',
+      category: InventoryCategory.bat,
+      brand: 'Rawlings',
+      model: 'Icon',
+      acquisitionType: AcquisitionType.purchased,
+      acquisitionValueCents: 15000,
+      locationId: 'old-display',
+    );
+
+    await tester.pumpWidget(createEditTestApp(existingItem));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('buyInventoryLocationField')), findsOneWidget);
+    expect(find.text('Old Display (Inactive)'), findsOneWidget);
+    expect(
+      container.read(buyInventoryFormControllerProvider).locationId,
+      'old-display',
+    );
   });
   testWidgets('shows glove-specific fields when Glove is selected', (
     WidgetTester tester,
@@ -156,7 +251,7 @@ void main() {
     expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
   });
 
-  testWidgets('shows only common details for Helmet', (
+  testWidgets('shows helmet-specific field when Helmet is selected', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createTestApp());
@@ -171,6 +266,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('buyInventoryNotesField')), findsOneWidget);
+    expect(
+      find.byKey(const Key('buyInventoryHelmetSizeField')),
+      findsOneWidget,
+    );
 
     expect(find.byKey(const Key('buyInventoryLengthField')), findsNothing);
     expect(find.byKey(const Key('buyInventoryGloveSizeField')), findsNothing);
@@ -415,6 +514,56 @@ void main() {
     expect(find.textContaining('was created.'), findsOneWidget);
     expect(find.text('Brand is required.'), findsNothing);
     expect(find.text('Acquisition value is required.'), findsNothing);
+  });
+  testWidgets('new inventory opens its detail screen after save', (
+    WidgetTester tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: AppRoutes.buyInventory,
+      routes: [
+        GoRoute(
+          path: AppRoutes.buyInventory,
+          builder: (context, state) =>
+              const Scaffold(body: BuyInventoryScreen()),
+        ),
+        GoRoute(
+          path: AppRoutes.inventoryDetail,
+          name: AppRouteNames.inventoryDetail,
+          builder: (context, state) => const Scaffold(
+            body: Center(child: Text('New inventory detail destination')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Combat',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '200.00',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('New inventory detail destination'), findsOneWidget);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      isNot(AppRoutes.buyInventory),
+    );
   });
   testWidgets('saves condition and purchase date with inventory item', (
     WidgetTester tester,
@@ -664,6 +813,44 @@ void main() {
     expect(savedItem.category, InventoryCategory.catchersGear);
     expect(savedItem.catchersGearSize, 'Adult');
   });
+  testWidgets('saves helmet size', (WidgetTester tester) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pumpAndSettle();
+
+    final formController = container.read(
+      buyInventoryFormControllerProvider.notifier,
+    );
+
+    formController.setCategory(InventoryCategory.helmet);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryBrandField')),
+      'Easton',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryAcquisitionValueField')),
+      '80.00',
+    );
+    await tester.enterText(
+      find.byKey(const Key('buyInventoryHelmetSizeField')),
+      'L/XL',
+    );
+
+    final submitButton = find.byKey(const Key('buyInventorySubmitButton'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final repository = container.read(inventoryRepositoryProvider);
+    final items = await repository.watchInventory().firstWhere(
+      (inventoryItems) => inventoryItems.isNotEmpty,
+    );
+
+    expect(items.single.category, InventoryCategory.helmet);
+    expect(items.single.helmetSize, 'L/XL');
+  });
+
   testWidgets('calculates drop from bat length and weight', (
     WidgetTester tester,
   ) async {
@@ -973,6 +1160,84 @@ void main() {
     expect(find.text('missing-contact'), findsNothing);
   });
 
+  testWidgets(
+    'ordinary user does not see historical acquisition value while editing',
+    (WidgetTester tester) async {
+      const item = InventoryItem(
+        id: 'item-secure-edit',
+        inventoryNumber: 'BAT-2608-0100',
+        category: InventoryCategory.bat,
+        brand: 'Combat',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 20000,
+      );
+
+      final inventoryRepository = InMemoryInventoryRepository(
+        initialItems: const [item],
+      );
+      final contactRepository = InMemoryContactRepository();
+
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(contactRepository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            contactRepositoryProvider.overrideWithValue(contactRepository),
+            currentAppPermissionsProvider.overrideWithValue(
+              const AppPermissions.none(),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: BuyInventoryScreen(existingItem: item)),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('buyInventoryAcquisitionValueField')),
+        findsNothing,
+      );
+      expect(find.text('Acquisition Value'), findsNothing);
+      expect(find.text('200.00'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'ordinary user still sees acquisition value for new inventory entry',
+    (WidgetTester tester) async {
+      final inventoryRepository = InMemoryInventoryRepository();
+      final contactRepository = InMemoryContactRepository();
+
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(contactRepository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            contactRepositoryProvider.overrideWithValue(contactRepository),
+            currentAppPermissionsProvider.overrideWithValue(
+              const AppPermissions.none(),
+            ),
+          ],
+          child: const MaterialApp(home: Scaffold(body: BuyInventoryScreen())),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('buyInventoryAcquisitionValueField')),
+        findsOneWidget,
+      );
+      expect(find.text('Acquisition Value'), findsOneWidget);
+    },
+  );
+
   testWidgets('shows stored photo removal confirmation while editing', (
     WidgetTester tester,
   ) async {
@@ -1008,7 +1273,11 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Cancel'));
+    final dialogCancel = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Cancel'),
+    );
+    await tester.tap(dialogCancel);
     await tester.pumpAndSettle();
 
     expect(find.text('Remove Photo?'), findsNothing);

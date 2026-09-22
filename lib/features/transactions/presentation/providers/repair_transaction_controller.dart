@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../inventory/domain/models/inventory_enums.dart';
+import '../../../inventory/presentation/providers/inventory_providers.dart';
 import '../../domain/models/repair_transaction.dart';
 import 'transaction_providers.dart';
 
@@ -16,8 +18,20 @@ class RepairTransactionController extends AsyncNotifier<void> {
     state = const AsyncLoading();
 
     final result = await AsyncValue.guard(() async {
-      final repository = ref.read(transactionRepositoryProvider);
+      final inventoryRepository = ref.read(inventoryRepositoryProvider);
+      final inventoryItem = await inventoryRepository.getInventoryItem(
+        repair.inventoryItemId,
+      );
 
+      if (inventoryItem?.status == InventoryStatus.sold ||
+          inventoryItem?.status == InventoryStatus.disposed) {
+        throw StateError(
+          '${inventoryItem!.status.label} inventory is no longer in '
+          'possession and cannot receive a new repair.',
+        );
+      }
+
+      final repository = ref.read(transactionRepositoryProvider);
       final savedRepair = await repository.createRepair(repair);
 
       ref.invalidate(repairTransactionProvider(savedRepair.id!));

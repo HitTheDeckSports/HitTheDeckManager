@@ -33,7 +33,12 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
   }
 
   void setAcquisitionType(AcquisitionType acquisitionType) {
-    state = state.copyWith(acquisitionType: acquisitionType);
+    state = state.copyWith(
+      acquisitionType: acquisitionType,
+      acquisitionValue: acquisitionType == AcquisitionType.consignment
+          ? ''
+          : state.acquisitionValue,
+    );
   }
 
   void setAcquisitionValue(String acquisitionValue) {
@@ -62,6 +67,10 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
 
   void setSellerContactId(String? sellerContactId) {
     state = state.copyWith(sellerContactId: sellerContactId);
+  }
+
+  void setLocationId(String? locationId) {
+    state = state.copyWith(locationId: locationId);
   }
 
   void setNotes(String notes) {
@@ -163,6 +172,10 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
     state = state.copyWith(catchersGearSize: catchersGearSize);
   }
 
+  void setHelmetSize(String helmetSize) {
+    state = state.copyWith(helmetSize: helmetSize);
+  }
+
   void setPhotoUrls(List<String> photoUrls) {
     state = state.copyWith(photoUrls: photoUrls);
   }
@@ -187,6 +200,7 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
 
   Future<InventoryItem?> submitUpdate(
     InventoryItem existingItem, {
+    bool preserveAcquisitionValue = false,
     bool resetAfterSave = true,
   }) async {
     final editedItem = state.toInventoryItem();
@@ -199,6 +213,9 @@ class BuyInventoryFormController extends Notifier<BuyInventoryFormState> {
       id: existingItem.id,
       inventoryNumber: existingItem.inventoryNumber,
       status: existingItem.status,
+      acquisitionValueCents: preserveAcquisitionValue
+          ? existingItem.acquisitionValueCents
+          : editedItem.acquisitionValueCents,
     );
 
     final updatedItem = await ref

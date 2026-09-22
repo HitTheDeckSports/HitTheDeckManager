@@ -5,6 +5,7 @@ import 'package:hit_the_deck_manager/features/reports/application/report_date_ra
 import 'package:hit_the_deck_manager/features/reports/application/reports_snapshot.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/deal_providers.dart';
 import 'package:hit_the_deck_manager/features/transactions/presentation/providers/transaction_providers.dart';
+import 'package:hit_the_deck_manager/features/transactions/presentation/providers/warranty_replacement_providers.dart';
 
 final reportAsOfProvider = Provider<DateTime>((ref) => DateTime.now());
 
@@ -38,6 +39,9 @@ final reportsSnapshotProvider = Provider<AsyncValue<ReportsSnapshot>>((ref) {
   final inventoryAsync = ref.watch(inventoryItemsProvider);
   final salesAsync = ref.watch(saleTransactionsProvider);
   final repairsAsync = ref.watch(repairTransactionsProvider);
+  final tradesAsync = ref.watch(tradeTransactionsProvider);
+  final disposalsAsync = ref.watch(disposalTransactionsProvider);
+  final warrantyAsync = ref.watch(warrantyReplacementDealsProvider);
   final dealsAsync = ref.watch(dealsProvider);
   final asOf = ref.watch(reportAsOfProvider);
   final selection = ref.watch(reportDateRangeSelectionProvider);
@@ -53,18 +57,34 @@ final reportsSnapshotProvider = Provider<AsyncValue<ReportsSnapshot>>((ref) {
       data: (sales) => repairsAsync.when(
         loading: () => const AsyncValue.loading(),
         error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
-        data: (repairs) => dealsAsync.when(
+        data: (repairs) => tradesAsync.when(
           loading: () => const AsyncValue.loading(),
           error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
-          data: (deals) => AsyncValue.data(
-            ReportsSnapshot.calculate(
-              inventoryItems: inventoryItems,
-              sales: sales,
-              repairs: repairs,
-              deals: deals,
-              asOf: asOf,
-              dateRange: dateRange,
-              dealMaxDepth: maxDepth,
+          data: (trades) => disposalsAsync.when(
+            loading: () => const AsyncValue.loading(),
+            error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+            data: (disposals) => warrantyAsync.when(
+              loading: () => const AsyncValue.loading(),
+              error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+              data: (warrantyReplacements) => dealsAsync.when(
+                loading: () => const AsyncValue.loading(),
+                error: (error, stackTrace) =>
+                    AsyncValue.error(error, stackTrace),
+                data: (deals) => AsyncValue.data(
+                  ReportsSnapshot.calculate(
+                    inventoryItems: inventoryItems,
+                    sales: sales,
+                    repairs: repairs,
+                    trades: trades,
+                    disposals: disposals,
+                    warrantyReplacements: warrantyReplacements,
+                    deals: deals,
+                    asOf: asOf,
+                    dateRange: dateRange,
+                    dealMaxDepth: maxDepth,
+                  ),
+                ),
+              ),
             ),
           ),
         ),

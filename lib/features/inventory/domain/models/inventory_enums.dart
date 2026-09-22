@@ -57,7 +57,7 @@ extension InventoryStatusLabel on InventoryStatus {
     return switch (this) {
       InventoryStatus.available => 'Available',
       InventoryStatus.sold => 'Sold',
-      InventoryStatus.inactive => 'Inactive',
+      InventoryStatus.inactive => 'On Hold',
       InventoryStatus.broken => 'Broken',
       InventoryStatus.disposed => 'Disposed',
     };

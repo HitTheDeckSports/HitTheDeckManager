@@ -48,10 +48,11 @@ void main() {
     status: InventoryStatus.available,
   );
 
-  const deal = Deal(
+  final deal = Deal(
     id: 'deal-a',
     parentSaleTransactionId: 'sale-a',
-    childInventoryItemIds: ['bat-b'],
+    childInventoryItemIds: const ['bat-b'],
+    createdAt: DateTime(2026, 8, 6),
   );
 
   testWidgets('parent sale displays View Deal and opens Deal route', (
@@ -63,7 +64,7 @@ void main() {
     final transactionRepository = InMemoryTransactionRepository(
       initialSales: [parentSale],
     );
-    final dealRepository = InMemoryDealRepository(initialDeals: const [deal]);
+    final dealRepository = InMemoryDealRepository(initialDeals: [deal]);
 
     final router = GoRouter(
       initialLocation: '/transactions/sale-a',
@@ -117,68 +118,76 @@ void main() {
     expect(find.text('Deal route: deal-a'), findsOneWidget);
   });
 
-  testWidgets('child inventory displays View Deal and opens Deal route', (
-    tester,
-  ) async {
-    final inventoryRepository = InMemoryInventoryRepository(
-      initialItems: const [parentItem, childItem],
-    );
-    final transactionRepository = InMemoryTransactionRepository(
-      initialSales: [parentSale],
-    );
-    final dealRepository = InMemoryDealRepository(initialDeals: const [deal]);
+  testWidgets(
+    'child inventory displays linked Deal number and opens Deal route',
+    (tester) async {
+      final inventoryRepository = InMemoryInventoryRepository(
+        initialItems: const [parentItem, childItem],
+      );
+      final transactionRepository = InMemoryTransactionRepository(
+        initialSales: [parentSale],
+      );
+      final dealRepository = InMemoryDealRepository(initialDeals: [deal]);
 
-    final router = GoRouter(
-      initialLocation: '/inventory/bat-b',
-      routes: [
-        GoRoute(
-          path: AppRoutes.inventoryDetail,
-          name: AppRouteNames.inventoryDetail,
-          builder: (context, state) => Scaffold(
-            body: InventoryItemDetailScreen(
-              itemId: state.pathParameters['itemId']!,
+      final router = GoRouter(
+        initialLocation: '/inventory/bat-b',
+        routes: [
+          GoRoute(
+            path: AppRoutes.inventoryDetail,
+            name: AppRouteNames.inventoryDetail,
+            builder: (context, state) => Scaffold(
+              body: InventoryItemDetailScreen(
+                itemId: state.pathParameters['itemId']!,
+              ),
             ),
           ),
-        ),
-        GoRoute(
-          path: AppRoutes.dealDetail,
-          name: AppRouteNames.dealDetail,
-          builder: (context, state) => Scaffold(
-            body: Text('Deal route: ${state.pathParameters['dealId']}'),
+          GoRoute(
+            path: AppRoutes.dealDetail,
+            name: AppRouteNames.dealDetail,
+            builder: (context, state) => Scaffold(
+              body: Text('Deal route: ${state.pathParameters['dealId']}'),
+            ),
           ),
-        ),
-      ],
-    );
-
-    addTearDown(inventoryRepository.dispose);
-    addTearDown(transactionRepository.dispose);
-    addTearDown(dealRepository.dispose);
-    addTearDown(router.dispose);
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
-          transactionRepositoryProvider.overrideWithValue(
-            transactionRepository,
-          ),
-          dealRepositoryProvider.overrideWithValue(dealRepository),
         ],
-        child: MaterialApp.router(routerConfig: router),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      addTearDown(inventoryRepository.dispose);
+      addTearDown(transactionRepository.dispose);
+      addTearDown(dealRepository.dispose);
+      addTearDown(router.dispose);
 
-    final button = find.byKey(const Key('inventoryViewDealButton'));
-    expect(button, findsOneWidget);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
+            transactionRepositoryProvider.overrideWithValue(
+              transactionRepository,
+            ),
+            dealRepositoryProvider.overrideWithValue(dealRepository),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
 
-    await tester.ensureVisible(button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(find.text('Deal route: deal-a'), findsOneWidget);
-  });
+      final dealSection = find.byKey(const Key('inventoryDealSection'));
+      expect(dealSection, findsOneWidget);
+      await tester.ensureVisible(dealSection);
+      await tester.pumpAndSettle();
+
+      final dealLink = find.byKey(const Key('inventoryDealNumberLink'));
+      expect(dealLink, findsOneWidget);
+      expect(find.text('Deal #2026-001'), findsOneWidget);
+      expect(find.text('View Deal'), findsNothing);
+
+      await tester.ensureVisible(dealLink);
+      await tester.tap(dealLink);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deal route: deal-a'), findsOneWidget);
+    },
+  );
 
   testWidgets('ordinary sale does not display View Deal', (tester) async {
     final inventoryRepository = InMemoryInventoryRepository(

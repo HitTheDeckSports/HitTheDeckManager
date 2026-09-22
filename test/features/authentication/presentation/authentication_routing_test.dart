@@ -6,19 +6,34 @@ import 'package:hit_the_deck_manager/features/authentication/domain/models/auth_
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authenticated_session.dart';
 import 'package:hit_the_deck_manager/features/authentication/domain/models/authorized_user.dart';
 import 'package:hit_the_deck_manager/features/authentication/presentation/providers/authorization_providers.dart';
+import 'package:hit_the_deck_manager/features/dashboard/application/dashboard_metrics.dart';
+import 'package:hit_the_deck_manager/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:hit_the_deck_manager/features/settings/presentation/settings_screen.dart';
 
-const testAuthUser = AuthUser(
-  id: 'test-user-id',
-  email: 'user@example.com',
-  displayName: 'Test User',
+const regressionTestDashboardMetrics = DashboardMetrics(
+  totalRevenueCents: 50000,
+  totalCostCents: 30000,
+  totalProfitCents: 20000,
+  grossMargin: 0.40,
+  openInventoryValueCents: 29000,
+  openInventoryCostCents: 18000,
+  openPotentialProfitCents: 11000,
+  inventoryCount: 3,
+  unitsSold: 7,
+  availableItems: 12,
+  averageDaysInInventory: 26,
+  brokenItems: 2,
+  dateRangeLabel: 'Month to Date',
 );
-
-const regularSession = AuthenticatedSession(
-  user: testAuthUser,
+const ownerSession = AuthenticatedSession(
+  user: AuthUser(
+    id: 'owner-id',
+    email: 'sales.hitthedecksports@gmail.com',
+    displayName: 'Owner',
+  ),
   authorization: AuthorizedUser(
-    email: 'user@example.com',
-    role: AuthorizedUserRole.user,
+    email: 'sales.hitthedecksports@gmail.com',
+    role: AuthorizedUserRole.owner,
     active: true,
   ),
 );
@@ -40,6 +55,9 @@ Widget buildAppWithSession(AuthenticatedSession? session) {
   return ProviderScope(
     overrides: [
       authenticatedSessionProvider.overrideWith((ref) => Stream.value(session)),
+      dashboardMetricsProvider.overrideWithValue(
+        const AsyncValue.data(regressionTestDashboardMetrics),
+      ),
     ],
     child: const HitTheDeckApp(),
   );
@@ -73,9 +91,7 @@ void main() {
       expect(find.text('Dashboard'), findsNothing);
     });
 
-    testWidgets('authorized user is allowed into protected home', (
-      tester,
-    ) async {
+    testWidgets('Admin is allowed into protected home', (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
 
@@ -84,47 +100,40 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      await tester.pumpWidget(buildAppWithSession(regularSession));
+      await tester.pumpWidget(buildAppWithSession(adminSession));
       await tester.pumpAndSettle();
 
       expect(find.text('Dashboard'), findsWidgets);
-      expect(find.text('Add Inventory'), findsOneWidget);
+      expect(
+        find.byKey(const Key('dashboardInventoryCountCard')),
+        findsOneWidget,
+      );
       expect(find.text('Sign in with Google'), findsNothing);
     });
   });
 
   group('Settings role visibility', () {
-    testWidgets('admin sees User Access administration option', (tester) async {
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1.0;
+    for (final entry in <String, AuthenticatedSession>{
+      'Owner': ownerSession,
+      'Admin': adminSession,
+    }.entries) {
+      testWidgets('${entry.key} sees User Access administration option', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(1200, 800);
+        tester.view.devicePixelRatio = 1.0;
 
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(buildSettingsWithSession(entry.value));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Administration'), findsOneWidget);
+        expect(find.text('User Access'), findsOneWidget);
       });
-
-      await tester.pumpWidget(buildSettingsWithSession(adminSession));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Administration'), findsOneWidget);
-      expect(find.text('User Access'), findsOneWidget);
-    });
-
-    testWidgets('normal user does not see User Access option', (tester) async {
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1.0;
-
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(buildSettingsWithSession(regularSession));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Administration'), findsNothing);
-      expect(find.text('User Access'), findsNothing);
-      expect(find.text('Preferences'), findsOneWidget);
-    });
+    }
   });
 }

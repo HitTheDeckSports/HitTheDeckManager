@@ -28,4 +28,40 @@ void main() {
 
     expect(deal.isValid, isFalse);
   });
+
+  test('legacy Deal uses direct children as effective lineage', () {
+    const deal = Deal(
+      parentSaleTransactionId: 'sale-a',
+      childInventoryItemIds: ['bat-b'],
+    );
+
+    expect(deal.lineageInventoryItemIds, isEmpty);
+    expect(deal.effectiveLineageInventoryItemIds, const ['bat-b']);
+    expect(deal.isValid, isTrue);
+  });
+
+  test('recursive lineage may contain descendants beyond direct children', () {
+    const deal = Deal(
+      parentSaleTransactionId: 'sale-a',
+      childInventoryItemIds: ['bat-b'],
+      lineageInventoryItemIds: ['bat-b', 'bat-c', 'bat-d'],
+    );
+
+    expect(deal.effectiveLineageInventoryItemIds, const [
+      'bat-b',
+      'bat-c',
+      'bat-d',
+    ]);
+    expect(deal.isValid, isTrue);
+  });
+
+  test('lineage must retain every direct child', () {
+    const deal = Deal(
+      parentSaleTransactionId: 'sale-a',
+      childInventoryItemIds: ['bat-b', 'bat-c'],
+      lineageInventoryItemIds: ['bat-b', 'bat-d'],
+    );
+
+    expect(deal.isValid, isFalse);
+  });
 }

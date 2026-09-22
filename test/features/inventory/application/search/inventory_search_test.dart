@@ -69,7 +69,7 @@ void main() {
     });
 
     test('matches category and status', () {
-      final results = InventorySearch.filter(items, 'glove inactive');
+      final results = InventorySearch.filter(items, 'glove on hold');
       expect(results, hasLength(1));
       expect(results.single.id, 'item-2');
     });
@@ -90,6 +90,22 @@ void main() {
       final results = InventorySearch.filter(items, '11.5');
       expect(results, hasLength(1));
       expect(results.single.id, 'item-2');
+    });
+
+    test('matches helmet size', () {
+      const helmet = InventoryItem(
+        id: 'item-helmet',
+        inventoryNumber: 'HLM-2608-0004',
+        category: InventoryCategory.helmet,
+        brand: 'Easton',
+        acquisitionType: AcquisitionType.purchased,
+        acquisitionValueCents: 8000,
+        helmetSize: 'L/XL',
+      );
+
+      final results = InventorySearch.filter([helmet], 'l/xl');
+
+      expect(results.single.id, 'item-helmet');
     });
 
     test('requires all query terms to match', () {

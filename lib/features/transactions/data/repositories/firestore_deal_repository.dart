@@ -114,6 +114,44 @@ class FirestoreDealRepository implements DealRepository {
   }
 
   @override
+  Future<Deal?> getDealForLineageInventoryItem(String inventoryItemId) async {
+    final normalizedId = inventoryItemId.trim();
+
+    if (normalizedId.isEmpty) {
+      throw const ValidationException(
+        'A Deal lineage inventory item ID is required.',
+      );
+    }
+
+    try {
+      final lineageSnapshot = await _deals
+          .where('lineageInventoryItemIds', arrayContains: normalizedId)
+          .limit(1)
+          .get();
+
+      if (lineageSnapshot.docs.isNotEmpty) {
+        return FirestoreDealMapper.fromFirestore(lineageSnapshot.docs.first);
+      }
+
+      final legacySnapshot = await _deals
+          .where('childInventoryItemIds', arrayContains: normalizedId)
+          .limit(1)
+          .get();
+
+      if (legacySnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      return FirestoreDealMapper.fromFirestore(legacySnapshot.docs.first);
+    } catch (error) {
+      throw _mapError(
+        error,
+        'Unable to load the Deal lineage for this inventory item.',
+      );
+    }
+  }
+
+  @override
   Future<Deal> createDeal(Deal deal) async {
     final normalized = FirestoreDealMapper.normalize(deal);
 
@@ -137,12 +175,12 @@ class FirestoreDealRepository implements DealRepository {
       );
     }
 
-    for (final childId in normalized.childInventoryItemIds) {
-      final existingChild = await getDealForChildInventoryItem(childId);
+    for (final lineageId in normalized.lineageInventoryItemIds) {
+      final existingLineage = await getDealForLineageInventoryItem(lineageId);
 
-      if (existingChild != null) {
+      if (existingLineage != null) {
         throw DuplicateException(
-          'Inventory item $childId already belongs to another Deal.',
+          'Inventory item $lineageId already belongs to another Deal.',
         );
       }
     }
@@ -192,14 +230,12 @@ class FirestoreDealRepository implements DealRepository {
       );
     }
 
-    for (final childId in normalized.childInventoryItemIds) {
-      final childMatches = await _deals
-          .where('childInventoryItemIds', arrayContains: childId)
-          .get();
+    for (final lineageId in normalized.lineageInventoryItemIds) {
+      final lineageMatch = await getDealForLineageInventoryItem(lineageId);
 
-      if (childMatches.docs.any((document) => document.id != id)) {
+      if (lineageMatch != null && lineageMatch.id != id) {
         throw DuplicateException(
-          'Inventory item $childId already belongs to another Deal.',
+          'Inventory item $lineageId already belongs to another Deal.',
         );
       }
     }

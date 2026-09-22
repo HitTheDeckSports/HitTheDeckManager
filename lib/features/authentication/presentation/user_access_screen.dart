@@ -32,7 +32,7 @@ class UserAccessScreen extends ConsumerWidget {
             ? null
             : () => _showAddUserDialog(context, ref),
         icon: const Icon(Icons.person_add),
-        label: const Text('Add User'),
+        label: const Text('Add Admin'),
       ),
       body: usersState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -59,9 +59,13 @@ class UserAccessScreen extends ConsumerWidget {
 
               return _AuthorizedUserTile(
                 user: user,
+                canManageProfile:
+                    session.authorization.isOwner &&
+                    user.role == AuthorizedUserRole.admin,
                 isBusy: actionState.isLoading,
                 onDisable: () => _confirmDisableUser(context, ref, user),
                 onRestore: () => _restoreUser(context, ref, user),
+                onRemove: () => _confirmRemoveUser(context, ref, user),
               );
             },
           );
@@ -71,43 +75,14 @@ class UserAccessScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddUserDialog(BuildContext context, WidgetRef ref) async {
-    final emailController = TextEditingController();
-
-    final shouldAdd = await showDialog<bool>(
+    final email = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add Authorized User'),
-          content: TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Google account email',
-              hintText: 'name@example.com',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => const _AddAdminDialog(),
     );
 
-    if (shouldAdd != true) {
-      emailController.dispose();
+    if (email == null) {
       return;
     }
-
-    final email = emailController.text;
-    emailController.dispose();
 
     try {
       await ref.read(userAccessControllerProvider.notifier).addUser(email);
@@ -117,7 +92,7 @@ class UserAccessScreen extends ConsumerWidget {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Access granted to ${email.trim()}.')),
+        SnackBar(content: Text('Admin access granted to ${email.trim()}.')),
       );
     } on AppException catch (error) {
       if (!context.mounted) {
@@ -204,27 +179,138 @@ class UserAccessScreen extends ConsumerWidget {
       ).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
+
+  Future<void> _confirmRemoveUser(
+    BuildContext context,
+    WidgetRef ref,
+    AuthorizedUser user,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Remove Admin Profile?'),
+          content: Text(
+            '${user.email} will lose access and the authorization profile '
+            'will be permanently removed. Historical business records are '
+            'not deleted.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('confirmRemoveAdminButton'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(userAccessControllerProvider.notifier)
+          .removeUser(user.email);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Admin profile removed for ${user.email}.')),
+      );
+    } on AppException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
 }
+
+class _AddAdminDialog extends StatefulWidget {
+  const _AddAdminDialog();
+
+  @override
+  State<_AddAdminDialog> createState() => _AddAdminDialogState();
+}
+
+class _AddAdminDialogState extends State<_AddAdminDialog> {
+  late final TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Admin Profile'),
+      content: TextField(
+        controller: _emailController,
+        keyboardType: TextInputType.emailAddress,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Google account email',
+          hintText: 'name@example.com',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_emailController.text),
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+enum _AdminProfileAction { disable, restore, remove }
 
 class _AuthorizedUserTile extends StatelessWidget {
   const _AuthorizedUserTile({
     required this.user,
+    required this.canManageProfile,
     required this.isBusy,
     required this.onDisable,
     required this.onRestore,
+    required this.onRemove,
   });
 
   final AuthorizedUser user;
+  final bool canManageProfile;
   final bool isBusy;
   final VoidCallback onDisable;
   final VoidCallback onRestore;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final roleLabel = switch (user.role) {
       AuthorizedUserRole.owner => 'Owner',
       AuthorizedUserRole.admin => 'Admin',
-      AuthorizedUserRole.user => 'User',
     };
 
     final statusLabel = user.active ? 'Active' : 'Disabled';
@@ -232,7 +318,6 @@ class _AuthorizedUserTile extends StatelessWidget {
     final icon = switch (user.role) {
       AuthorizedUserRole.owner => Icons.admin_panel_settings,
       AuthorizedUserRole.admin => Icons.manage_accounts,
-      AuthorizedUserRole.user => Icons.person,
     };
 
     return ListTile(
@@ -241,16 +326,42 @@ class _AuthorizedUserTile extends StatelessWidget {
       subtitle: Text('$roleLabel • $statusLabel'),
       trailing: user.isOwner
           ? const Chip(label: Text('Owner'))
-          : user.role == AuthorizedUserRole.admin
+          : !canManageProfile
           ? const Chip(label: Text('Admin'))
-          : user.active
-          ? OutlinedButton(
-              onPressed: isBusy ? null : onDisable,
-              child: const Text('Disable'),
-            )
-          : FilledButton.tonal(
-              onPressed: isBusy ? null : onRestore,
-              child: const Text('Restore'),
+          : PopupMenuButton<_AdminProfileAction>(
+              key: ValueKey('adminProfileMenu-${user.email}'),
+              enabled: !isBusy,
+              tooltip: 'Manage Admin profile',
+              onSelected: (action) {
+                switch (action) {
+                  case _AdminProfileAction.disable:
+                    onDisable();
+                    break;
+                  case _AdminProfileAction.restore:
+                    onRestore();
+                    break;
+                  case _AdminProfileAction.remove:
+                    onRemove();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                if (user.active)
+                  const PopupMenuItem(
+                    value: _AdminProfileAction.disable,
+                    child: Text('Disable Access'),
+                  )
+                else
+                  const PopupMenuItem(
+                    value: _AdminProfileAction.restore,
+                    child: Text('Restore Access'),
+                  ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: _AdminProfileAction.remove,
+                  child: Text('Remove Profile'),
+                ),
+              ],
             ),
     );
   }
