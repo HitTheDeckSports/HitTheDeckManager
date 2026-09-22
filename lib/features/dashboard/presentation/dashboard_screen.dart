@@ -124,10 +124,10 @@ class _DashboardContent extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         AppSurfaceCard(
           key: const Key('dashboardQuickStatsPanel'),
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -191,7 +191,7 @@ class _DashboardContent extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 10),
         _DashboardAction(
           key: const Key('dashboardAddInventoryButton'),
           backgroundColor: AppTheme.primaryRed,

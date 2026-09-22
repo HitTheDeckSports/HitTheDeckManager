@@ -107,6 +107,30 @@ void main() {
     );
   });
 
+  testWidgets('Dashboard compact spacing keeps lower sections tight', (
+    WidgetTester tester,
+  ) async {
+    final router = _createRouter();
+    addTearDown(router.dispose);
+
+    await _pumpDashboard(tester, router: router);
+
+    final quickStatsTop = tester
+        .getTopLeft(find.byKey(const Key('dashboardQuickStatsPanel')))
+        .dy;
+    final overviewBottom = tester
+        .getBottomLeft(find.byKey(const Key('dashboardPotentialProfitCard')))
+        .dy;
+    final addInventoryTop = tester
+        .getTopLeft(find.byKey(const Key('dashboardAddInventoryButton')))
+        .dy;
+    final quickStatsBottom = tester
+        .getBottomLeft(find.byKey(const Key('dashboardQuickStatsPanel')))
+        .dy;
+
+    expect(quickStatsTop - overviewBottom, 10);
+    expect(addInventoryTop - quickStatsBottom, 10);
+  });
   testWidgets('Dashboard quick stats remain one four-column row', (
     WidgetTester tester,
   ) async {
