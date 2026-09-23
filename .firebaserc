@@ -1,6 +1,8 @@
 {
   "projects": {
-    "default": "hit-the-deck-manager"
+    "default": "hit-the-deck-manager",
+    "dev": "hit-the-deck-manager",
+    "prod": "hit-the-deck-manager-prod"
   },
   "targets": {},
   "etags": {}

@@ -9,21 +9,30 @@ Hit the Deck Manager uses compile-time environment selection.
 
 There is intentionally no in-app environment switch.
 
-## Development
+## Firebase project aliases
 
-Development is the default:
+```text
+default -> hit-the-deck-manager
+dev     -> hit-the-deck-manager
+prod    -> hit-the-deck-manager-prod
+```
+
+The Development project remains the default. Production commands should use an
+explicit project or the `prod` alias.
+
+## Development
 
 ```powershell
 flutter run
 ```
 
-Equivalent explicit command:
+is equivalent to:
 
 ```powershell
 flutter run --dart-define=APP_ENV=development
 ```
 
-Development currently resolves to Firebase project:
+Development resolves to:
 
 ```text
 hit-the-deck-manager
@@ -37,12 +46,36 @@ Production builds must be explicit:
 flutter run --dart-define=APP_ENV=production
 ```
 
-During Phase 7A1, Production intentionally fails closed because Production
-Firebase credentials have not yet been installed. This prevents a production
-build from silently falling back to Development Firebase.
+Production resolves to:
 
-Phase 7A2/7B will install the actual Production Firebase options.
+```text
+hit-the-deck-manager-prod
+```
+
+Registered V1.0 Production client apps:
+
+```text
+Android
+  Package: com.hitthedecksports.manager
+  App ID: 1:738646463284:android:0088c02725de6d375fcb61
+
+Windows (Firebase Web configuration)
+  App ID: 1:738646463284:web:d38987d805fbb0dc5fcb61
+```
+
+Android and Windows are the V1.0 release targets. iOS/macOS Production Firebase
+registration is intentionally deferred.
+
+## Native Android configuration
+
+This checkpoint does not replace `android/app/google-services.json`.
+Development native Android configuration remains untouched until the dedicated
+Android environment/signing checkpoint.
+
+The Dart bootstrap uses explicit `FirebaseOptions`, so `APP_ENV=production`
+resolves application initialization to the Production Firebase project.
 
 ## Safety rule
 
-A Production build must never silently use Development Firebase.
+A Production build must never silently use Development Firebase, and normal
+Development builds must continue to use the Development project.
