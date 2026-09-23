@@ -42,11 +42,7 @@
           "client_type": 3
         }
       ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyC1yldHBVyOicu3nFZm-LkXN7Hui_rUJu4"
-        }
-      ],
+      "api_key": [{"current_key": "AIzaSyC1yldHBVyOicu3nFZm-LkXN7Hui_rUJu4"}],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
@@ -57,9 +53,7 @@
             {
               "client_id": "88697282371-k2lo4uvvu37dhlsl7hd8jli1gvbp0ors.apps.googleusercontent.com",
               "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.hitTheDeckManager"
-              }
+              "ios_info": {"bundle_id": "com.example.hitTheDeckManager"}
             }
           ]
         }
