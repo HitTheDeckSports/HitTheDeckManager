@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hit_the_deck_manager/shared/media/photo_compression_service.dart';
 import 'package:hit_the_deck_manager/shared/media/photo_storage_service.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   group('PhotoStoragePaths', () {
@@ -62,14 +66,76 @@ void main() {
       expect(downloadUrl, contains('firebasestorage.googleapis.com'));
     });
   });
+
   group('photo upload constraints', () {
     test('Storage limit remains 5 MB', () {
       expect(FirebasePhotoStorageService.maxUploadBytes, 5 * 1024 * 1024);
     });
 
-    test('compression defaults remain suitable for mobile uploads', () {
+    test('compression defaults remain aligned across platforms', () {
       expect(NativePhotoCompressionService.maxDimensionPixels, 1600);
       expect(NativePhotoCompressionService.jpegQuality, 82);
+      expect(WindowsPhotoCompressionService.maxDimensionPixels, 1600);
+      expect(WindowsPhotoCompressionService.jpegQuality, 82);
+    });
+  });
+
+  group('WindowsPhotoCompressionService', () {
+    test('converts PNG to JPEG', () async {
+      final source = img.Image(width: 40, height: 30);
+      img.fill(source, color: img.ColorRgb8(20, 80, 140));
+      final file = XFile.fromData(
+        Uint8List.fromList(img.encodePng(source)),
+        mimeType: 'image/png',
+        name: 'test.png',
+      );
+
+      const service = WindowsPhotoCompressionService();
+      final result = await service.compressPhoto(file);
+      final decoded = img.decodeJpg(result);
+
+      expect(result, isNotEmpty);
+      expect(decoded, isNotNull);
+      expect(decoded!.width, 40);
+      expect(decoded.height, 30);
+    });
+
+    test('resizes longest side to 1600 pixels', () async {
+      final source = img.Image(width: 2400, height: 1200);
+      img.fill(source, color: img.ColorRgb8(120, 40, 40));
+      final file = XFile.fromData(
+        Uint8List.fromList(img.encodePng(source)),
+        mimeType: 'image/png',
+        name: 'large.png',
+      );
+
+      const service = WindowsPhotoCompressionService();
+      final result = await service.compressPhoto(file);
+      final decoded = img.decodeJpg(result);
+
+      expect(decoded, isNotNull);
+      expect(decoded!.width, 1600);
+      expect(decoded.height, 800);
+    });
+
+    test('rejects undecodable bytes', () async {
+      final file = XFile.fromData(
+        Uint8List.fromList(<int>[1, 2, 3, 4]),
+        name: 'invalid.bin',
+      );
+
+      const service = WindowsPhotoCompressionService();
+
+      await expectLater(
+        service.compressPhoto(file),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('could not be decoded'),
+          ),
+        ),
+      );
     });
   });
 }

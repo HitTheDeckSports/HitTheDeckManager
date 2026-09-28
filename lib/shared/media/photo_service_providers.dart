@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'photo_compression_service.dart';
@@ -11,6 +12,10 @@ final photoPickerServiceProvider = Provider<PhotoPickerService>((ref) {
 final photoCompressionServiceProvider = Provider<PhotoCompressionService>((
   ref,
 ) {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    return const WindowsPhotoCompressionService();
+  }
+
   return const NativePhotoCompressionService();
 });
 
